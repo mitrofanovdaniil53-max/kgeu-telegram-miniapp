@@ -149,13 +149,17 @@ function kgeuSetNote(subject, value) {
       --top-border: rgba(255,255,255,.08);
     }
     html.tg-light {
-      --bg: var(--tg-bg, #f4f6f9);
-      --card: var(--tg-sec, #ffffff);
-      --text: var(--tg-text, #0f172a);
-      --muted: var(--tg-hint, #64748b);
-      --border: #e2e8f0;
-      --accent: var(--tg-btn, #1557d6);
+      --bg: #f5f7fa;
+      --bg2: #eef2f7;
+      --card: #ffffff;
+      --text: #101828;
+      --muted: #667085;
+      --border: #e4e7ec;
+      --accent: #1557d6;
       --accent-soft: rgba(21, 87, 214, 0.10);
+      --lek: #1557d6; --pr: #16a085; --lab: #7c3aed; --other: #98a2b3;
+      --warn: #d97706; --ok: #35c98a; --danger: #dc2626; --replace: #ea580c;
+      --shadow: 0 8px 24px rgba(16, 24, 40, 0.06);
       --top-bg: #111827;
       --top-text: #ffffff;
       --top-muted: #aeb8c8;
@@ -357,6 +361,14 @@ function kgeuSetNote(subject, value) {
       backdrop-filter: blur(18px) saturate(150%);
     }
     .tabs::-webkit-scrollbar { display: none; }
+    .tabs {
+      cursor: grab;
+      user-select: none;
+      touch-action: pan-x;
+      overscroll-behavior-x: contain;
+    }
+    .tabs.dragging { cursor: grabbing; scroll-behavior: auto; }
+    .tabs .tab { user-select: none; }
     .tab {
       border: 0; border-radius: 17px;
       min-height: 42px;
@@ -785,6 +797,7 @@ function kgeuSetNote(subject, value) {
     .changes-badge { display:inline-flex; min-width:18px; height:18px; align-items:center; justify-content:center; padding:0 5px; border-radius:999px; background:var(--replace); color:#fff; font-size:10px; font-weight:800; margin-left:5px; }
   
     .kgeu-footer {
+      position:relative;
       margin: 30px 14px 4px;
       padding: 18px 4px 4px;
       border-top: 1px solid var(--border);
@@ -794,7 +807,9 @@ function kgeuSetNote(subject, value) {
       gap: 16px;
       color: var(--muted);
     }
-    .kgeu-footer-main { display:flex; align-items:center; gap:10px; min-width:0; }
+    .kgeu-footer-main { display:flex; align-items:center; justify-content:flex-start; gap:10px; min-width:0; flex:1; text-align:left; padding-right:54px; }
+    .kgeu-footer-main > div { align-self:center; }
+    .kgeu-logo-img { display:block; width:42px; height:42px; object-fit:contain; flex-shrink:0; position:absolute; left:50%; top:18px; transform:translateX(-50%); }
     .kgeu-footer-icon { font-size:28px; color:var(--text); line-height:1; }
     .kgeu-footer-main strong { display:block; color:var(--text); font-size:14px; }
     .kgeu-footer-main span { display:block; margin-top:2px; font-size:10px; line-height:1.3; }
@@ -1001,7 +1016,7 @@ function kgeuSetNote(subject, value) {
       .top-actions { gap:3px; }
     }
 
-/* ===== KGEU Student Service v3 ===== */
+/* ===== KGEU Student Service v6 ===== */
 .service-page{display:flex;flex-direction:column;gap:14px;padding-bottom:24px}
 .service-hero{border-radius:24px;padding:18px;background:var(--card);border:1px solid var(--border);box-shadow:0 8px 24px rgba(16,24,40,.06)}
 .service-kicker{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
@@ -1070,9 +1085,11 @@ html.tg-light .service-launch-btn{background:#fff;color:#101828;border-color:#e4
   position:absolute !important;
   right:8px !important;
   bottom:8px !important;
-  width:24px !important;height:24px !important;
+  width:22px !important;height:22px !important;
   display:flex !important;align-items:center !important;justify-content:center !important;
   margin:0 !important;padding:0 !important;
+  top:50% !important; right:0 !important; bottom:auto !important;
+  transform:translateY(-50%) !important;
 }
 .kgeu-note-icon{
   width:24px !important;height:24px !important;
@@ -1082,9 +1099,21 @@ html.tg-light .service-launch-btn{background:#fff;color:#101828;border-color:#e4
   font-size:15px !important;
 }
 /* If the original card has a metadata/footer row, align the note with it. */
-.card .card-meta{padding-right:32px !important;min-height:24px;display:flex;align-items:center;flex-wrap:wrap}
+.card .card-meta{position:relative !important;padding-right:30px !important;min-height:24px;display:flex;flex-direction:column;align-items:flex-start;gap:3px}
+    .card .card-meta .kgeu-note-inline{top:50% !important;right:0 !important;bottom:auto !important;transform:translateY(-50%) !important}
+    .card .card-meta .row{justify-content:flex-start;text-align:left;width:100%}
 .card .card-meta .kgeu-note-inline{bottom:50%;transform:translateY(50%) !important}
 
+
+    html.tg-light .service-card, html.tg-light .service-row, html.tg-light .feature-box,
+    html.tg-light .teacher-item, html.tg-light .saved-group, html.tg-light .group-result,
+    html.tg-light .hostel-box, html.tg-light .service-btn:not(.primary),
+    html.tg-light .service-form input, html.tg-light .service-form select, html.tg-light .service-form textarea {
+      background:#fff !important; color:#101828 !important; border-color:#e4e7ec !important;
+    }
+    html.tg-light .service-row-meta, html.tg-light .service-card p, html.tg-light .teacher-directory .mini-note,
+    html.tg-light .teacher-index-progress, html.tg-light .saved-group-id, html.tg-light .group-result-meta { color:#667085 !important; }
+    html.tg-light .service-pill { background:#eef2f7 !important; color:#667085 !important; }
 </style>
 
 <script>
@@ -1144,15 +1173,19 @@ html.tg-light .service-launch-btn{background:#fff;color:#101828;border-color:#e4
 
 <style id="kgeu-tg-notes-ui-v2">
 .kgeu-note-inline{
-  position:absolute;
-  right:10px;
-  bottom:10px;
+  position:absolute !important;
+  right:0 !important;
+  top:50% !important;
+  bottom:auto !important;
+  width:22px !important;
+  height:22px !important;
   z-index:4;
+  transform:translateY(-50%) !important;
 }
 
 .kgeu-note-icon{
-  width:30px;
-  height:30px;
+  width:22px !important;
+  height:22px !important;
   border:0;
   border-radius:9px;
   padding:0;
@@ -2718,8 +2751,8 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
   function serviceLoad(){
     try{
       const x=JSON.parse(localStorage.getItem(STUDENT_SERVICE_KEY)||'null');
-      return x && typeof x==='object' ? x : {tasks:[],deadlines:[],events:[],hostel:{totalGoal:250,adminGoal:100,work:[],social:[]}};
-    }catch(e){return {tasks:[],deadlines:[],events:[],hostel:{totalGoal:250,adminGoal:100,work:[],social:[]}};}
+      return x && typeof x==='object' ? x : {tasks:[],deadlines:[],events:[],hostel:{totalGoal:250,adminGoal:100,socialGoal:150,work:[],social:[]}};
+    }catch(e){return {tasks:[],deadlines:[],events:[],hostel:{totalGoal:250,adminGoal:100,socialGoal:150,work:[],social:[]}};}
   }
   let serviceData=serviceLoad();
   function serviceSave(){try{localStorage.setItem(STUDENT_SERVICE_KEY,JSON.stringify(serviceData));}catch(e){}}
@@ -2740,7 +2773,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     const dlOpen=serviceData.deadlines.filter(x=>!x.done).length;
     return '<div class="service-page">'+
       '<section class="service-hero">'+
-        '<div class="service-kicker">Студенческий помощник</div>'+
+        '<div class="service-kicker">Мой сервис</div>'+
         '<h1 class="service-title">Мой сервис</h1>'+
         '<div class="service-sub">'+serviceEsc(GROUP_NAME)+' · всё важное в одном месте</div>'+
         '<div class="service-actions">'+
@@ -2783,7 +2816,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     return '<div class="service-page">'+
       '<section class="service-hero"><div class="service-kicker">Общежитие</div><h1 class="service-title">Учёт баллов</h1>'+
       '<div class="service-sub">Цели можно изменить под правила твоего года.</div>'+
-      '<div class="service-form-row service-form"><div><label>Цель всего</label><input id="hostel-total-goal" type="number" min="0" value="'+Number(h.totalGoal||250)+'"></div><div><label>Цель административных</label><input id="hostel-admin-goal" type="number" min="0" value="'+Number(h.adminGoal||100)+'"></div></div>'+
+      '<div class="service-form-row service-form"><div><label>Цель социальных баллов</label><input id="hostel-social-goal" type="number" min="0" value="'+Number(h.socialGoal||Math.max(0,Number(h.totalGoal||250)-Number(h.adminGoal||100)))+'"></div><div><label>Цель административных баллов</label><input id="hostel-admin-goal" type="number" min="0" value="'+Number(h.adminGoal||100)+'"></div></div>'+
       '<div class="service-actions"><button class="service-btn primary" data-service-action="save-hostel-goals">Сохранить цели</button><button class="service-btn" data-service-action="service-home">← Мой сервис</button></div></section>'+
       '<section class="service-card"><h3>Прогресс</h3><div class="hostel-summary">'+
         '<div class="hostel-box"><strong>'+total+'</strong><span>всего / '+Number(h.totalGoal||250)+'</span></div>'+
@@ -2882,8 +2915,9 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       if(a==='study'){document.getElementById('app').innerHTML=serviceRenderStudy();serviceBind();return;}
       if(a==='service-home'){document.getElementById('app').innerHTML=serviceRenderToday();serviceBind();return;}
       if(a==='save-hostel-goals'){
-        serviceData.hostel.totalGoal=Math.max(0,Number(document.getElementById('hostel-total-goal').value||0));
         serviceData.hostel.adminGoal=Math.max(0,Number(document.getElementById('hostel-admin-goal').value||0));
+        serviceData.hostel.socialGoal=Math.max(0,Number(document.getElementById('hostel-social-goal').value||0));
+        serviceData.hostel.totalGoal=serviceData.hostel.adminGoal+serviceData.hostel.socialGoal;
         serviceSave();document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();return;
       }
       if(a==='add-work'){
@@ -2986,12 +3020,35 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     render();
   }
 
-  document.querySelectorAll('.tab').forEach(function (btn) {
-    btn.addEventListener('click', function () {
+  // Tabs: wheel scrolling on desktop. Navigation is kept completely separate
+  // from scrolling so a click can never be swallowed by drag/pointer handling.
+  (function bindTabs(){
+    const tabs = document.getElementById('tabs');
+    if (!tabs || tabs.dataset.bound === '1') return;
+    tabs.dataset.bound = '1';
+
+    tabs.addEventListener('wheel', function(e){
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        const max = Math.max(0, tabs.scrollWidth - tabs.clientWidth);
+        if (max > 0) {
+          e.preventDefault();
+          tabs.scrollLeft = Math.max(0, Math.min(max, tabs.scrollLeft + e.deltaY));
+        }
+      }
+    }, {passive:false});
+
+    // One delegated click handler: works for every tab and survives re-renders.
+    tabs.addEventListener('click', function(e){
+      const btn = e.target.closest ? e.target.closest('.tab[data-mode]') : null;
+      if (!btn || !tabs.contains(btn)) return;
+      const mode = btn.getAttribute('data-mode');
+      if (!mode) return;
+      e.preventDefault();
+      e.stopPropagation();
       if (teacherView) closeTeacher();
-      switchTab(btn.getAttribute('data-mode'));
-    });
-  });
+      switchTab(mode);
+    }, false);
+  })();
 
   async function refresh(manual) {
     if (isRefreshing) return;
@@ -3211,14 +3268,16 @@ function kgeuPrepareCard(card) {
   actions.append(close, save);
   panel.append(textarea, actions);
 
-  // Put the expandable content into the card itself.
+  // Keep the note action in the metadata area so it sits on the same compact
+  // visual line as teacher/room information and never changes card height.
   const contentTarget =
     card.querySelector(".lesson-content, .card-content, .lesson-info, .schedule-card-content") ||
     card;
+  const metaTarget = card.querySelector(".card-meta") || contentTarget;
 
   contentTarget.appendChild(panel);
   wrap.appendChild(button);
-  card.appendChild(wrap);
+  metaTarget.appendChild(wrap);
   card.classList.add("has-kgeu-note");
 
   const refreshState = () => {
