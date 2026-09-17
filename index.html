@@ -83,6 +83,13 @@ function kgeuSetNote(subject, value) {
   else delete kgeuPersonalData.notes[key];
   kgeuSavePersonalData(kgeuPersonalData);
 }
+// Keep the appearance controls synchronized after Telegram/app visibility changes.
+document.addEventListener('visibilitychange', () => {
+  if(!document.hidden) {
+    try { applyTheme(); } catch(e) { console.warn('Theme resync failed', e); }
+  }
+});
+
 </script>
 
   <style>
@@ -1000,6 +1007,198 @@ function kgeuSetNote(subject, value) {
       .logo svg { width:27px; height:27px; }
       .top-actions { gap:3px; }
     }
+
+/* KGEU APP THEME OVERRIDES */
+:root {
+  --app-light-bg: #f5f7fa;
+  --app-light-bg2: #ffffff;
+  --app-light-card: #ffffff;
+  --app-light-text: #111827;
+  --app-light-muted: #6b7280;
+  --app-light-border: #e5e7eb;
+  --app-light-accent: #2481cc;
+
+  --app-dark-bg: #0f1115;
+  --app-dark-bg2: #171a21;
+  --app-dark-card: #1c2029;
+  --app-dark-text: #f3f4f6;
+  --app-dark-muted: #9ca3af;
+  --app-dark-border: #2b313d;
+  --app-dark-accent: #5aa9e6;
+}
+
+/* Explicit app themes: do not inherit Telegram's opposite/current palette. */
+html.tg-light {
+  color-scheme: light;
+  --bg: var(--app-light-bg) !important;
+  --bg2: var(--app-light-bg2) !important;
+  --card: var(--app-light-card) !important;
+  --text: var(--app-light-text) !important;
+  --muted: var(--app-light-muted) !important;
+  --border: var(--app-light-border) !important;
+  --accent: var(--app-light-accent) !important;
+  --tg-bg: var(--app-light-bg) !important;
+  --tg-sec: var(--app-light-bg2) !important;
+  --tg-text: var(--app-light-text) !important;
+  --tg-hint: var(--app-light-muted) !important;
+  --tg-btn: var(--app-light-accent) !important;
+}
+
+html.tg-dark {
+  color-scheme: dark;
+  --bg: var(--app-dark-bg) !important;
+  --bg2: var(--app-dark-bg2) !important;
+  --card: var(--app-dark-card) !important;
+  --text: var(--app-dark-text) !important;
+  --muted: var(--app-dark-muted) !important;
+  --border: var(--app-dark-border) !important;
+  --accent: var(--app-dark-accent) !important;
+  --tg-bg: var(--app-dark-bg) !important;
+  --tg-sec: var(--app-dark-bg2) !important;
+  --tg-text: var(--app-dark-text) !important;
+  --tg-hint: var(--app-dark-muted) !important;
+  --tg-btn: var(--app-dark-accent) !important;
+}
+
+/* Saved/search group rows keep strong contrast in both themes. */
+html.tg-light .saved-group,
+html.tg-light .group-result,
+html.tg-light .search-result,
+html.tg-light .group-item {
+  background: #ffffff;
+  color: #111827;
+}
+html.tg-dark .saved-group,
+html.tg-dark .group-result,
+html.tg-dark .search-result,
+html.tg-dark .group-item {
+  background: #1c2029;
+  color: #f3f4f6;
+}
+html.tg-light .saved-group-name,
+html.tg-light .group-result-name,
+html.tg-light .search-result-name,
+html.tg-light .group-item-name {
+  color: #111827 !important;
+}
+html.tg-dark .saved-group-name,
+html.tg-dark .group-result-name,
+html.tg-dark .search-result-name,
+html.tg-dark .group-item-name {
+  color: #f3f4f6 !important;
+}
+html.tg-light .saved-group-id,
+html.tg-dark .saved-group-id {
+  color: var(--muted) !important;
+}
+
+/* Notes modal: the old rules targeted body.dark, while the app uses html.tg-dark. */
+html.tg-dark .kgeu-note-expand textarea,
+html.tg-dark .kgeu-note-modal textarea,
+html.tg-dark .kgeu-note-textarea {
+  background: #151922 !important;
+  color: #f3f4f6 !important;
+  border-color: #343b49 !important;
+  caret-color: #f3f4f6;
+}
+html.tg-dark .kgeu-note-expand textarea::placeholder,
+html.tg-dark .kgeu-note-modal textarea::placeholder,
+html.tg-dark .kgeu-note-textarea::placeholder {
+  color: #9ca3af !important;
+  opacity: 1;
+}
+html.tg-light .kgeu-note-expand textarea,
+html.tg-light .kgeu-note-modal textarea,
+html.tg-light .kgeu-note-textarea {
+  background: #f8fafc !important;
+  color: #111827 !important;
+  border-color: #d9dee7 !important;
+}
+html.tg-light .kgeu-note-expand textarea::placeholder,
+html.tg-light .kgeu-note-modal textarea::placeholder,
+html.tg-light .kgeu-note-textarea::placeholder {
+  color: #6b7280 !important;
+  opacity: 1;
+}
+html.tg-dark .kgeu-note-icon { color: #9ca3af !important; }
+html.tg-dark .kgeu-note-icon.has-note { color: #5aa9e6 !important; }
+html.tg-light .kgeu-note-icon { color: #7b8794 !important; }
+html.tg-light .kgeu-note-icon.has-note { color: #2481cc !important; }
+
+/* Compact, usable density scale. */
+.ui-compact .card { padding: 14px 14px !important; }
+.ui-compact .card-subject { font-size: 16px !important; line-height: 1.2; }
+.ui-compact .card-time { font-size: 15px !important; }
+.ui-compact .card-meta { font-size: 12px !important; }
+
+.ui-standard .card { padding: 17px 16px !important; }
+.ui-standard .card-subject { font-size: 18px !important; line-height: 1.22; }
+.ui-standard .card-time { font-size: 16px !important; }
+.ui-standard .card-meta { font-size: 13px !important; }
+
+.ui-large .card { padding: 19px 18px !important; }
+.ui-large .card-subject { font-size: 19px !important; line-height: 1.22; }
+.ui-large .card-time { font-size: 17px !important; }
+.ui-large .card-meta { font-size: 14px !important; }
+
+/* Keep lesson cards compact when a note exists: icon is integrated into the footer,
+   rather than creating a large extra "floor" below the lesson. */
+.kgeu-note-inline {
+  position: absolute !important;
+  right: 10px !important;
+  bottom: 8px !important;
+  width: 28px !important;
+  height: 28px !important;
+}
+.card.has-kgeu-note .card-body {
+  padding-bottom: 10px !important;
+  padding-right: 44px !important;
+}
+.kgeu-note-icon {
+  width: 28px !important;
+  height: 28px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+
+/* Reliable appearance switch geometry/state. */
+.theme-switch {
+  display: inline-flex !important;
+  align-items: center !important;
+}
+.theme-switch input {
+  position: absolute !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+.theme-switch .fake-switch {
+  position: relative !important;
+  display: inline-block !important;
+  width: 42px !important;
+  height: 24px !important;
+  flex: 0 0 42px !important;
+  border-radius: 999px !important;
+  cursor: pointer !important;
+}
+.theme-switch .fake-switch::after {
+  content: "" !important;
+  position: absolute !important;
+  top: 3px !important;
+  left: 3px !important;
+  width: 18px !important;
+  height: 18px !important;
+  border-radius: 50% !important;
+  background: #fff !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,.22) !important;
+  transform: translateX(0) !important;
+  transition: transform .18s ease !important;
+}
+.theme-switch input:checked + .fake-switch::after {
+  transform: translateX(18px) !important;
+}
+
 </style>
 
 <script>
@@ -1134,13 +1333,13 @@ function kgeuSetNote(subject, value) {
 }
 .kgeu-note-save-v2{background:#1557D6;color:#fff}
 .kgeu-note-close-v2{background:#EEF2F6;color:#344054}
-body.dark .kgeu-note-expand textarea{
+html.tg-dark .kgeu-note-expand textarea{
   background:rgba(17,24,39,.75);
   border-color:rgba(152,162,179,.25);
 }
-body.dark .kgeu-note-close-v2{background:#263244;color:#D0D5DD}
-body.dark .kgeu-note-icon{color:#98A2B3}
-body.dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,.10)}
+html.tg-dark .kgeu-note-close-v2{background:#263244;color:#D0D5DD}
+html.tg-dark .kgeu-note-icon{color:#98A2B3}
+html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,.10)}
 </style>
 
 </head>
@@ -1365,6 +1564,7 @@ body.dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,.10
     return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   }
   function applyTelegramThemeParams() {
+    if (settings.theme !== 'auto') return;
     // Map Telegram theme params onto the same custom properties the light/dark
     // palettes already fall back to, so the UI blends into the client's theme
     // instead of hardcoding colors Telegram doesn't provide.
@@ -1380,11 +1580,15 @@ body.dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,.10
   }
   function applyTheme() {
     const root = document.documentElement;
-    root.classList.remove('tg-dark', 'tg-light', 'ui-compact', 'ui-large');
+    if (settings.theme !== 'auto') {
+      ['--tg-bg','--tg-sec','--tg-text','--tg-hint','--tg-btn'].forEach(v => root.style.removeProperty(v));
+    }
+    root.classList.remove('tg-dark', 'tg-light', 'ui-compact', 'ui-standard', 'ui-large');
     const effectiveTheme = settings.theme === 'auto' ? getSystemTheme() : settings.theme;
     root.classList.add(effectiveTheme === 'dark' ? 'tg-dark' : 'tg-light');
     if (settings.density === 'compact') root.classList.add('ui-compact');
-    if (settings.density === 'large') root.classList.add('ui-large');
+    else if (settings.density === 'standard') root.classList.add('ui-standard');
+    else if (settings.density === 'large') root.classList.add('ui-large');
     applyTelegramThemeParams();
     syncAppearanceControls();
   }
