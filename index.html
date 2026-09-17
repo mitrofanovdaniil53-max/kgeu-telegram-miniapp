@@ -83,13 +83,6 @@ function kgeuSetNote(subject, value) {
   else delete kgeuPersonalData.notes[key];
   kgeuSavePersonalData(kgeuPersonalData);
 }
-// Keep the appearance controls synchronized after Telegram/app visibility changes.
-document.addEventListener('visibilitychange', () => {
-  if(!document.hidden) {
-    try { applyTheme(); } catch(e) { console.warn('Theme resync failed', e); }
-  }
-});
-
 </script>
 
   <style>
@@ -1008,196 +1001,89 @@ document.addEventListener('visibilitychange', () => {
       .top-actions { gap:3px; }
     }
 
-/* KGEU APP THEME OVERRIDES */
-:root {
-  --app-light-bg: #f5f7fa;
-  --app-light-bg2: #ffffff;
-  --app-light-card: #ffffff;
-  --app-light-text: #111827;
-  --app-light-muted: #6b7280;
-  --app-light-border: #e5e7eb;
-  --app-light-accent: #2481cc;
-
-  --app-dark-bg: #0f1115;
-  --app-dark-bg2: #171a21;
-  --app-dark-card: #1c2029;
-  --app-dark-text: #f3f4f6;
-  --app-dark-muted: #9ca3af;
-  --app-dark-border: #2b313d;
-  --app-dark-accent: #5aa9e6;
+/* ===== KGEU Student Service v3 ===== */
+.service-page{display:flex;flex-direction:column;gap:14px;padding-bottom:24px}
+.service-hero{border-radius:24px;padding:18px;background:var(--card);border:1px solid var(--border);box-shadow:0 8px 24px rgba(16,24,40,.06)}
+.service-kicker{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+.service-title{font-size:24px;font-weight:800;line-height:1.1;margin:0 0 6px}
+.service-sub{color:var(--muted);font-size:14px}
+.service-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.service-card{border:1px solid var(--border);background:var(--card);border-radius:20px;padding:15px;box-shadow:0 6px 18px rgba(16,24,40,.05)}
+.service-card h3{font-size:16px;margin:0 0 5px}
+.service-card p{font-size:13px;color:var(--muted);margin:0}
+.service-stat{font-size:27px;font-weight:800;line-height:1.05;margin:8px 0 2px}
+.service-progress{height:8px;background:var(--bg2);border-radius:99px;overflow:hidden;margin:11px 0 7px}
+.service-progress>span{display:block;height:100%;background:var(--accent);border-radius:99px;max-width:100%}
+.service-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.service-btn{border:1px solid var(--border);background:var(--bg2);color:var(--text);border-radius:13px;padding:10px 12px;font-weight:700;cursor:pointer;font:inherit}
+.service-btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.service-btn.danger{color:#c0392b}
+.service-section-title{display:flex;justify-content:space-between;align-items:center;margin:3px 2px 0}
+.service-section-title h2{font-size:18px;margin:0}
+.service-list{display:flex;flex-direction:column;gap:8px}
+.service-row{display:flex;align-items:center;gap:10px;border:1px solid var(--border);background:var(--card);border-radius:16px;padding:11px 12px}
+.service-row-main{min-width:0;flex:1}
+.service-row-title{font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.service-row-meta{font-size:12px;color:var(--muted);margin-top:3px}
+.service-pill{display:inline-flex;align-items:center;border-radius:999px;padding:4px 7px;font-size:11px;font-weight:800;background:var(--bg2);color:var(--muted);white-space:nowrap}
+.service-empty{padding:18px;text-align:center;border:1px dashed var(--border);border-radius:16px;color:var(--muted);font-size:13px}
+.service-form{display:grid;gap:9px;margin-top:10px}
+.service-form label{font-size:12px;font-weight:700;color:var(--muted)}
+.service-form input,.service-form select,.service-form textarea{width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:12px;padding:10px 11px;background:var(--bg);color:var(--text);font:inherit}
+.service-form textarea{min-height:78px;resize:vertical}
+.service-form-row{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.service-file{padding:8px!important}
+.hostel-summary{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.hostel-box{background:var(--bg2);border-radius:15px;padding:12px}
+.hostel-box strong{font-size:22px}
+.hostel-box span{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.report-note{font-size:12px;color:var(--muted);line-height:1.45;margin-top:8px}
+@media (max-width:520px){
+  .service-grid{grid-template-columns:1fr}
+  .service-form-row{grid-template-columns:1fr}
+  .service-title{font-size:22px}
 }
-
-/* Explicit app themes: do not inherit Telegram's opposite/current palette. */
-html.tg-light {
-  color-scheme: light;
-  --bg: var(--app-light-bg) !important;
-  --bg2: var(--app-light-bg2) !important;
-  --card: var(--app-light-card) !important;
-  --text: var(--app-light-text) !important;
-  --muted: var(--app-light-muted) !important;
-  --border: var(--app-light-border) !important;
-  --accent: var(--app-light-accent) !important;
-  --tg-bg: var(--app-light-bg) !important;
-  --tg-sec: var(--app-light-bg2) !important;
-  --tg-text: var(--app-light-text) !important;
-  --tg-hint: var(--app-light-muted) !important;
-  --tg-btn: var(--app-light-accent) !important;
-}
-
-html.tg-dark {
-  color-scheme: dark;
-  --bg: var(--app-dark-bg) !important;
-  --bg2: var(--app-dark-bg2) !important;
-  --card: var(--app-dark-card) !important;
-  --text: var(--app-dark-text) !important;
-  --muted: var(--app-dark-muted) !important;
-  --border: var(--app-dark-border) !important;
-  --accent: var(--app-dark-accent) !important;
-  --tg-bg: var(--app-dark-bg) !important;
-  --tg-sec: var(--app-dark-bg2) !important;
-  --tg-text: var(--app-dark-text) !important;
-  --tg-hint: var(--app-dark-muted) !important;
-  --tg-btn: var(--app-dark-accent) !important;
-}
-
-/* Saved/search group rows keep strong contrast in both themes. */
-html.tg-light .saved-group,
-html.tg-light .group-result,
-html.tg-light .search-result,
-html.tg-light .group-item {
-  background: #ffffff;
-  color: #111827;
-}
-html.tg-dark .saved-group,
-html.tg-dark .group-result,
-html.tg-dark .search-result,
-html.tg-dark .group-item {
-  background: #1c2029;
-  color: #f3f4f6;
-}
-html.tg-light .saved-group-name,
-html.tg-light .group-result-name,
-html.tg-light .search-result-name,
-html.tg-light .group-item-name {
-  color: #111827 !important;
-}
-html.tg-dark .saved-group-name,
-html.tg-dark .group-result-name,
-html.tg-dark .search-result-name,
-html.tg-dark .group-item-name {
-  color: #f3f4f6 !important;
-}
-html.tg-light .saved-group-id,
-html.tg-dark .saved-group-id {
-  color: var(--muted) !important;
-}
-
-/* Notes modal: the old rules targeted body.dark, while the app uses html.tg-dark. */
-html.tg-dark .kgeu-note-expand textarea,
-html.tg-dark .kgeu-note-modal textarea,
-html.tg-dark .kgeu-note-textarea {
-  background: #151922 !important;
-  color: #f3f4f6 !important;
-  border-color: #343b49 !important;
-  caret-color: #f3f4f6;
-}
-html.tg-dark .kgeu-note-expand textarea::placeholder,
-html.tg-dark .kgeu-note-modal textarea::placeholder,
-html.tg-dark .kgeu-note-textarea::placeholder {
-  color: #9ca3af !important;
-  opacity: 1;
-}
-html.tg-light .kgeu-note-expand textarea,
-html.tg-light .kgeu-note-modal textarea,
-html.tg-light .kgeu-note-textarea {
-  background: #f8fafc !important;
-  color: #111827 !important;
-  border-color: #d9dee7 !important;
-}
-html.tg-light .kgeu-note-expand textarea::placeholder,
-html.tg-light .kgeu-note-modal textarea::placeholder,
-html.tg-light .kgeu-note-textarea::placeholder {
-  color: #6b7280 !important;
-  opacity: 1;
-}
-html.tg-dark .kgeu-note-icon { color: #9ca3af !important; }
-html.tg-dark .kgeu-note-icon.has-note { color: #5aa9e6 !important; }
-html.tg-light .kgeu-note-icon { color: #7b8794 !important; }
-html.tg-light .kgeu-note-icon.has-note { color: #2481cc !important; }
-
-/* Compact, usable density scale. */
-.ui-compact .card { padding: 14px 14px !important; }
-.ui-compact .card-subject { font-size: 16px !important; line-height: 1.2; }
-.ui-compact .card-time { font-size: 15px !important; }
-.ui-compact .card-meta { font-size: 12px !important; }
-
-.ui-standard .card { padding: 17px 16px !important; }
-.ui-standard .card-subject { font-size: 18px !important; line-height: 1.22; }
-.ui-standard .card-time { font-size: 16px !important; }
-.ui-standard .card-meta { font-size: 13px !important; }
-
-.ui-large .card { padding: 19px 18px !important; }
-.ui-large .card-subject { font-size: 19px !important; line-height: 1.22; }
-.ui-large .card-time { font-size: 17px !important; }
-.ui-large .card-meta { font-size: 14px !important; }
-
-/* Keep lesson cards compact when a note exists: icon is integrated into the footer,
-   rather than creating a large extra "floor" below the lesson. */
-.kgeu-note-inline {
-  position: absolute !important;
-  right: 10px !important;
-  bottom: 8px !important;
-  width: 28px !important;
-  height: 28px !important;
-}
-.card.has-kgeu-note .card-body {
-  padding-bottom: 10px !important;
-  padding-right: 44px !important;
-}
-.kgeu-note-icon {
-  width: 28px !important;
-  height: 28px !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
+/* Prevent Telegram Mobile WebView from retaining the previous page canvas. */
+html.tg-light body{background-color:var(--tg-bg,#f5f7fa)}
+html.tg-dark body{background-color:var(--tg-bg,#111827)}
 
 
-/* Reliable appearance switch geometry/state. */
-.theme-switch {
-  display: inline-flex !important;
-  align-items: center !important;
+.theme-switch input{position:absolute!important;opacity:0!important;pointer-events:none!important}
+.theme-switch input:checked + .fake-switch:after{transform:translateX(18px)!important}
+
+
+/* ===== v4: visible Student Service entry ===== */
+.service-launch-btn{
+  width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;
+  margin:10px 0;padding:13px 15px;border:1px solid var(--border);
+  border-radius:16px;background:var(--card);color:var(--text);
+  font:inherit;font-weight:800;text-align:left;cursor:pointer;
 }
-.theme-switch input {
-  position: absolute !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
+.service-launch-btn span{font-size:11px;font-weight:600;color:var(--muted);text-align:right}
+html.tg-dark .service-launch-btn{background:#151e2e;color:#f1f5f9;border-color:#243044}
+html.tg-light .service-launch-btn{background:#fff;color:#101828;border-color:#e4e7ec}
+
+
+/* ===== v4: note icon never increases lesson-card height ===== */
+
+.kgeu-note-inline{
+  position:absolute !important;
+  right:8px !important;
+  bottom:8px !important;
+  width:24px !important;height:24px !important;
+  display:flex !important;align-items:center !important;justify-content:center !important;
+  margin:0 !important;padding:0 !important;
 }
-.theme-switch .fake-switch {
-  position: relative !important;
-  display: inline-block !important;
-  width: 42px !important;
-  height: 24px !important;
-  flex: 0 0 42px !important;
-  border-radius: 999px !important;
-  cursor: pointer !important;
+.kgeu-note-icon{
+  width:24px !important;height:24px !important;
+  min-width:24px !important;min-height:24px !important;
+  padding:0 !important;margin:0 !important;
+  display:inline-flex !important;align-items:center !important;justify-content:center !important;
+  font-size:15px !important;
 }
-.theme-switch .fake-switch::after {
-  content: "" !important;
-  position: absolute !important;
-  top: 3px !important;
-  left: 3px !important;
-  width: 18px !important;
-  height: 18px !important;
-  border-radius: 50% !important;
-  background: #fff !important;
-  box-shadow: 0 1px 4px rgba(0,0,0,.22) !important;
-  transform: translateX(0) !important;
-  transition: transform .18s ease !important;
-}
-.theme-switch input:checked + .fake-switch::after {
-  transform: translateX(18px) !important;
-}
+/* If the original card has a metadata/footer row, align the note with it. */
+.card .card-meta{padding-right:32px !important;min-height:24px;display:flex;align-items:center;flex-wrap:wrap}
+.card .card-meta .kgeu-note-inline{bottom:50%;transform:translateY(50%) !important}
 
 </style>
 
@@ -1263,9 +1149,7 @@ html.tg-light .kgeu-note-icon.has-note { color: #2481cc !important; }
   bottom:10px;
   z-index:4;
 }
-.card.has-kgeu-note .card-body{
-  padding-bottom:42px;
-}
+
 .kgeu-note-icon{
   width:30px;
   height:30px;
@@ -1384,6 +1268,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     <button class="tab" data-mode="week">Неделя</button>
     <button class="tab" data-mode="month">Месяц</button>
     <button class="tab" data-mode="teachers">Преподаватели</button>
+    <button class="tab" data-mode="service">Мой сервис</button>
   </div>
   </div>
   <div class="schedule-shell">
@@ -1418,7 +1303,10 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       <button class="icon-btn modal-close" id="group-close" aria-label="Закрыть">×</button>
     </div>
 
-    <div class="settings-section">
+    <button id="open-student-service" class="service-launch-btn" type="button">
+  🎓 Мой сервис <span>Задачи · дедлайны · общежитие</span>
+</button>
+<div class="settings-section">
       <div class="settings-section-title">Моя группа</div>
       <div class="current-group-box">
         <div>
@@ -1564,13 +1452,15 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   }
   function applyTelegramThemeParams() {
-    if (settings.theme !== 'auto') return;
-    // Map Telegram theme params onto the same custom properties the light/dark
-    // palettes already fall back to, so the UI blends into the client's theme
-    // instead of hardcoding colors Telegram doesn't provide.
+    // Telegram palette is applied in Auto mode. Manual mode keeps the app's original
+    // light/dark palette and therefore cannot be overridden by Telegram Mobile WebView.
     try {
       const tp = tg && tg.themeParams;
       const root = document.documentElement.style;
+      if (settings.theme !== 'auto') {
+        ['--tg-bg','--tg-sec','--tg-text','--tg-hint','--tg-btn'].forEach(function(v){root.removeProperty(v);});
+        return;
+      }
       if (tp && tp.bg_color) root.setProperty('--tg-bg', tp.bg_color);
       if (tp && tp.secondary_bg_color) root.setProperty('--tg-sec', tp.secondary_bg_color);
       if (tp && tp.text_color) root.setProperty('--tg-text', tp.text_color);
@@ -1580,9 +1470,6 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
   }
   function applyTheme() {
     const root = document.documentElement;
-    if (settings.theme !== 'auto') {
-      ['--tg-bg','--tg-sec','--tg-text','--tg-hint','--tg-btn'].forEach(v => root.style.removeProperty(v));
-    }
     root.classList.remove('tg-dark', 'tg-light', 'ui-compact', 'ui-standard', 'ui-large');
     const effectiveTheme = settings.theme === 'auto' ? getSystemTheme() : settings.theme;
     root.classList.add(effectiveTheme === 'dark' ? 'tg-dark' : 'tg-light');
@@ -1590,6 +1477,11 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     else if (settings.density === 'standard') root.classList.add('ui-standard');
     else if (settings.density === 'large') root.classList.add('ui-large');
     applyTelegramThemeParams();
+    // Explicitly repaint the page canvas; important for Telegram Mobile WebView.
+    document.documentElement.style.colorScheme = effectiveTheme;
+    document.body.style.backgroundColor = effectiveTheme === 'dark'
+      ? (getComputedStyle(root).getPropertyValue('--tg-bg').trim() || '#111827')
+      : (getComputedStyle(root).getPropertyValue('--tg-bg').trim() || '#f5f7fa');
     syncAppearanceControls();
   }
   function syncAppearanceControls() {
@@ -2820,6 +2712,203 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     if (shareToday) shareToday.addEventListener('click', shareSchedule);
   }
 
+
+  // ===== Student Service: local-first tools, ready for future Bot/Worker sync =====
+  const STUDENT_SERVICE_KEY = 'kgeu_student_service_v1';
+  function serviceLoad(){
+    try{
+      const x=JSON.parse(localStorage.getItem(STUDENT_SERVICE_KEY)||'null');
+      return x && typeof x==='object' ? x : {tasks:[],deadlines:[],events:[],hostel:{totalGoal:250,adminGoal:100,work:[],social:[]}};
+    }catch(e){return {tasks:[],deadlines:[],events:[],hostel:{totalGoal:250,adminGoal:100,work:[],social:[]}};}
+  }
+  let serviceData=serviceLoad();
+  function serviceSave(){try{localStorage.setItem(STUDENT_SERVICE_KEY,JSON.stringify(serviceData));}catch(e){}}
+  function serviceEsc(s){return escapeHtml(String(s==null?'':s));}
+  function serviceDate(s){if(!s)return '';const d=new Date(s+'T00:00:00');return isNaN(d)?s:d.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'});}
+  function serviceSumWork(){return serviceData.hostel.work.reduce((a,x)=>a+Number(x.points||0),0);}
+  function serviceSumSocial(){return serviceData.hostel.social.reduce((a,x)=>a+Number(x.points||0),0);}
+  function serviceTotalPoints(){return serviceSumWork()+serviceSumSocial();}
+  function serviceRenderToday(){
+    const lessons=getLessonsForDate(isoDate(new Date()));
+    const now=new Date();
+    let next=null;
+    for(const l of lessons){
+      const d=new Date(isoDate(new Date())+'T'+String(l.start||'00:00')+':00');
+      if(d>now){next=l;break;}
+    }
+    const taskOpen=serviceData.tasks.filter(x=>!x.done).length;
+    const dlOpen=serviceData.deadlines.filter(x=>!x.done).length;
+    return '<div class="service-page">'+
+      '<section class="service-hero">'+
+        '<div class="service-kicker">Студенческий помощник</div>'+
+        '<h1 class="service-title">Мой сервис</h1>'+
+        '<div class="service-sub">'+serviceEsc(GROUP_NAME)+' · всё важное в одном месте</div>'+
+        '<div class="service-actions">'+
+          '<button class="service-btn primary" data-service-action="task">+ Задача</button>'+
+          '<button class="service-btn" data-service-action="deadline">+ Дедлайн</button>'+
+          '<button class="service-btn" data-service-action="event">+ Мероприятие</button><button class="service-btn" data-service-action="study">Учёба</button>'+
+        '</div>'+
+      '</section>'+
+      '<div class="service-grid">'+
+        '<section class="service-card"><h3>Следующая пара</h3>'+
+          (next?'<div class="service-stat">'+serviceEsc(next.start)+'</div><p>'+serviceEsc(next.subject)+'</p><p>'+serviceEsc(roomText(next.room||''))+'</p>':'<div class="service-stat">—</div><p>Сегодня следующих пар нет</p>')+
+        '</section>'+
+        '<section class="service-card"><h3>Мои дела</h3><div class="service-stat">'+taskOpen+'</div><p>активных задач</p><p>'+dlOpen+' дедлайнов</p></section>'+
+      '</div>'+
+      '<section class="service-card"><h3>🏠 Баллы общежития</h3>'+
+        '<div class="hostel-summary">'+
+          '<div class="hostel-box"><strong>'+serviceTotalPoints()+'</strong><span>всего</span></div>'+
+          '<div class="hostel-box"><strong>'+serviceSumSocial()+'</strong><span>социальные</span></div>'+
+        '</div>'+
+        '<div class="service-progress"><span style="width:'+Math.min(100, serviceTotalPoints()/Math.max(1,Number(serviceData.hostel.totalGoal||250))*100)+'%"></span></div>'+
+        '<p>'+serviceTotalPoints()+' / '+Number(serviceData.hostel.totalGoal||250)+' баллов</p>'+
+        '<div class="service-actions"><button class="service-btn primary" data-service-action="hostel">🏠 Учёт баллов общежития</button></div>'+
+      '</section>'+
+      '<section><div class="service-section-title"><h2>Ближайшие дедлайны</h2></div>'+
+        '<div class="service-list">'+
+        (serviceData.deadlines.filter(x=>!x.done).sort((a,b)=>String(a.date).localeCompare(String(b.date))).slice(0,4).map(x=>
+          '<div class="service-row"><div class="service-row-main"><div class="service-row-title">'+serviceEsc(x.title)+'</div><div class="service-row-meta">'+serviceDate(x.date)+'</div></div><span class="service-pill">дедлайн</span></div>'
+        ).join('') || '<div class="service-empty">Дедлайнов пока нет.</div>')+
+        '</div></section>'+
+      '<section><div class="service-section-title"><h2>Последние задачи</h2></div>'+
+        '<div class="service-list">'+
+        (serviceData.tasks.slice(-4).reverse().map((x,i)=>
+          '<div class="service-row"><button class="service-btn" data-service-toggle-task="'+serviceEsc(x.id)+'">'+(x.done?'✓':'○')+'</button><div class="service-row-main"><div class="service-row-title">'+serviceEsc(x.title)+'</div><div class="service-row-meta">'+serviceEsc(x.note||'')+'</div></div></div>'
+        ).join('') || '<div class="service-empty">Добавь первую задачу.</div>')+
+        '</div></section>'+
+      '</div>';
+  }
+  function serviceRenderHostel(){
+    const h=serviceData.hostel, total=serviceTotalPoints(), social=serviceSumSocial(), admin=serviceSumWork();
+    return '<div class="service-page">'+
+      '<section class="service-hero"><div class="service-kicker">Общежитие</div><h1 class="service-title">Учёт баллов</h1>'+
+      '<div class="service-sub">Цели можно изменить под правила твоего года.</div>'+
+      '<div class="service-form-row service-form"><div><label>Цель всего</label><input id="hostel-total-goal" type="number" min="0" value="'+Number(h.totalGoal||250)+'"></div><div><label>Цель административных</label><input id="hostel-admin-goal" type="number" min="0" value="'+Number(h.adminGoal||100)+'"></div></div>'+
+      '<div class="service-actions"><button class="service-btn primary" data-service-action="save-hostel-goals">Сохранить цели</button><button class="service-btn" data-service-action="service-home">← Мой сервис</button></div></section>'+
+      '<section class="service-card"><h3>Прогресс</h3><div class="hostel-summary">'+
+        '<div class="hostel-box"><strong>'+total+'</strong><span>всего / '+Number(h.totalGoal||250)+'</span></div>'+
+        '<div class="hostel-box"><strong>'+admin+'</strong><span>административные</span></div>'+
+        '<div class="hostel-box"><strong>'+social+'</strong><span>социальные</span></div>'+
+        '<div class="hostel-box"><strong>'+Math.max(0,Number(h.totalGoal||250)-total)+'</strong><span>осталось</span></div>'+
+      '</div><div class="service-progress"><span style="width:'+Math.min(100,total/Math.max(1,Number(h.totalGoal||250))*100)+'%"></span></div></section>'+
+      '<section class="service-card"><h3>⏱ Административные / GBS</h3><p>За каждые 10 минут — 1 балл. Вводи фактически отработанные минуты, приложение посчитает баллы.</p>'+
+      '<div class="service-form"><div class="service-form-row"><div><label>Дата</label><input id="work-date" type="date" value="'+isoDate(new Date())+'"></div><div><label>Минуты</label><input id="work-minutes" type="number" min="0" step="1" placeholder="20"></div></div><div><label>Что делал</label><input id="work-title" placeholder="GBS / дежурство / работа"></div>'+
+      '<button class="service-btn primary" data-service-action="add-work">Добавить работу</button></div>'+
+      '<div class="service-list" style="margin-top:10px">'+(h.work.slice().reverse().slice(0,12).map(x=>
+        '<div class="service-row"><div class="service-row-main"><div class="service-row-title">'+serviceDate(x.date)+' · '+Number(x.minutes)+' мин</div><div class="service-row-meta">'+serviceEsc(x.title||'Работа')+'</div></div><span class="service-pill">+'+Number(x.points)+' б.</span><button class="service-btn danger" data-service-del-work="'+serviceEsc(x.id)+'">×</button></div>'
+      ).join('')||'<div class="service-empty">Записей пока нет.</div>')+'</div></section>'+
+      '<section class="service-card"><h3>🎓 Социальные баллы</h3><p>Фиксируй мероприятие, дату, количество баллов и подтверждение участия. Файл остаётся в данных этого устройства до подключения синхронизации с ботом.</p>'+
+      '<div class="service-form"><div class="service-form-row"><div><label>Дата</label><input id="social-date" type="date" value="'+isoDate(new Date())+'"></div><div><label>Баллы</label><input id="social-points" type="number" min="0" step="1" placeholder="10"></div></div><div><label>Мероприятие</label><input id="social-title" placeholder="Название мероприятия"></div><div><label>Комментарий</label><textarea id="social-note" placeholder="Организатор, роль, что подтверждает участие…"></textarea></div><div><label>Подтверждение</label><input id="social-file" class="service-file" type="file" accept="image/*,.pdf,.doc,.docx"></div>'+
+      '<button class="service-btn primary" data-service-action="add-social">Добавить мероприятие</button></div>'+
+      '<div class="service-list" style="margin-top:10px">'+(h.social.slice().reverse().slice(0,12).map(x=>
+        '<div class="service-row"><div class="service-row-main"><div class="service-row-title">'+serviceDate(x.date)+' · '+serviceEsc(x.title)+'</div><div class="service-row-meta">'+Number(x.points)+' б. · '+serviceEsc(x.note||'')+(x.fileName?' · '+serviceEsc(x.fileName):'')+'</div></div><button class="service-btn danger" data-service-del-social="'+serviceEsc(x.id)+'">×</button></div>'
+      ).join('')||'<div class="service-empty">Мероприятий пока нет.</div>')+'</div>'+
+      '<div class="service-actions"><button class="service-btn primary" data-service-action="export-word">📄 Сформировать Word-отчёт</button></div>'+
+      '<div class="report-note">Отчёт формируется прямо в Mini App. Для официальной подачи проверь шаблон и требования общежития перед отправкой.</div></section>'+
+      '</div>';
+  }
+  function serviceRenderStudy(){
+    return '<div class="service-page"><section class="service-hero"><div class="service-kicker">Учёба</div><h1 class="service-title">Задачи и дедлайны</h1><div class="service-sub">Личный учебный слой поверх расписания.</div>'+
+      '<div class="service-actions"><button class="service-btn primary" data-service-action="task">+ Задача</button><button class="service-btn" data-service-action="deadline">+ Дедлайн</button><button class="service-btn" data-service-action="service-home">← Мой сервис</button></div></section>'+
+      '<section><div class="service-section-title"><h2>Задачи</h2></div><div class="service-list">'+
+      (serviceData.tasks.map(x=>'<div class="service-row"><button class="service-btn" data-service-toggle-task="'+serviceEsc(x.id)+'">'+(x.done?'✓':'○')+'</button><div class="service-row-main"><div class="service-row-title">'+serviceEsc(x.title)+'</div><div class="service-row-meta">'+serviceEsc(x.note||'')+'</div></div><button class="service-btn danger" data-service-del-task="'+serviceEsc(x.id)+'">×</button></div>').join('')||'<div class="service-empty">Задач нет.</div>')+
+      '</div></section><section><div class="service-section-title"><h2>Дедлайны</h2></div><div class="service-list">'+
+      (serviceData.deadlines.map(x=>'<div class="service-row"><button class="service-btn" data-service-toggle-deadline="'+serviceEsc(x.id)+'">'+(x.done?'✓':'○')+'</button><div class="service-row-main"><div class="service-row-title">'+serviceEsc(x.title)+'</div><div class="service-row-meta">'+serviceDate(x.date)+' · '+serviceEsc(x.note||'')+'</div></div><button class="service-btn danger" data-service-del-deadline="'+serviceEsc(x.id)+'">×</button></div>').join('')||'<div class="service-empty">Дедлайнов нет.</div>')+
+      '</div></section></div>';
+  }
+  function servicePromptTask(){
+    const title=prompt('Название задачи:'); if(!title)return;
+    const note=prompt('Комментарий (необязательно):')||'';
+    serviceData.tasks.push({id:'t_'+Date.now(),title:title,note:note,done:false,createdAt:Date.now()});serviceSave();render();
+  }
+  function servicePromptDeadline(){
+    const title=prompt('Что нужно сделать?'); if(!title)return;
+    const date=prompt('Дата дедлайна в формате ГГГГ-ММ-ДД:',isoDate(new Date())); if(!date)return;
+    const note=prompt('Комментарий (необязательно):')||'';
+    serviceData.deadlines.push({id:'d_'+Date.now(),title:title,date:date,note:note,done:false});serviceSave();render();
+  }
+  function servicePromptEvent(){
+    const title=prompt('Название мероприятия:'); if(!title)return;
+    const date=prompt('Дата в формате ГГГГ-ММ-ДД:',isoDate(new Date())); if(!date)return;
+    const points=Number(prompt('Сколько социальных баллов?', '10')||0);
+    serviceData.events.push({id:'e_'+Date.now(),title:title,date:date,points:points});serviceSave();
+    // Also create a social record, so one input immediately participates in the report.
+    serviceData.hostel.social.push({id:'s_'+Date.now(),title:title,date:date,points:points,note:'Добавлено из раздела мероприятий',fileName:''});
+    serviceSave();render();
+  }
+  function serviceReadFile(file){
+    return new Promise(function(resolve){
+      if(!file){resolve({name:'',data:''});return;}
+      const r=new FileReader();r.onload=function(){resolve({name:file.name,data:String(r.result||'')});};r.onerror=function(){resolve({name:file.name,data:''});};r.readAsDataURL(file);
+    });
+  }
+  function serviceDownload(filename,content,mime){
+    const blob=new Blob([content],{type:mime||'text/plain;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+    a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url);},1000);
+  }
+  function serviceExportWord(){
+    const h=serviceData.hostel,total=serviceTotalPoints(),admin=serviceSumWork(),social=serviceSumSocial();
+    let rows='';
+    h.work.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))).forEach(x=>rows+='<tr><td>'+serviceEsc(x.date)+'</td><td>Административные</td><td>'+serviceEsc(x.title||'Работа')+'</td><td>'+Number(x.minutes||0)+'</td><td>'+Number(x.points||0)+'</td><td></td></tr>');
+    h.social.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))).forEach(x=>rows+='<tr><td>'+serviceEsc(x.date)+'</td><td>Социальные</td><td>'+serviceEsc(x.title)+'</td><td></td><td>'+Number(x.points||0)+'</td><td>'+serviceEsc(x.fileName||'')+'</td></tr>');
+    const doc='<!doctype html><html><head><meta charset="utf-8"><title>Отчёт по баллам</title><style>body{font-family:Arial,sans-serif;font-size:11pt}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:6px}h1{font-size:18pt}</style></head><body>'+
+      '<h1>Отчёт по баллам общежития</h1><p>Группа: '+serviceEsc(GROUP_NAME)+'</p><p>Всего: <b>'+total+'</b> / '+Number(h.totalGoal||250)+' · Административные: <b>'+admin+'</b> · Социальные: <b>'+social+'</b></p>'+
+      '<table><tr><th>Дата</th><th>Тип</th><th>Событие / работа</th><th>Минуты</th><th>Баллы</th><th>Подтверждение</th></tr>'+rows+'</table>'+
+      '<p>Документ сформирован в KGEU Student Service. Перед официальной подачей проверьте соответствие требованиям общежития.</p></body></html>';
+    serviceDownload('KGEU_отчет_по_баллам_'+isoDate(new Date())+'.doc',doc,'application/msword');
+  }
+  function renderService(){return serviceRenderToday();}
+
+  (function bindStudentServiceLauncher(){
+    const btn=document.getElementById('open-student-service');
+    if(!btn || btn.dataset.bound==='1') return;
+    btn.dataset.bound='1';
+    btn.addEventListener('click',function(){
+      const app=document.getElementById('app');
+      if(!app) return;
+      app.innerHTML=renderService();
+      serviceBind();
+      window.scrollTo({top:0,behavior:'smooth'});
+    });
+  })();
+
+  function serviceBind(){
+    document.querySelectorAll('[data-service-action]').forEach(function(b){b.addEventListener('click',async function(){
+      const a=b.getAttribute('data-service-action');
+      if(a==='task')return servicePromptTask();
+      if(a==='deadline')return servicePromptDeadline();
+      if(a==='event')return servicePromptEvent();
+      if(a==='hostel'){document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();return;}
+      if(a==='study'){document.getElementById('app').innerHTML=serviceRenderStudy();serviceBind();return;}
+      if(a==='service-home'){document.getElementById('app').innerHTML=serviceRenderToday();serviceBind();return;}
+      if(a==='save-hostel-goals'){
+        serviceData.hostel.totalGoal=Math.max(0,Number(document.getElementById('hostel-total-goal').value||0));
+        serviceData.hostel.adminGoal=Math.max(0,Number(document.getElementById('hostel-admin-goal').value||0));
+        serviceSave();document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();return;
+      }
+      if(a==='add-work'){
+        const date=document.getElementById('work-date').value||isoDate(new Date()),minutes=Math.max(0,Math.floor(Number(document.getElementById('work-minutes').value||0)));
+        if(!minutes){toast('Укажи количество минут');return;}
+        const title=document.getElementById('work-title').value.trim()||'Работа';
+        serviceData.hostel.work.push({id:'w_'+Date.now(),date:date,minutes:minutes,points:Math.floor(minutes/10),title:title});
+        serviceSave();document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();return;
+      }
+      if(a==='add-social'){
+        const file=document.getElementById('social-file').files[0];
+        const rec={id:'s_'+Date.now(),date:document.getElementById('social-date').value||isoDate(new Date()),points:Math.max(0,Math.floor(Number(document.getElementById('social-points').value||0))),title:document.getElementById('social-title').value.trim()||'Мероприятие',note:document.getElementById('social-note').value.trim(),fileName:file?file.name:'',fileData:''};
+        if(!rec.points){toast('Укажи количество социальных баллов');return;}
+        const f=await serviceReadFile(file);rec.fileData=f.data;serviceData.hostel.social.push(rec);serviceSave();document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();return;
+      }
+      if(a==='export-word')return serviceExportWord();
+    });});
+    document.querySelectorAll('[data-service-toggle-task]').forEach(function(b){b.addEventListener('click',function(){const x=serviceData.tasks.find(x=>x.id===b.getAttribute('data-service-toggle-task'));if(x)x.done=!x.done;serviceSave();document.getElementById('app').innerHTML=serviceRenderStudy();serviceBind();});});
+    document.querySelectorAll('[data-service-toggle-deadline]').forEach(function(b){b.addEventListener('click',function(){const x=serviceData.deadlines.find(x=>x.id===b.getAttribute('data-service-toggle-deadline'));if(x)x.done=!x.done;serviceSave();document.getElementById('app').innerHTML=serviceRenderStudy();serviceBind();});});
+    document.querySelectorAll('[data-service-del-task]').forEach(function(b){b.addEventListener('click',function(){serviceData.tasks=serviceData.tasks.filter(x=>x.id!==b.getAttribute('data-service-del-task'));serviceSave();document.getElementById('app').innerHTML=serviceRenderStudy();serviceBind();});});
+    document.querySelectorAll('[data-service-del-deadline]').forEach(function(b){b.addEventListener('click',function(){serviceData.deadlines=serviceData.deadlines.filter(x=>x.id!==b.getAttribute('data-service-del-deadline'));serviceSave();document.getElementById('app').innerHTML=serviceRenderStudy();serviceBind();});});
+    document.querySelectorAll('[data-service-del-work]').forEach(function(b){b.addEventListener('click',function(){serviceData.hostel.work=serviceData.hostel.work.filter(x=>x.id!==b.getAttribute('data-service-del-work'));serviceSave();document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();});});
+    document.querySelectorAll('[data-service-del-social]').forEach(function(b){b.addEventListener('click',function(){serviceData.hostel.social=serviceData.hostel.social.filter(x=>x.id!==b.getAttribute('data-service-del-social'));serviceSave();document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();});});
+  }
+
   function render() {
     const app = document.getElementById('app');
     if (teacherView) {
@@ -2844,6 +2933,9 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     } else if (currentMode === 'teachers') {
       app.innerHTML = renderTeachers();
       bindEvents();
+    } else if (currentMode === 'service') {
+      app.innerHTML = renderService();
+      serviceBind();
     }
   }
 
@@ -3179,6 +3271,23 @@ document.addEventListener("DOMContentLoaded", () => {
     subtree: true
   });
 });
+
+  // KGEU mobile theme resync
+  document.addEventListener('visibilitychange', function(){
+    if(!document.hidden){try{applyTheme();}catch(e){}}
+  });
+
+  document.addEventListener('click',function(e){
+    const t=e.target.closest && e.target.closest('[data-mode="service"]');
+    if(t){
+      e.preventDefault();
+      const app=document.getElementById('app');
+      if(app && typeof renderService==='function'){
+        app.innerHTML=renderService(); serviceBind(); window.scrollTo({top:0,behavior:'smooth'});
+      }
+    }
+  });
+
 </script>
 
 </body>
