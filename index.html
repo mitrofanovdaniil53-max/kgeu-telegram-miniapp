@@ -2835,6 +2835,31 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
   const STUDENT_SERVICE_KEY = 'kgeu_student_service_v1';
   const STUDENT_SERVICE_SCHEMA = 4;
   const STUDENT_SERVICE_BACKUP_KEY = 'kgeu_student_service_backup_v1';
+  const STUDENT_SERVICE_SYNC_KEY = 'kgeu_student_service_sync_v1';
+  function serviceSyncMeta(){
+    try{
+      const x=JSON.parse(localStorage.getItem(STUDENT_SERVICE_SYNC_KEY)||'null');
+      if(x&&typeof x==='object') return Object.assign({deviceId:'',dirty:false,lastLocalSave:0,lastServerSync:0},x);
+    }catch(e){}
+    const meta={deviceId:'dev_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8),dirty:false,lastLocalSave:0,lastServerSync:0};
+    try{localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(meta));}catch(e){}
+    return meta;
+  }
+  function serviceMarkDirty(){
+    const meta=serviceSyncMeta();
+    meta.dirty=true;meta.lastLocalSave=Date.now();
+    try{localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(meta));}catch(e){}
+  }
+  function serviceSyncPackage(){
+    const meta=serviceSyncMeta();
+    return {format:'kgeu-student-service-sync',formatVersion:1,schemaVersion:STUDENT_SERVICE_SCHEMA,deviceId:meta.deviceId,exportedAt:new Date().toISOString(),serviceData:serviceNormalizeData(serviceData),personalData:(typeof kgeuPersonalData!=='undefined'?kgeuPersonalData:{version:1,notes:{}})};
+  }
+  function serviceExportSyncPackage(){
+    try{
+      const blob=new Blob([JSON.stringify(serviceSyncPackage(),null,2)],{type:'application/json;charset=utf-8'});
+      const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='kgeu-student-service-sync-'+isoDate(new Date())+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url);},1000);toast('Пакет синхронизации подготовлен');
+    }catch(e){toast('Не удалось создать пакет синхронизации');}
+  }
 
   function serviceId(prefix){return prefix+'_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8);}
   function serviceRecordArray(value){return Array.isArray(value)?value.filter(function(x){return x&&typeof x==='object';}):[];}
@@ -2875,7 +2900,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     }catch(e){return fallback;}
   }
   let serviceData=serviceLoad();
-  function serviceSave(){try{serviceData=serviceNormalizeData(serviceData);serviceData.updatedAt=Date.now();localStorage.setItem(STUDENT_SERVICE_KEY,JSON.stringify(serviceData));return true;}catch(e){toast('Не удалось сохранить данные');return false;}}
+  function serviceSave(){try{serviceData=serviceNormalizeData(serviceData);serviceData.updatedAt=Date.now();localStorage.setItem(STUDENT_SERVICE_KEY,JSON.stringify(serviceData));serviceMarkDirty();return true;}catch(e){toast('Не удалось сохранить данные');return false;}}
   function serviceEsc(s){return escapeHtml(String(s==null?'':s));}
   function serviceDate(s){if(!s)return '';const d=new Date(s+'T00:00:00');return isNaN(d)?s:d.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'});}
   function serviceDateKey(s){return /^\d{4}-\d{2}-\d{2}$/.test(String(s||''))?String(s):'';}
@@ -2929,7 +2954,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
         '<div class="service-actions">'+
           '<button class="service-btn primary" data-service-action="task">+ Задача</button>'+
           '<button class="service-btn" data-service-action="deadline">+ Дедлайн</button>'+
-          '<button class="service-btn" data-service-action="event">+ Мероприятие</button><button class="service-btn" data-service-action="calendar">Календарь</button><button class="service-btn" data-service-action="study">Учёба</button><button class="service-btn" data-service-action="analytics">Аналитика</button><button class="service-btn" data-service-action="reminders">Напоминания</button><button class="service-btn" data-service-action="data">Данные</button>'+
+          '<button class="service-btn" data-service-action="event">+ Мероприятие</button><button class="service-btn" data-service-action="calendar">Календарь</button><button class="service-btn" data-service-action="study">Учёба</button><button class="service-btn" data-service-action="analytics">Аналитика</button><button class="service-btn" data-service-action="reminders">Напоминания</button><button class="service-btn" data-service-action="analytics">Аналитика</button><button class="service-btn" data-service-action="data">Данные</button><button class="service-btn" data-service-action="sync">Синхронизация</button>'+
         '</div>'+
       '</section>'+
       '<div class="service-grid">'+
@@ -3320,6 +3345,16 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     };
     reader.onerror=function(){toast('Не удалось прочитать файл');};reader.readAsText(file);
   }
+  function serviceRenderSync(){
+    const m=serviceSyncMeta();
+    const device=String(m.deviceId||'').replace(/^(.{8}).+$/,'$1…');
+    const localTime=m.lastLocalSave?new Date(m.lastLocalSave).toLocaleString('ru-RU'):'—';
+    const serverTime=m.lastServerSync?new Date(m.lastServerSync).toLocaleString('ru-RU'):'ещё не было';
+    return '<div class="service-page"><section class="service-hero"><div class="service-kicker">Мой сервис</div><h1 class="service-title">Синхронизация</h1><div class="service-sub">Подготовка к облачной синхронизации. Сейчас данные остаются на устройстве; backend подключим следующим этапом.</div><div class="service-actions"><button class="service-btn" data-service-action="service-home">← Мой сервис</button><button class="service-btn" data-service-action="data">Данные</button></div></section>'+
+      '<section class="service-card"><div class="service-section-title"><h2>Состояние</h2><span class="service-status '+(m.dirty?'today':'done')+'">'+(m.dirty?'Есть локальные изменения':'Синхронизировано')+'</span></div><div class="service-data-grid"><div class="service-data-box"><strong>Локально</strong><span>источник данных</span></div><div class="service-data-box"><strong>'+serviceEsc(device||'—')+'</strong><span>ID устройства</span></div><div class="service-data-box"><strong>'+serviceData.tasks.length+'</strong><span>задач</span></div><div class="service-data-box"><strong>'+serviceData.deadlines.length+'</strong><span>дедлайнов</span></div></div><p class="service-data-note">Последнее локальное изменение: '+serviceEsc(localTime)+' · серверная синхронизация: '+serviceEsc(serverTime)+'.</p></section>'+
+      '<section class="service-card"><h2 style="margin:0 0 5px">Пакет синхронизации</h2><p class="service-data-note">Это технический JSON-пакет для будущего Worker API. Он содержит нормализованные данные и заметки, но сам по себе никуда их не отправляет.</p><div class="service-actions"><button class="service-btn primary" data-service-action="export-sync">Экспортировать пакет</button><button class="service-btn" data-service-action="data">Резервная копия</button></div></section>'+
+      '<section class="service-card"><h2 style="margin:0 0 5px">Что подключим дальше</h2><p class="service-data-note">Telegram Mini App → Cloudflare Worker → D1. Worker будет проверять Telegram identity на сервере, а клиент не будет считаться доверенным источником userId.</p></section></div>';
+  }
   function serviceRenderData(){
     const bytes=JSON.stringify(serviceData).length;
     const noteCount=(typeof kgeuPersonalData!=='undefined'&&kgeuPersonalData.notes)?Object.keys(kgeuPersonalData.notes).length:0;
@@ -3371,6 +3406,8 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       if(a==='reminders'){document.getElementById('app').innerHTML=serviceRenderReminders();serviceBind();window.scrollTo({top:0,behavior:'smooth'});return;}
       if(a==='analytics'){document.getElementById('app').innerHTML=serviceRenderAnalytics();serviceBind();window.scrollTo({top:0,behavior:'smooth'});return;}
       if(a==='data'){document.getElementById('app').innerHTML=serviceRenderData();serviceBind();window.scrollTo({top:0,behavior:'smooth'});return;}
+      if(a==='sync'){document.getElementById('app').innerHTML=serviceRenderSync();serviceBind();window.scrollTo({top:0,behavior:'smooth'});return;}
+      if(a==='export-sync'){return serviceExportSyncPackage();}
       if(a==='export-data'){return serviceExportData();}
       if(a==='import-data'){const input=document.getElementById('service-import-file');if(input){input.onchange=function(){serviceImportData(input.files&&input.files[0]);input.value='';};input.click();}return;}
       if(a==='request-notifications'){
