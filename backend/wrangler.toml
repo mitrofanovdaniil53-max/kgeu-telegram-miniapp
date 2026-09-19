@@ -1,4 +1,4 @@
-name = "kgeu-student-service-api"
+name = "kgeu-telegram-miniapp"
 main = "kgeu_service_worker_v21.js"
 compatibility_date = "2026-09-19"
 
