@@ -1063,6 +1063,12 @@ function kgeuSetNote(subject, value) {
 .service-status.overdue{background:rgba(220,38,38,.12);color:#dc2626}
 .service-status.today{background:rgba(217,119,6,.12);color:#b45309}
 .service-status.done{background:rgba(53,201,138,.13);color:#16835b}
+.service-data-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:10px}
+.service-data-box{border:1px solid var(--border);background:var(--bg2);border-radius:15px;padding:12px}
+.service-data-box strong{display:block;font-size:13px;margin-bottom:3px}
+.service-data-box span{display:block;color:var(--muted);font-size:11px;line-height:1.4}
+.service-data-note{font-size:12px;color:var(--muted);line-height:1.45;margin-top:9px}
+@media(max-width:560px){.service-data-grid{grid-template-columns:1fr}}
 .service-status.upcoming{background:var(--bg2);color:var(--muted)}
 .service-section-title .service-btn{padding:7px 10px;font-size:12px}
 
@@ -2827,36 +2833,49 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
 
   // ===== Student Service: local-first tools, ready for future Bot/Worker sync =====
   const STUDENT_SERVICE_KEY = 'kgeu_student_service_v1';
-  function serviceEmptyData(){return {version:3,tasks:[],deadlines:[],events:[],hostel:{totalGoal:250,adminGoal:100,socialGoal:150,work:[],social:[]},reminders:{enabled:false,taskDays:1,deadlineDays:1,eventDays:1}};}
+  const STUDENT_SERVICE_SCHEMA = 4;
+  const STUDENT_SERVICE_BACKUP_KEY = 'kgeu_student_service_backup_v1';
+
+  function serviceId(prefix){return prefix+'_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8);}
+  function serviceRecordArray(value){return Array.isArray(value)?value.filter(function(x){return x&&typeof x==='object';}):[];}
+  function serviceNormalizeRecord(x,prefix){
+    const r=Object.assign({},x||{});
+    if(!r.id) r.id=serviceId(prefix);
+    if(r.title!=null) r.title=String(r.title);
+    if(r.subject!=null) r.subject=String(r.subject);
+    if(r.note!=null) r.note=String(r.note);
+    return r;
+  }
+  function serviceEmptyData(){return {version:STUDENT_SERVICE_SCHEMA,schemaVersion:STUDENT_SERVICE_SCHEMA,updatedAt:Date.now(),tasks:[],deadlines:[],events:[],hostel:{totalGoal:250,adminGoal:100,socialGoal:150,work:[],social:[]},reminders:{enabled:false,taskDays:1,deadlineDays:1,eventDays:1}};}
+  function serviceNormalizeData(x){
+    const src=(x&&typeof x==='object')?x:{};
+    const h=(src.hostel&&typeof src.hostel==='object')?src.hostel:{};
+    const tasks=serviceRecordArray(src.tasks).map(function(r){const x=serviceNormalizeRecord(r,'t');return {id:x.id,title:String(x.title||'').trim(),dueDate:serviceDateKey(x.dueDate)?x.dueDate:'',subject:String(x.subject||''),note:String(x.note||''),done:!!x.done,createdAt:Number(x.createdAt||Date.now()),updatedAt:Number(x.updatedAt||x.createdAt||Date.now())};}).filter(function(x){return x.title;});
+    const deadlines=serviceRecordArray(src.deadlines).map(function(r){const x=serviceNormalizeRecord(r,'d');return {id:x.id,title:String(x.title||'').trim(),date:serviceDateKey(x.date)?x.date:'',subject:String(x.subject||''),note:String(x.note||''),done:!!x.done,createdAt:Number(x.createdAt||Date.now()),updatedAt:Number(x.updatedAt||x.createdAt||Date.now())};}).filter(function(x){return x.title;});
+    const events=serviceRecordArray(src.events).map(function(r){const x=serviceNormalizeRecord(r,'e');return {id:x.id,title:String(x.title||'').trim(),date:serviceDateKey(x.date)?x.date:'',points:Number(x.points||0),createdAt:Number(x.createdAt||Date.now()),updatedAt:Number(x.updatedAt||x.createdAt||Date.now())};}).filter(function(x){return x.title;});
+    const work=serviceRecordArray(h.work).map(function(r){const x=serviceNormalizeRecord(r,'w');return {id:x.id,date:serviceDateKey(x.date)?x.date:'',minutes:Math.max(0,Number(x.minutes||0)),points:Math.max(0,Number(x.points||0)),title:String(x.title||'Работа'),createdAt:Number(x.createdAt||Date.now()),updatedAt:Number(x.updatedAt||x.createdAt||Date.now())};});
+    const social=serviceRecordArray(h.social).map(function(r){const x=serviceNormalizeRecord(r,'s');return {id:x.id,date:serviceDateKey(x.date)?x.date:'',points:Math.max(0,Number(x.points||0)),title:String(x.title||'Мероприятие'),note:String(x.note||''),fileName:String(x.fileName||''),fileData:String(x.fileData||''),createdAt:Number(x.createdAt||Date.now()),updatedAt:Number(x.updatedAt||x.createdAt||Date.now())};});
+    const rem=src.reminders&&typeof src.reminders==='object'?src.reminders:{};
+    return {version:STUDENT_SERVICE_SCHEMA,schemaVersion:STUDENT_SERVICE_SCHEMA,updatedAt:Number(src.updatedAt||Date.now()),tasks:tasks,deadlines:deadlines,events:events,reminders:{enabled:!!rem.enabled,taskDays:Math.max(0,Math.min(7,Number(rem.taskDays!=null?rem.taskDays:1))),deadlineDays:Math.max(0,Math.min(7,Number(rem.deadlineDays!=null?rem.deadlineDays:1))),eventDays:Math.max(0,Math.min(7,Number(rem.eventDays!=null?rem.eventDays:1)))},hostel:{totalGoal:Math.max(0,Number(h.totalGoal||250)),adminGoal:Math.max(0,Number(h.adminGoal||100)),socialGoal:Math.max(0,Number(h.socialGoal||150)),work:work,social:social}};
+  }
   function serviceLoad(){
     const fallback=serviceEmptyData();
     try{
-      const x=JSON.parse(localStorage.getItem(STUDENT_SERVICE_KEY)||'null');
+      const raw=localStorage.getItem(STUDENT_SERVICE_KEY);
+      if(!raw) return fallback;
+      const x=JSON.parse(raw);
       if(!x || typeof x!=='object') return fallback;
-      const h=(x.hostel&&typeof x.hostel==='object')?x.hostel:{};
-      return {
-        version:3,
-        tasks:Array.isArray(x.tasks)?x.tasks.filter(Boolean):[],
-        deadlines:Array.isArray(x.deadlines)?x.deadlines.filter(Boolean):[],
-        events:Array.isArray(x.events)?x.events.filter(Boolean):[],
-        reminders:{
-          enabled:!!(x.reminders&&x.reminders.enabled),
-          taskDays:Math.max(0,Math.min(7,Number(x.reminders&&x.reminders.taskDays!=null?x.reminders.taskDays:1))),
-          deadlineDays:Math.max(0,Math.min(7,Number(x.reminders&&x.reminders.deadlineDays!=null?x.reminders.deadlineDays:1))),
-          eventDays:Math.max(0,Math.min(7,Number(x.reminders&&x.reminders.eventDays!=null?x.reminders.eventDays:1)))
-        },
-        hostel:{
-          totalGoal:Math.max(0,Number(h.totalGoal||250)),
-          adminGoal:Math.max(0,Number(h.adminGoal||100)),
-          socialGoal:Math.max(0,Number(h.socialGoal||150)),
-          work:Array.isArray(h.work)?h.work.filter(Boolean):[],
-          social:Array.isArray(h.social)?h.social.filter(Boolean):[]
-        }
-      };
+      const oldVersion=Number(x.schemaVersion||x.version||1);
+      if(oldVersion<STUDENT_SERVICE_SCHEMA){
+        try{localStorage.setItem(STUDENT_SERVICE_BACKUP_KEY,raw);}catch(e){}
+      }
+      const normalized=serviceNormalizeData(x);
+      try{localStorage.setItem(STUDENT_SERVICE_KEY,JSON.stringify(normalized));}catch(e){}
+      return normalized;
     }catch(e){return fallback;}
   }
   let serviceData=serviceLoad();
-  function serviceSave(){try{localStorage.setItem(STUDENT_SERVICE_KEY,JSON.stringify(serviceData));}catch(e){}}
+  function serviceSave(){try{serviceData=serviceNormalizeData(serviceData);serviceData.updatedAt=Date.now();localStorage.setItem(STUDENT_SERVICE_KEY,JSON.stringify(serviceData));return true;}catch(e){toast('Не удалось сохранить данные');return false;}}
   function serviceEsc(s){return escapeHtml(String(s==null?'':s));}
   function serviceDate(s){if(!s)return '';const d=new Date(s+'T00:00:00');return isNaN(d)?s:d.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'});}
   function serviceDateKey(s){return /^\d{4}-\d{2}-\d{2}$/.test(String(s||''))?String(s):'';}
@@ -2910,7 +2929,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
         '<div class="service-actions">'+
           '<button class="service-btn primary" data-service-action="task">+ Задача</button>'+
           '<button class="service-btn" data-service-action="deadline">+ Дедлайн</button>'+
-          '<button class="service-btn" data-service-action="event">+ Мероприятие</button><button class="service-btn" data-service-action="calendar">Календарь</button><button class="service-btn" data-service-action="study">Учёба</button><button class="service-btn" data-service-action="analytics">Аналитика</button><button class="service-btn" data-service-action="reminders">Напоминания</button>'+
+          '<button class="service-btn" data-service-action="event">+ Мероприятие</button><button class="service-btn" data-service-action="calendar">Календарь</button><button class="service-btn" data-service-action="study">Учёба</button><button class="service-btn" data-service-action="analytics">Аналитика</button><button class="service-btn" data-service-action="reminders">Напоминания</button><button class="service-btn" data-service-action="data">Данные</button>'+
         '</div>'+
       '</section>'+
       '<div class="service-grid">'+
@@ -3270,6 +3289,46 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       '<div class="service-calendar-legend"><span><i class="service-calendar-dot lesson"></i>пары</span><span><i class="service-calendar-dot task"></i>задачи</span><span><i class="service-calendar-dot deadline"></i>дедлайны</span><span><i class="service-calendar-dot event"></i>мероприятия</span></div></section>'+
       '<section><div class="service-section-title"><h2>'+serviceDate(serviceCalendarSelected)+'</h2></div><div class="service-list">'+agenda+'</div></section></div>';
   }
+  function serviceExportData(){
+    try{
+      const payload={format:'kgeu-student-service',formatVersion:1,exportedAt:new Date().toISOString(),serviceData:serviceNormalizeData(serviceData),personalData:(typeof kgeuPersonalData!=='undefined'?kgeuPersonalData:{version:1,notes:{}})};
+      const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8'});
+      const url=URL.createObjectURL(blob);const a=document.createElement('a');
+      a.href=url;a.download='kgeu-student-service-backup-'+isoDate(new Date())+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url);},1000);toast('Резервная копия подготовлена');
+    }catch(e){toast('Не удалось создать резервную копию');}
+  }
+  function serviceBackupCurrent(){try{localStorage.setItem(STUDENT_SERVICE_BACKUP_KEY,JSON.stringify(serviceData));}catch(e){}}
+  function serviceImportData(file){
+    if(!file)return;
+    if(file.size>5*1024*1024){toast('Файл больше 5 МБ');return;}
+    const reader=new FileReader();
+    reader.onload=function(){
+      try{
+        const payload=JSON.parse(String(reader.result||''));
+        const incoming=payload&&payload.serviceData?payload.serviceData:payload;
+        if(!incoming||typeof incoming!=='object'||(!Array.isArray(incoming.tasks)&&!Array.isArray(incoming.deadlines)&&!Array.isArray(incoming.events))){throw new Error('bad');}
+        serviceBackupCurrent();
+        serviceData=serviceNormalizeData(incoming);
+        serviceSave();
+        if(payload.personalData&&typeof payload.personalData==='object'&&typeof kgeuSavePersonalData==='function'){
+          const pd=payload.personalData;
+          kgeuPersonalData={version:1,notes:(pd.notes&&typeof pd.notes==='object')?pd.notes:{},updatedAt:Date.now()};
+          kgeuSavePersonalData(kgeuPersonalData);
+        }
+        toast('Данные восстановлены');document.getElementById('app').innerHTML=serviceRenderData();serviceBind();
+      }catch(e){toast('Не удалось прочитать резервную копию');}
+    };
+    reader.onerror=function(){toast('Не удалось прочитать файл');};reader.readAsText(file);
+  }
+  function serviceRenderData(){
+    const bytes=JSON.stringify(serviceData).length;
+    const noteCount=(typeof kgeuPersonalData!=='undefined'&&kgeuPersonalData.notes)?Object.keys(kgeuPersonalData.notes).length:0;
+    return '<div class="service-page"><section class="service-hero"><div class="service-kicker">Мой сервис</div><h1 class="service-title">Данные и резервная копия</h1><div class="service-sub">Единая локальная модель данных. Пока без backend — можно безопасно перенести данные вручную.</div><div class="service-actions"><button class="service-btn" data-service-action="service-home">← Мой сервис</button><button class="service-btn" data-service-action="study">Учёба</button></div></section>'+
+      '<section class="service-card"><div class="service-section-title"><h2>Текущее состояние</h2><span class="service-pill">v'+STUDENT_SERVICE_SCHEMA+'</span></div><div class="service-data-grid">'+
+      '<div class="service-data-box"><strong>'+serviceData.tasks.length+'</strong><span>задач</span></div><div class="service-data-box"><strong>'+serviceData.deadlines.length+'</strong><span>дедлайнов</span></div><div class="service-data-box"><strong>'+serviceData.events.length+'</strong><span>мероприятий</span></div><div class="service-data-box"><strong>'+noteCount+'</strong><span>заметок по предметам</span></div></div><p class="service-data-note">Последнее сохранение: '+serviceEsc(new Date(Number(serviceData.updatedAt||Date.now())).toLocaleString('ru-RU'))+' · размер данных: '+Math.round(bytes/1024)+' КБ.</p></section>'+
+      '<section class="service-card"><h2 style="margin:0 0 5px">Резервная копия</h2><p class="service-data-note">Экспорт сохраняет задачи, дедлайны, мероприятия, баллы общежития, настройки напоминаний и заметки. Файл остаётся у тебя и никуда автоматически не отправляется.</p><div class="service-actions"><button class="service-btn primary" data-service-action="export-data">Экспортировать JSON</button><button class="service-btn" data-service-action="import-data">Восстановить из JSON</button><input id="service-import-file" type="file" accept="application/json,.json" style="display:none"></div><p class="service-data-note">Перед восстановлением текущие данные сохраняются во внутреннюю резервную копию.</p></section>'+
+      '<section class="service-card"><h2 style="margin:0 0 5px">Совместимость</h2><p class="service-data-note">Версии до v19 автоматически приводятся к единой схеме. При миграции исходная строка localStorage дополнительно сохраняется как резервная копия.</p></section></div>';
+  }
   function renderService(){return serviceRenderToday();}
 
   (function bindStudentServiceLauncher(){
@@ -3311,6 +3370,9 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       if(a==='calendar'){document.getElementById('app').innerHTML=serviceRenderCalendar();serviceBind();window.scrollTo({top:0,behavior:'smooth'});return;}
       if(a==='reminders'){document.getElementById('app').innerHTML=serviceRenderReminders();serviceBind();window.scrollTo({top:0,behavior:'smooth'});return;}
       if(a==='analytics'){document.getElementById('app').innerHTML=serviceRenderAnalytics();serviceBind();window.scrollTo({top:0,behavior:'smooth'});return;}
+      if(a==='data'){document.getElementById('app').innerHTML=serviceRenderData();serviceBind();window.scrollTo({top:0,behavior:'smooth'});return;}
+      if(a==='export-data'){return serviceExportData();}
+      if(a==='import-data'){const input=document.getElementById('service-import-file');if(input){input.onchange=function(){serviceImportData(input.files&&input.files[0]);input.value='';};input.click();}return;}
       if(a==='request-notifications'){
         if('Notification' in window){try{const p=await Notification.requestPermission();toast(p==='granted'?'Уведомления разрешены':'Разрешение не выдано');}catch(e){toast('Не удалось запросить разрешение');}}else toast('Этот WebView не поддерживает системные уведомления');
         return;
