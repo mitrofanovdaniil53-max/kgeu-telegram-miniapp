@@ -2836,6 +2836,30 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
   const STUDENT_SERVICE_SCHEMA = 4;
   const STUDENT_SERVICE_BACKUP_KEY = 'kgeu_student_service_backup_v1';
   const STUDENT_SERVICE_SYNC_KEY = 'kgeu_student_service_sync_v1';
+  const STUDENT_SERVICE_ENDPOINT_KEY = 'kgeu_student_service_endpoint_v1';
+  function serviceSyncEndpoint(){try{return String(localStorage.getItem(STUDENT_SERVICE_ENDPOINT_KEY)||'').trim().replace(/\/+$/,'');}catch(e){return '';}}
+  function serviceSetSyncEndpoint(value){try{localStorage.setItem(STUDENT_SERVICE_ENDPOINT_KEY,String(value||'').trim().replace(/\/+$/,''));}catch(e){}}
+  function serviceTelegramInitData(){try{return (window.Telegram&&window.Telegram.WebApp&&window.Telegram.WebApp.initData)?String(window.Telegram.WebApp.initData):'';}catch(e){return '';}}
+  async function serviceSyncRequest(path, options){
+    const endpoint=serviceSyncEndpoint();
+    if(!endpoint) throw new Error('endpoint_missing');
+    const headers=Object.assign({'Content-Type':'application/json'},(options&&options.headers)||{});
+    const initData=serviceTelegramInitData();
+    if(initData) headers['X-Telegram-Init-Data']=initData;
+    const res=await fetch(endpoint+path,Object.assign({},options||{},{headers:headers}));
+    const text=await res.text();
+    let data=null;try{data=text?JSON.parse(text):null;}catch(e){data={raw:text};}
+    if(!res.ok) throw new Error((data&&data.error)||('HTTP '+res.status));
+    return data;
+  }
+  async function serviceCheckBackend(){
+    const data=await serviceSyncRequest('/api/health',{method:'GET'});
+    return data;
+  }
+  async function servicePushToBackend(){
+    const payload=serviceSyncPackage();
+    return await serviceSyncRequest('/api/sync',{method:'POST',body:JSON.stringify(payload)});
+  }
   function serviceSyncMeta(){
     try{
       const x=JSON.parse(localStorage.getItem(STUDENT_SERVICE_SYNC_KEY)||'null');
@@ -3350,10 +3374,13 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     const device=String(m.deviceId||'').replace(/^(.{8}).+$/,'$1…');
     const localTime=m.lastLocalSave?new Date(m.lastLocalSave).toLocaleString('ru-RU'):'—';
     const serverTime=m.lastServerSync?new Date(m.lastServerSync).toLocaleString('ru-RU'):'ещё не было';
-    return '<div class="service-page"><section class="service-hero"><div class="service-kicker">Мой сервис</div><h1 class="service-title">Синхронизация</h1><div class="service-sub">Подготовка к облачной синхронизации. Сейчас данные остаются на устройстве; backend подключим следующим этапом.</div><div class="service-actions"><button class="service-btn" data-service-action="service-home">← Мой сервис</button><button class="service-btn" data-service-action="data">Данные</button></div></section>'+
-      '<section class="service-card"><div class="service-section-title"><h2>Состояние</h2><span class="service-status '+(m.dirty?'today':'done')+'">'+(m.dirty?'Есть локальные изменения':'Синхронизировано')+'</span></div><div class="service-data-grid"><div class="service-data-box"><strong>Локально</strong><span>источник данных</span></div><div class="service-data-box"><strong>'+serviceEsc(device||'—')+'</strong><span>ID устройства</span></div><div class="service-data-box"><strong>'+serviceData.tasks.length+'</strong><span>задач</span></div><div class="service-data-box"><strong>'+serviceData.deadlines.length+'</strong><span>дедлайнов</span></div></div><p class="service-data-note">Последнее локальное изменение: '+serviceEsc(localTime)+' · серверная синхронизация: '+serviceEsc(serverTime)+'.</p></section>'+
-      '<section class="service-card"><h2 style="margin:0 0 5px">Пакет синхронизации</h2><p class="service-data-note">Это технический JSON-пакет для будущего Worker API. Он содержит нормализованные данные и заметки, но сам по себе никуда их не отправляет.</p><div class="service-actions"><button class="service-btn primary" data-service-action="export-sync">Экспортировать пакет</button><button class="service-btn" data-service-action="data">Резервная копия</button></div></section>'+
-      '<section class="service-card"><h2 style="margin:0 0 5px">Что подключим дальше</h2><p class="service-data-note">Telegram Mini App → Cloudflare Worker → D1. Worker будет проверять Telegram identity на сервере, а клиент не будет считаться доверенным источником userId.</p></section></div>';
+    const endpoint=serviceSyncEndpoint();
+    const tg=serviceTelegramInitData();
+    return '<div class="service-page"><section class="service-hero"><div class="service-kicker">Мой сервис</div><h1 class="service-title">Синхронизация</h1><div class="service-sub">v21: клиент уже умеет обращаться к Worker API, но сервер подключается только после указания адреса Worker.</div><div class="service-actions"><button class="service-btn" data-service-action="service-home">← Мой сервис</button><button class="service-btn" data-service-action="data">Данные</button></div></section>'+
+      '<section class="service-card"><div class="service-section-title"><h2>Состояние</h2><span id="service-sync-status" class="service-status '+(m.dirty?'today':'done')+'">'+(m.dirty?'Есть локальные изменения':'Локально сохранено')+'</span></div><div class="service-data-grid"><div class="service-data-box"><strong>Локально</strong><span>источник данных</span></div><div class="service-data-box"><strong>'+serviceEsc(device||'—')+'</strong><span>ID устройства</span></div><div class="service-data-box"><strong>'+serviceData.tasks.length+'</strong><span>задач</span></div><div class="service-data-box"><strong>'+serviceData.deadlines.length+'</strong><span>дедлайнов</span></div></div><p class="service-data-note">Последнее локальное изменение: '+serviceEsc(localTime)+' · последняя успешная синхронизация: '+serviceEsc(serverTime)+'.</p></section>'+
+      '<section class="service-card"><h2 style="margin:0 0 5px">Worker API</h2><p class="service-data-note">Укажи URL развернутого Cloudflare Worker. Он должен иметь маршруты <code>/api/health</code> и <code>/api/sync</code>. Пока поле пустое, приложение работает полностью локально.</p><div class="service-form-row"><input id="service-sync-endpoint" class="service-input" type="url" inputmode="url" placeholder="https://kgeu-service.example.workers.dev" value="'+serviceEsc(endpoint)+'"></div><div class="service-actions"><button class="service-btn" data-service-action="save-sync-endpoint">Сохранить адрес</button><button class="service-btn" data-service-action="check-sync">Проверить связь</button><button class="service-btn primary" data-service-action="sync-now">Синхронизировать</button></div><p id="service-sync-feedback" class="service-data-note">'+(endpoint?(tg?'Telegram initData доступен':'Telegram initData пока не доступен в этом окружении'):'Worker пока не настроен.')+'</p></section>'+
+      '<section class="service-card"><h2 style="margin:0 0 5px">Безопасность</h2><p class="service-data-note">Клиент не передаёт доверенный userId из localStorage. В Telegram Mini App сервер должен проверять <code>Telegram.WebApp.initData</code>; данные <code>initDataUnsafe</code> нельзя считать доверенными. До проверки сервером никакая облачная запись не считается авторизованной.</p></section>'+
+      '<section class="service-card"><h2 style="margin:0 0 5px">Ручной пакет</h2><p class="service-data-note">Если backend недоступен, JSON-пакет по-прежнему можно сохранить как резервную копию.</p><div class="service-actions"><button class="service-btn" data-service-action="export-sync">Экспортировать пакет</button></div></section></div>';
   }
   function serviceRenderData(){
     const bytes=JSON.stringify(serviceData).length;
@@ -3407,6 +3434,28 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       if(a==='analytics'){document.getElementById('app').innerHTML=serviceRenderAnalytics();serviceBind();window.scrollTo({top:0,behavior:'smooth'});return;}
       if(a==='data'){document.getElementById('app').innerHTML=serviceRenderData();serviceBind();window.scrollTo({top:0,behavior:'smooth'});return;}
       if(a==='sync'){document.getElementById('app').innerHTML=serviceRenderSync();serviceBind();window.scrollTo({top:0,behavior:'smooth'});return;}
+      if(a==='save-sync-endpoint'){
+        const input=document.getElementById('service-sync-endpoint');
+        serviceSetSyncEndpoint(input?input.value:'');
+        document.getElementById('app').innerHTML=serviceRenderSync();serviceBind();toast(serviceSyncEndpoint()?'Адрес Worker сохранён':'Адрес Worker очищен');return;
+      }
+      if(a==='check-sync'){
+        const feedback=document.getElementById('service-sync-feedback');if(feedback)feedback.textContent='Проверяю связь…';
+        try{const data=await serviceCheckBackend();if(feedback)feedback.textContent='Worker отвечает: '+serviceEsc(data&&data.service?data.service:'OK')+' · '+serviceEsc(data&&data.version?data.version:'');toast('Связь с Worker работает');}
+        catch(e){if(feedback)feedback.textContent='Ошибка связи: '+serviceEsc(e.message||'неизвестная ошибка');toast('Не удалось подключиться к Worker');}
+        return;
+      }
+      if(a==='sync-now'){
+        const feedback=document.getElementById('service-sync-feedback');if(feedback)feedback.textContent='Синхронизирую…';
+        try{
+          const result=await servicePushToBackend();
+          const m=serviceSyncMeta();m.dirty=false;m.lastServerSync=Date.now();try{localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(m));}catch(e){}
+          if(feedback)feedback.textContent='Синхронизация завершена: '+serviceEsc(result&&result.status?result.status:'OK');
+          toast('Данные отправлены на сервер');
+          document.getElementById('app').innerHTML=serviceRenderSync();serviceBind();
+        }catch(e){if(feedback)feedback.textContent='Ошибка синхронизации: '+serviceEsc(e.message||'неизвестная ошибка');toast('Синхронизация не выполнена');}
+        return;
+      }
       if(a==='export-sync'){return serviceExportSyncPackage();}
       if(a==='export-data'){return serviceExportData();}
       if(a==='import-data'){const input=document.getElementById('service-import-file');if(input){input.onchange=function(){serviceImportData(input.files&&input.files[0]);input.value='';};input.click();}return;}
