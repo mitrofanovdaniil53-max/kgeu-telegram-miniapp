@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1">
   <meta name="color-scheme" content="light dark">
   <title>Моё расписание</title>
-  <!-- Telegram Mini App v11: design/functionality carried over from the VK build, Liquid Glass-inspired UI -->
+  <!-- Telegram Mini App v11 · v8 stability pass: Liquid Glass-inspired UI -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
 <script id="kgeu-tg-personal-notes-v1">
@@ -362,13 +362,16 @@ function kgeuSetNote(subject, value) {
     }
     .tabs::-webkit-scrollbar { display: none; }
     .tabs {
+      position: relative;
+      z-index: 10;
       cursor: grab;
       user-select: none;
       touch-action: pan-x;
       overscroll-behavior-x: contain;
+      pointer-events: auto;
     }
     .tabs.dragging { cursor: grabbing; scroll-behavior: auto; }
-    .tabs .tab { user-select: none; }
+    .tabs .tab { user-select: none; pointer-events: auto; position: relative; z-index: 11; }
     .tab {
       border: 0; border-radius: 17px;
       min-height: 42px;
@@ -3020,8 +3023,9 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     render();
   }
 
-  // Tabs: wheel scrolling on desktop. Navigation is kept completely separate
-  // from scrolling so a click can never be swallowed by drag/pointer handling.
+  // Tabs: wheel scrolling on desktop + direct button activation.
+  // Direct onclick handlers avoid delegated-event conflicts with Telegram/WebView
+  // gesture handling and remain stable because the tab DOM is never re-rendered.
   (function bindTabs(){
     const tabs = document.getElementById('tabs');
     if (!tabs || tabs.dataset.bound === '1') return;
@@ -3037,17 +3041,16 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       }
     }, {passive:false});
 
-    // One delegated click handler: works for every tab and survives re-renders.
-    tabs.addEventListener('click', function(e){
-      const btn = e.target.closest ? e.target.closest('.tab[data-mode]') : null;
-      if (!btn || !tabs.contains(btn)) return;
-      const mode = btn.getAttribute('data-mode');
-      if (!mode) return;
-      e.preventDefault();
-      e.stopPropagation();
-      if (teacherView) closeTeacher();
-      switchTab(mode);
-    }, false);
+    tabs.querySelectorAll('.tab[data-mode]').forEach(function(btn){
+      btn.onclick = function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        const mode = btn.getAttribute('data-mode');
+        if (!mode) return;
+        if (teacherView) closeTeacher();
+        switchTab(mode);
+      };
+    });
   })();
 
   async function refresh(manual) {
@@ -3336,16 +3339,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if(!document.hidden){try{applyTheme();}catch(e){}}
   });
 
-  document.addEventListener('click',function(e){
-    const t=e.target.closest && e.target.closest('[data-mode="service"]');
-    if(t){
-      e.preventDefault();
-      const app=document.getElementById('app');
-      if(app && typeof renderService==='function'){
-        app.innerHTML=renderService(); serviceBind(); window.scrollTo({top:0,behavior:'smooth'});
-      }
-    }
-  });
 
 </script>
 
