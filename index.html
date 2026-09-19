@@ -1069,6 +1069,18 @@ function kgeuSetNote(subject, value) {
 .service-study-tools{display:grid;gap:10px;padding:12px;border:1px solid var(--border);border-radius:16px;background:var(--card)}
 .service-study-search{width:100%;box-sizing:border-box;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:12px;padding:11px 12px;font:inherit;outline:none}
 .service-study-search:focus{border-color:var(--accent)}
+.service-analytics-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+.service-analytics-box{border:1px solid var(--border);background:var(--bg2);border-radius:15px;padding:12px;min-width:0}
+.service-analytics-box strong{display:block;font-size:22px;line-height:1.05}
+.service-analytics-box span{display:block;margin-top:5px;color:var(--muted);font-size:11px}
+.service-bar-list{display:grid;gap:9px}
+.service-bar-row{display:grid;grid-template-columns:minmax(80px,1fr) 100px 34px;gap:8px;align-items:center}
+.service-bar-label{font-size:12px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.service-bar-track{height:8px;border-radius:999px;background:var(--bg2);overflow:hidden}
+.service-bar-track span{display:block;height:100%;background:var(--accent);border-radius:999px}
+.service-bar-value{font-size:11px;color:var(--muted);text-align:right}
+.service-analytics-note{color:var(--muted);font-size:12px;line-height:1.45}
+@media(max-width:720px){.service-analytics-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.service-bar-row{grid-template-columns:minmax(70px,1fr) 80px 30px}}
 .service-filter-row{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;padding-bottom:1px}
 .service-filter-row::-webkit-scrollbar{display:none}
 .service-filter-chip{flex:0 0 auto;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:999px;padding:7px 10px;font-size:12px;font-weight:800;cursor:pointer}
@@ -2898,7 +2910,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
         '<div class="service-actions">'+
           '<button class="service-btn primary" data-service-action="task">+ Задача</button>'+
           '<button class="service-btn" data-service-action="deadline">+ Дедлайн</button>'+
-          '<button class="service-btn" data-service-action="event">+ Мероприятие</button><button class="service-btn" data-service-action="calendar">Календарь</button><button class="service-btn" data-service-action="study">Учёба</button><button class="service-btn" data-service-action="reminders">Напоминания</button>'+
+          '<button class="service-btn" data-service-action="event">+ Мероприятие</button><button class="service-btn" data-service-action="calendar">Календарь</button><button class="service-btn" data-service-action="study">Учёба</button><button class="service-btn" data-service-action="analytics">Аналитика</button><button class="service-btn" data-service-action="reminders">Напоминания</button>'+
         '</div>'+
       '</section>'+
       '<div class="service-grid">'+
@@ -3168,6 +3180,59 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     const order={deadline:1,task:2,event:3};
     return out.sort((a,b)=>a.days-b.days||order[a.type]-order[b.type]||a.title.localeCompare(b.title));
   }
+  function serviceRenderAnalytics(){
+    const today=isoDate(new Date());
+    const taskTotal=serviceData.tasks.length;
+    const taskDone=serviceData.tasks.filter(function(x){return !!x.done;}).length;
+    const taskOpen=taskTotal-taskDone;
+    const taskOverdue=serviceData.tasks.filter(function(x){return !x.done&&serviceDateKey(x.dueDate)&&x.dueDate<today;}).length;
+    const deadlineTotal=serviceData.deadlines.length;
+    const deadlineDone=serviceData.deadlines.filter(function(x){return !!x.done;}).length;
+    const deadlineOverdue=serviceData.deadlines.filter(function(x){return !x.done&&serviceDateKey(x.date)&&x.date<today;}).length;
+    const completion=taskTotal?Math.round(taskDone/taskTotal*100):0;
+    const deadlineCompletion=deadlineTotal?Math.round(deadlineDone/deadlineTotal*100):0;
+    const subjects=serviceSubjectList();
+    const subjectRows=subjects.map(function(subject){
+      const key=kgeuSubjectKey(subject);
+      const lessons=(Array.isArray(allLessons)?allLessons:[]).filter(function(x){return kgeuSubjectKey(x.subject)===key;}).length;
+      const tasks=serviceData.tasks.filter(function(x){return kgeuSubjectKey(x.subject)===key;});
+      const deadlines=serviceData.deadlines.filter(function(x){return kgeuSubjectKey(x.subject)===key;});
+      const total=tasks.length+deadlines.length;
+      const done=tasks.filter(function(x){return !!x.done;}).length+deadlines.filter(function(x){return !!x.done;}).length;
+      return {subject:subject,lessons:lessons,total:total,done:done};
+    }).sort(function(a,b){return b.total-a.total||b.lessons-a.lessons||a.subject.localeCompare(b.subject,'ru');});
+    const maxLoad=Math.max(1,...subjectRows.map(function(x){return x.total;}));
+    const subjectHtml=subjectRows.slice(0,12).map(function(x){
+      return '<div class="service-bar-row"><div class="service-bar-label" title="'+serviceEsc(x.subject)+'">'+serviceEsc(x.subject)+'</div><div class="service-bar-track"><span style="width:'+Math.round(x.total/maxLoad*100)+'%"></span></div><div class="service-bar-value">'+x.total+'</div></div>';
+    }).join('')||'<div class="service-calendar-empty">Предметов в расписании пока нет.</div>';
+    const weeks=[];
+    for(let i=3;i>=0;i--){
+      const end=new Date(); end.setHours(0,0,0,0); end.setDate(end.getDate()-i*7);
+      const start=new Date(end); start.setDate(start.getDate()-6);
+      const sk=isoDate(start), ek=isoDate(end);
+      const done=serviceData.tasks.filter(function(x){return x.done&&serviceDateKey(x.dueDate)>=sk&&serviceDateKey(x.dueDate)<=ek;}).length;
+      const due=serviceData.tasks.filter(function(x){return serviceDateKey(x.dueDate)>=sk&&serviceDateKey(x.dueDate)<=ek;}).length;
+      const lessons=(Array.isArray(allLessons)?allLessons:[]).filter(function(x){const d=serviceDateKey(x.date);return d>=sk&&d<=ek;}).length;
+      weeks.push({label:start.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'})+'–'+end.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'}),done:done,due:due,lessons:lessons});
+    }
+    const weekMax=Math.max(1,...weeks.map(function(x){return Math.max(x.due,x.lessons);}));
+    const weekHtml=weeks.map(function(x){return '<div class="service-bar-row"><div class="service-bar-label">'+x.label+' · '+x.lessons+' пар</div><div class="service-bar-track"><span style="width:'+Math.round(Math.max(x.due,x.lessons)/weekMax*100)+'%"></span></div><div class="service-bar-value">'+x.done+'/'+x.due+'</div></div>';}).join('');
+    return '<div class="service-page"><section class="service-hero"><div class="service-kicker">Мой сервис</div><h1 class="service-title">Аналитика</h1><div class="service-sub">Учебная нагрузка и прогресс по данным, которые уже есть в сервисе.</div><div class="service-actions"><button class="service-btn" data-service-action="service-home">← Мой сервис</button><button class="service-btn" data-service-action="study">Учёба</button><button class="service-btn" data-service-action="calendar">Календарь</button></div></section>'+
+      '<section><div class="service-section-title"><h2>Общий прогресс</h2></div><div class="service-analytics-grid">'+
+      '<div class="service-analytics-box"><strong>'+taskTotal+'</strong><span>всего задач</span></div>'+
+      '<div class="service-analytics-box"><strong>'+taskDone+'</strong><span>задач выполнено</span></div>'+
+      '<div class="service-analytics-box"><strong>'+completion+'%</strong><span>выполнение задач</span></div>'+
+      '<div class="service-analytics-box"><strong>'+taskOverdue+'</strong><span>просроченных задач</span></div>'+
+      '<div class="service-analytics-box"><strong>'+deadlineTotal+'</strong><span>всего дедлайнов</span></div>'+
+      '<div class="service-analytics-box"><strong>'+deadlineDone+'</strong><span>дедлайнов закрыто</span></div>'+
+      '<div class="service-analytics-box"><strong>'+deadlineCompletion+'%</strong><span>закрытие дедлайнов</span></div>'+
+      '<div class="service-analytics-box"><strong>'+deadlineOverdue+'</strong><span>просроченных дедлайнов</span></div>'+
+      '</div></section>'+
+      '<section class="service-card"><div class="service-section-title"><h2>Нагрузка по предметам</h2><span class="service-pill">'+subjects.length+'</span></div><div class="service-bar-list">'+subjectHtml+'</div><p class="service-analytics-note" style="margin-top:10px">Нагрузка считается по количеству пар из расписания и связанных задач/дедлайнов. Это не официальная оценка успеваемости.</p></section>'+
+      '<section class="service-card"><div class="service-section-title"><h2>Последние 4 недели</h2></div><div class="service-bar-list">'+weekHtml+'</div><p class="service-analytics-note" style="margin-top:10px">Формат справа: выполнено задач / задач со сроком в неделе. Пары показаны рядом для ориентира по нагрузке.</p></section>'+
+      '<section class="service-card"><h3>Что можно улучшить</h3><p>'+(taskOverdue?('Сейчас есть '+taskOverdue+' просроченных задач — их можно разобрать в разделе «Учёба».'):(taskOpen?'Активные задачи без просрочки — можно заранее закрывать ближайшие сроки.':'Все задачи отмечены как выполненные.'))+'</p></section>'+
+      '</div>';
+  }
   function serviceRenderReminders(){
     const r=serviceData.reminders||{enabled:false,taskDays:1,deadlineDays:1,eventDays:1};
     const items=serviceReminderItems();
@@ -3245,6 +3310,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       if(a==='event')return servicePromptEvent();
       if(a==='calendar'){document.getElementById('app').innerHTML=serviceRenderCalendar();serviceBind();window.scrollTo({top:0,behavior:'smooth'});return;}
       if(a==='reminders'){document.getElementById('app').innerHTML=serviceRenderReminders();serviceBind();window.scrollTo({top:0,behavior:'smooth'});return;}
+      if(a==='analytics'){document.getElementById('app').innerHTML=serviceRenderAnalytics();serviceBind();window.scrollTo({top:0,behavior:'smooth'});return;}
       if(a==='request-notifications'){
         if('Notification' in window){try{const p=await Notification.requestPermission();toast(p==='granted'?'Уведомления разрешены':'Разрешение не выдано');}catch(e){toast('Не удалось запросить разрешение');}}else toast('Этот WebView не поддерживает системные уведомления');
         return;
