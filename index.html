@@ -1084,6 +1084,42 @@ function kgeuSetNote(subject, value) {
 .service-subject-stat{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 .service-chip{display:inline-flex;align-items:center;border-radius:999px;padding:4px 8px;background:var(--bg2);font-size:10px;font-weight:800;color:var(--muted)}
 
+
+.service-calendar-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.service-calendar-title{font-size:17px;font-weight:800;text-transform:capitalize}
+.service-calendar-nav{display:flex;gap:6px}
+.service-calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+.service-calendar-weekday{text-align:center;font-size:10px;font-weight:800;color:var(--muted);padding:3px 0}
+.service-calendar-day{min-height:58px;border:1px solid var(--border);background:var(--card);border-radius:12px;padding:6px;cursor:pointer;position:relative;overflow:hidden}
+.service-calendar-day.muted{opacity:.42}
+.service-calendar-day.today{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.service-calendar-day.selected{background:var(--bg2);border-color:var(--text)}
+.service-calendar-num{font-size:12px;font-weight:800}
+.service-calendar-dots{display:flex;gap:3px;flex-wrap:wrap;margin-top:7px}
+.service-calendar-dot{width:6px;height:6px;border-radius:50%;background:var(--muted)}
+.service-calendar-dot.lesson{background:#2563eb}
+.service-calendar-dot.task{background:#16a34a}
+.service-calendar-dot.deadline{background:#dc2626}
+.service-calendar-dot.event{background:#9333ea}
+.service-calendar-legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px;color:var(--muted);font-size:11px}
+.service-calendar-legend span{display:inline-flex;align-items:center;gap:4px}
+.service-agenda-row{display:flex;gap:9px;align-items:flex-start;border:1px solid var(--border);background:var(--card);border-radius:14px;padding:10px 11px}
+.service-agenda-time{width:42px;flex:0 0 42px;font-size:12px;font-weight:800}
+.service-agenda-kind{font-size:10px;color:var(--muted);margin-top:3px}
+.service-calendar-empty{padding:15px;text-align:center;color:var(--muted);border:1px dashed var(--border);border-radius:14px}
+.service-reminder-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.service-reminder-box{border:1px solid var(--border);background:var(--bg2);border-radius:14px;padding:12px}
+.service-reminder-box strong{display:block;font-size:18px;margin-bottom:3px}
+.service-reminder-box span{font-size:11px;color:var(--muted)}
+.service-reminder-row{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--border);background:var(--card);border-radius:14px;padding:11px}
+.service-toggle{position:relative;width:44px;height:24px;border-radius:999px;border:1px solid var(--border);background:var(--bg2);cursor:pointer;padding:0}
+.service-toggle:after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--muted);transition:.15s}
+.service-toggle.on{background:var(--accent);border-color:var(--accent)}
+.service-toggle.on:after{left:23px;background:#fff}
+@media(max-width:520px){.service-reminder-grid{grid-template-columns:1fr}}
+
+@media(max-width:520px){.service-calendar-day{min-height:52px;padding:5px}.service-calendar-title{font-size:15px}}
+
 @media (max-width:520px){
   .service-grid{grid-template-columns:1fr}
   .service-form-row{grid-template-columns:1fr}
@@ -2779,7 +2815,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
 
   // ===== Student Service: local-first tools, ready for future Bot/Worker sync =====
   const STUDENT_SERVICE_KEY = 'kgeu_student_service_v1';
-  function serviceEmptyData(){return {version:2,tasks:[],deadlines:[],events:[],hostel:{totalGoal:250,adminGoal:100,socialGoal:150,work:[],social:[]}};}
+  function serviceEmptyData(){return {version:3,tasks:[],deadlines:[],events:[],hostel:{totalGoal:250,adminGoal:100,socialGoal:150,work:[],social:[]},reminders:{enabled:false,taskDays:1,deadlineDays:1,eventDays:1}};}
   function serviceLoad(){
     const fallback=serviceEmptyData();
     try{
@@ -2787,10 +2823,16 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       if(!x || typeof x!=='object') return fallback;
       const h=(x.hostel&&typeof x.hostel==='object')?x.hostel:{};
       return {
-        version:2,
+        version:3,
         tasks:Array.isArray(x.tasks)?x.tasks.filter(Boolean):[],
         deadlines:Array.isArray(x.deadlines)?x.deadlines.filter(Boolean):[],
         events:Array.isArray(x.events)?x.events.filter(Boolean):[],
+        reminders:{
+          enabled:!!(x.reminders&&x.reminders.enabled),
+          taskDays:Math.max(0,Math.min(7,Number(x.reminders&&x.reminders.taskDays!=null?x.reminders.taskDays:1))),
+          deadlineDays:Math.max(0,Math.min(7,Number(x.reminders&&x.reminders.deadlineDays!=null?x.reminders.deadlineDays:1))),
+          eventDays:Math.max(0,Math.min(7,Number(x.reminders&&x.reminders.eventDays!=null?x.reminders.eventDays:1)))
+        },
         hostel:{
           totalGoal:Math.max(0,Number(h.totalGoal||250)),
           adminGoal:Math.max(0,Number(h.adminGoal||100)),
@@ -2856,7 +2898,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
         '<div class="service-actions">'+
           '<button class="service-btn primary" data-service-action="task">+ Задача</button>'+
           '<button class="service-btn" data-service-action="deadline">+ Дедлайн</button>'+
-          '<button class="service-btn" data-service-action="event">+ Мероприятие</button><button class="service-btn" data-service-action="study">Учёба</button>'+
+          '<button class="service-btn" data-service-action="event">+ Мероприятие</button><button class="service-btn" data-service-action="calendar">Календарь</button><button class="service-btn" data-service-action="study">Учёба</button><button class="service-btn" data-service-action="reminders">Напоминания</button>'+
         '</div>'+
       '</section>'+
       '<div class="service-grid">'+
@@ -2874,6 +2916,24 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
         '<p>'+serviceTotalPoints()+' / '+Number(serviceData.hostel.totalGoal||250)+' баллов</p>'+
         '<div class="service-actions"><button class="service-btn primary" data-service-action="hostel">🏠 Учёт баллов общежития</button></div>'+
       '</section>'+
+      '<section><div class="service-section-title"><h2>Сегодня</h2><button class="service-btn" data-service-action="calendar">Открыть календарь</button></div>'+
+        '<div class="service-list">'+
+        (function(){
+          const todayKey=isoDate(new Date());
+          const rows=[];
+          lessons.forEach(function(x){rows.push('<div class="service-agenda-row"><div class="service-agenda-time">'+serviceEsc(x.start||'—')+'</div><div class="service-row-main"><div class="service-row-title">'+serviceEsc(x.subject||'Пара')+'</div><div class="service-agenda-kind">'+serviceEsc(roomText(x.room||x.aud||''))+'</div></div></div>');});
+          serviceData.tasks.filter(function(x){return !x.done&&serviceDateKey(x.dueDate)===todayKey;}).forEach(function(x){rows.push('<div class="service-agenda-row"><div class="service-agenda-time">—</div><div class="service-row-main"><div class="service-row-title">'+serviceEsc(x.title)+'</div><div class="service-agenda-kind">Задача'+serviceSubjectText(x.subject)+'</div></div></div>');});
+          serviceData.deadlines.filter(function(x){return !x.done&&serviceDateKey(x.date)===todayKey;}).forEach(function(x){rows.push('<div class="service-agenda-row"><div class="service-agenda-time">!</div><div class="service-row-main"><div class="service-row-title">'+serviceEsc(x.title)+'</div><div class="service-agenda-kind">Дедлайн'+serviceSubjectText(x.subject)+'</div></div></div>');});
+          serviceData.events.filter(function(x){return serviceDateKey(x.date)===todayKey;}).forEach(function(x){rows.push('<div class="service-agenda-row"><div class="service-agenda-time">★</div><div class="service-row-main"><div class="service-row-title">'+serviceEsc(x.title)+'</div><div class="service-agenda-kind">Мероприятие · '+Number(x.points||0)+' б.</div></div></div>');});
+          return rows.join('')||'<div class="service-calendar-empty">На сегодня ничего дополнительного нет.</div>';
+        })()+
+        '</div></section>'+
+      '<section><div class="service-section-title"><h2>На ближайшие 7 дней</h2><button class="service-btn" data-service-action="reminders">Напоминания</button></div>'+
+        '<div class="service-reminder-grid">'+
+          '<div class="service-reminder-box"><strong>'+serviceData.tasks.filter(function(x){return !x.done&&serviceDateKey(x.dueDate)&&x.dueDate>=isoDate(new Date())&&x.dueDate<=isoDate(new Date(Date.now()+6*86400000));}).length+'</strong><span>задач</span></div>'+
+          '<div class="service-reminder-box"><strong>'+serviceData.deadlines.filter(function(x){return !x.done&&serviceDateKey(x.date)&&x.date>=isoDate(new Date())&&x.date<=isoDate(new Date(Date.now()+6*86400000));}).length+'</strong><span>дедлайнов</span></div>'+
+          '<div class="service-reminder-box"><strong>'+serviceData.events.filter(function(x){return serviceDateKey(x.date)&&x.date>=isoDate(new Date())&&x.date<=isoDate(new Date(Date.now()+6*86400000));}).length+'</strong><span>мероприятий</span></div>'+
+        '</div></section>'+
       '<section><div class="service-section-title"><h2>Ближайшие дедлайны</h2></div>'+
         '<div class="service-list">'+
         (serviceData.deadlines.filter(x=>!x.done).sort((a,b)=>String(a.date).localeCompare(String(b.date))).slice(0,4).map(x=>
@@ -3026,7 +3086,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       return '<div class="service-row"><button class="service-btn" data-service-subject="'+serviceEsc(subject)+'">→</button><div class="service-row-main"><div class="service-row-title">'+serviceEsc(subject)+'</div><div class="service-row-meta">'+(note?'Есть заметка':'Заметки нет')+' · '+taskCount+' задач · '+dlCount+' дедлайнов</div></div><button class="service-btn" data-service-note-subject="'+serviceEsc(subject)+'">📝</button></div>';
     }).join('');
     return '<div class="service-page"><section class="service-hero"><div class="service-kicker">Учёба</div><h1 class="service-title">Учебный центр</h1><div class="service-sub">Задачи, дедлайны и предметы в одном месте. Ищи по названию и быстро отбирай нужное.</div>'+
-      '<div class="service-actions"><button class="service-btn primary" data-service-action="task">+ Задача</button><button class="service-btn" data-service-action="deadline">+ Дедлайн</button><button class="service-btn" data-service-action="schedule">Расписание →</button><button class="service-btn" data-service-action="service-home">← Мой сервис</button></div></section>'+
+      '<div class="service-actions"><button class="service-btn primary" data-service-action="task">+ Задача</button><button class="service-btn" data-service-action="deadline">+ Дедлайн</button><button class="service-btn" data-service-action="schedule">Расписание →</button><button class="service-btn" data-service-action="reminders">Напоминания</button><button class="service-btn" data-service-action="service-home">← Мой сервис</button></div></section>'+
       '<section class="service-study-tools"><input id="service-study-search" class="service-study-search" type="search" autocomplete="off" placeholder="Поиск по задачам, дедлайнам, предметам…" value="'+serviceEsc(serviceStudyQuery)+'">'+
       '<div class="service-filter-row">'+chip('all','Все')+chip('active','Активные')+chip('today','Сегодня')+chip('overdue','Просрочено')+chip('done','Готово')+'</div>'+
       '<select id="service-study-subject" class="service-study-select">'+subjectOptions+'</select></section>'+
@@ -3085,6 +3145,66 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       '<p>Документ сформирован в KGEU Student Service. Перед официальной подачей проверьте соответствие требованиям общежития.</p></body></html>';
     serviceDownload('KGEU_отчет_по_баллам_'+isoDate(new Date())+'.doc',doc,'application/msword');
   }
+  let serviceCalendarDate=new Date();
+  let serviceCalendarSelected=isoDate(new Date());
+  function serviceCalendarMonthKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+  function serviceCalendarDaysInMonth(year,month){return new Date(year,month+1,0).getDate();}
+  function serviceCalendarItems(dateKey){
+    const items=[];
+    (Array.isArray(allLessons)?allLessons:[]).filter(function(x){return String(x.date||'')===dateKey;}).forEach(function(x){items.push({type:'lesson',time:x.start||'00:00',title:x.subject||'Пара',meta:(x.end?x.start+'–'+x.end:'')+(x.room||x.aud?' · '+roomText(x.room||x.aud||''):'' )});});
+    serviceData.tasks.filter(function(x){return !x.done&&serviceDateKey(x.dueDate)===dateKey;}).forEach(function(x){items.push({type:'task',time:'',title:x.title,meta:'Задача'+serviceSubjectText(x.subject)});});
+    serviceData.deadlines.filter(function(x){return !x.done&&serviceDateKey(x.date)===dateKey;}).forEach(function(x){items.push({type:'deadline',time:'!',title:x.title,meta:'Дедлайн'+serviceSubjectText(x.subject)});});
+    serviceData.events.filter(function(x){return serviceDateKey(x.date)===dateKey;}).forEach(function(x){items.push({type:'event',time:'★',title:x.title,meta:'Мероприятие · '+Number(x.points||0)+' б.'});});
+    const order={lesson:1,task:2,deadline:3,event:4};
+    return items.sort(function(a,b){return String(a.time||'99:99').localeCompare(String(b.time||'99:99'))||order[a.type]-order[b.type];});
+  }
+  function serviceReminderItems(){
+    const today=isoDate(new Date());
+    const out=[];
+    const add=function(type,title,date,meta){if(!serviceDateKey(date))return; const d0=new Date(today+'T00:00:00'), d1=new Date(date+'T00:00:00'); const days=Math.round((d1-d0)/86400000); if(days>=0&&days<=7) out.push({type:type,title:title,date:date,days:days,meta:meta||''});};
+    serviceData.tasks.filter(x=>!x.done).forEach(x=>add('task',x.title,x.dueDate,'Задача'+serviceSubjectText(x.subject)));
+    serviceData.deadlines.filter(x=>!x.done).forEach(x=>add('deadline',x.title,x.date,'Дедлайн'+serviceSubjectText(x.subject)));
+    serviceData.events.forEach(x=>add('event',x.title,x.date,'Мероприятие'));
+    const order={deadline:1,task:2,event:3};
+    return out.sort((a,b)=>a.days-b.days||order[a.type]-order[b.type]||a.title.localeCompare(b.title));
+  }
+  function serviceRenderReminders(){
+    const r=serviceData.reminders||{enabled:false,taskDays:1,deadlineDays:1,eventDays:1};
+    const items=serviceReminderItems();
+    const rows=items.map(function(x){const when=x.days===0?'Сегодня':(x.days===1?'Завтра':'Через '+x.days+' дн.');return '<div class="service-reminder-row"><div class="service-row-main"><div class="service-row-title">'+serviceEsc(x.title)+'</div><div class="service-row-meta">'+serviceEsc(x.meta)+' · '+serviceDate(x.date)+'</div></div><span class="service-status '+(x.days===0?'today':'upcoming')+'">'+when+'</span></div>';}).join('')||'<div class="service-calendar-empty">На ближайшие 7 дней ничего нет.</div>';
+    return '<div class="service-page"><section class="service-hero"><div class="service-kicker">Мой сервис</div><h1 class="service-title">Напоминания</h1><div class="service-sub">Локальные напоминания работают, когда сервис открыт. Telegram-уведомления подключим после backend.</div><div class="service-actions"><button class="service-btn" data-service-action="service-home">← Мой сервис</button><button class="service-btn" data-service-action="calendar">Календарь</button></div></section>'+
+      '<section class="service-card"><div class="service-section-title"><h2>Настройки</h2><button class="service-toggle '+(r.enabled?'on':'')+'" data-reminders-toggle aria-label="Включить напоминания"></button></div>'+
+      '<p>Включение: '+(r.enabled?'включено':'выключено')+'. Браузер может дополнительно запросить разрешение на уведомления.</p>'+
+      '<div class="service-actions"><button class="service-btn primary" data-service-action="request-notifications">Разрешить уведомления</button></div></section>'+
+      '<section><div class="service-section-title"><h2>Ближайшие 7 дней</h2><span class="service-pill">'+items.length+'</span></div><div class="service-list">'+rows+'</div></section></div>';
+  }
+  function serviceRenderCalendar(){
+    const d=new Date(serviceCalendarDate.getFullYear(),serviceCalendarDate.getMonth(),1);
+    const year=d.getFullYear(),month=d.getMonth();
+    const first=(new Date(year,month,1).getDay()+6)%7;
+    const count=serviceCalendarDaysInMonth(year,month);
+    const prevCount=serviceCalendarDaysInMonth(year,month-1);
+    const cells=[];
+    const todayKey=isoDate(new Date());
+    for(let i=0;i<42;i++){
+      const offset=i-first+1;
+      let day=offset,cellMonth=month,cellYear=year,muted=false;
+      if(offset<1){day=prevCount+offset;cellMonth=month-1;cellYear=year;muted=true;}
+      else if(offset>count){day=offset-count;cellMonth=month+1;cellYear=year;muted=true;}
+      const key=cellYear+'-'+String(cellMonth+1).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+      const items=serviceCalendarItems(key);
+      const dots=items.slice(0,5).map(function(x){return '<span class="service-calendar-dot '+x.type+'"></span>';}).join('');
+      cells.push('<button type="button" class="service-calendar-day '+(muted?'muted ':'')+(key===todayKey?'today ':'')+(key===serviceCalendarSelected?'selected':'')+'" data-calendar-date="'+key+'"><div class="service-calendar-num">'+day+'</div><div class="service-calendar-dots">'+dots+'</div></button>');
+    }
+    const selectedItems=serviceCalendarItems(serviceCalendarSelected);
+    const agenda=selectedItems.map(function(x){return '<div class="service-agenda-row"><div class="service-agenda-time">'+serviceEsc(x.time||'—')+'</div><div class="service-row-main"><div class="service-row-title">'+serviceEsc(x.title)+'</div><div class="service-agenda-kind">'+serviceEsc(x.meta)+'</div></div></div>';}).join('')||'<div class="service-calendar-empty">На выбранную дату ничего нет.</div>';
+    const monthTitle=d.toLocaleDateString('ru-RU',{month:'long',year:'numeric'});
+    return '<div class="service-page"><section class="service-hero"><div class="service-kicker">Мой сервис</div><h1 class="service-title">Календарь</h1><div class="service-sub">Пары, задачи, дедлайны и мероприятия — в одном календаре.</div><div class="service-actions"><button class="service-btn" data-service-action="service-home">← Мой сервис</button><button class="service-btn" data-service-action="study">Учёба</button></div></section>'+
+      '<section class="service-card"><div class="service-calendar-head"><button class="service-btn" data-calendar-prev>‹</button><div class="service-calendar-title">'+serviceEsc(monthTitle)+'</div><div class="service-calendar-nav"><button class="service-btn" data-calendar-today>Сегодня</button><button class="service-btn" data-calendar-next>›</button></div></div>'+
+      '<div class="service-calendar-grid">'+['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(function(x){return '<div class="service-calendar-weekday">'+x+'</div>';}).join('')+cells.join('')+'</div>'+
+      '<div class="service-calendar-legend"><span><i class="service-calendar-dot lesson"></i>пары</span><span><i class="service-calendar-dot task"></i>задачи</span><span><i class="service-calendar-dot deadline"></i>дедлайны</span><span><i class="service-calendar-dot event"></i>мероприятия</span></div></section>'+
+      '<section><div class="service-section-title"><h2>'+serviceDate(serviceCalendarSelected)+'</h2></div><div class="service-list">'+agenda+'</div></section></div>';
+  }
   function renderService(){return serviceRenderToday();}
 
   (function bindStudentServiceLauncher(){
@@ -3101,6 +3221,13 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
   })();
 
   function serviceBind(){
+    document.querySelectorAll('[data-calendar-date]').forEach(function(b){b.addEventListener('click',function(){serviceCalendarSelected=b.getAttribute('data-calendar-date')||serviceCalendarSelected;serviceCalendarDate=new Date(serviceCalendarSelected+'T00:00:00');document.getElementById('app').innerHTML=serviceRenderCalendar();serviceBind();});});
+    const calPrev=document.querySelector('[data-calendar-prev]');
+    if(calPrev)calPrev.addEventListener('click',function(){serviceCalendarDate=new Date(serviceCalendarDate.getFullYear(),serviceCalendarDate.getMonth()-1,1);serviceCalendarSelected=serviceCalendarMonthKey(serviceCalendarDate)+'-01';document.getElementById('app').innerHTML=serviceRenderCalendar();serviceBind();});
+    const calNext=document.querySelector('[data-calendar-next]');
+    if(calNext)calNext.addEventListener('click',function(){serviceCalendarDate=new Date(serviceCalendarDate.getFullYear(),serviceCalendarDate.getMonth()+1,1);serviceCalendarSelected=serviceCalendarMonthKey(serviceCalendarDate)+'-01';document.getElementById('app').innerHTML=serviceRenderCalendar();serviceBind();});
+    const calToday=document.querySelector('[data-calendar-today]');
+    if(calToday)calToday.addEventListener('click',function(){serviceCalendarDate=new Date();serviceCalendarSelected=isoDate(new Date());document.getElementById('app').innerHTML=serviceRenderCalendar();serviceBind();});
     const search=document.getElementById('service-study-search');
     if(search){
       search.addEventListener('input',function(){serviceStudyQuery=search.value;serviceApplyStudyFilters();});
@@ -3109,11 +3236,19 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     const subjectSelect=document.getElementById('service-study-subject');
     if(subjectSelect){subjectSelect.addEventListener('change',function(){serviceStudySubject=subjectSelect.value;serviceApplyStudyFilters();});}
     document.querySelectorAll('[data-study-filter]').forEach(function(b){b.addEventListener('click',function(){serviceStudyFilter=b.getAttribute('data-study-filter')||'all';document.querySelectorAll('[data-study-filter]').forEach(function(x){x.classList.toggle('active',x===b);});serviceApplyStudyFilters();});});
+    const reminderToggle=document.querySelector('[data-reminders-toggle]');
+    if(reminderToggle) reminderToggle.addEventListener('click',function(){serviceData.reminders=serviceData.reminders||{taskDays:1,deadlineDays:1,eventDays:1};serviceData.reminders.enabled=!serviceData.reminders.enabled;serviceSave();document.getElementById('app').innerHTML=serviceRenderReminders();serviceBind();});
     document.querySelectorAll('[data-service-action]').forEach(function(b){b.addEventListener('click',async function(){
       const a=b.getAttribute('data-service-action');
       if(a==='task')return servicePromptTask();
       if(a==='deadline')return servicePromptDeadline();
       if(a==='event')return servicePromptEvent();
+      if(a==='calendar'){document.getElementById('app').innerHTML=serviceRenderCalendar();serviceBind();window.scrollTo({top:0,behavior:'smooth'});return;}
+      if(a==='reminders'){document.getElementById('app').innerHTML=serviceRenderReminders();serviceBind();window.scrollTo({top:0,behavior:'smooth'});return;}
+      if(a==='request-notifications'){
+        if('Notification' in window){try{const p=await Notification.requestPermission();toast(p==='granted'?'Уведомления разрешены':'Разрешение не выдано');}catch(e){toast('Не удалось запросить разрешение');}}else toast('Этот WebView не поддерживает системные уведомления');
+        return;
+      }
       if(a==='hostel'){document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();return;}
       if(a==='study'){document.getElementById('app').innerHTML=serviceRenderStudy();serviceBind();return;}
       if(a==='schedule'||a==='today'){switchTab('today');return;}
