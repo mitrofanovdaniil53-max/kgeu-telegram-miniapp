@@ -1,0 +1,11 @@
+name = "kgeu-student-service-api"
+main = "kgeu_service_worker_v21.js"
+compatibility_date = "2026-09-19"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "kgeu-student-service"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+
+# Store the bot token as a Worker secret, not in source code:
+# npx wrangler secret put TELEGRAM_BOT_TOKEN
