@@ -4,8 +4,8 @@ compatibility_date = "2026-09-19"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "kgeu-student-service"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+database_name = "kgeu-student-db"
+database_id = "e6fccc0d-11ff-43f0-be47-6f15159780dd"
 
 # Store the bot token as a Worker secret, not in source code:
 # npx wrangler secret put TELEGRAM_BOT_TOKEN
