@@ -1056,6 +1056,15 @@ function kgeuSetNote(subject, value) {
 .hostel-box strong{font-size:22px}
 .hostel-box span{display:block;color:var(--muted);font-size:12px;margin-top:2px}
 .report-note{font-size:12px;color:var(--muted);line-height:1.45;margin-top:8px}
+.service-row.is-done{opacity:.62}
+.service-row.is-done .service-row-title{text-decoration:line-through}
+.service-status{display:inline-flex;align-items:center;border-radius:999px;padding:4px 7px;font-size:10px;font-weight:800;white-space:nowrap}
+.service-status.overdue{background:rgba(220,38,38,.12);color:#dc2626}
+.service-status.today{background:rgba(217,119,6,.12);color:#b45309}
+.service-status.done{background:rgba(53,201,138,.13);color:#16835b}
+.service-status.upcoming{background:var(--bg2);color:var(--muted)}
+.service-section-title .service-btn{padding:7px 10px;font-size:12px}
+
 @media (max-width:520px){
   .service-grid{grid-template-columns:1fr}
   .service-form-row{grid-template-columns:1fr}
@@ -2751,16 +2760,45 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
 
   // ===== Student Service: local-first tools, ready for future Bot/Worker sync =====
   const STUDENT_SERVICE_KEY = 'kgeu_student_service_v1';
+  function serviceEmptyData(){return {version:2,tasks:[],deadlines:[],events:[],hostel:{totalGoal:250,adminGoal:100,socialGoal:150,work:[],social:[]}};}
   function serviceLoad(){
+    const fallback=serviceEmptyData();
     try{
       const x=JSON.parse(localStorage.getItem(STUDENT_SERVICE_KEY)||'null');
-      return x && typeof x==='object' ? x : {tasks:[],deadlines:[],events:[],hostel:{totalGoal:250,adminGoal:100,socialGoal:150,work:[],social:[]}};
-    }catch(e){return {tasks:[],deadlines:[],events:[],hostel:{totalGoal:250,adminGoal:100,socialGoal:150,work:[],social:[]}};}
+      if(!x || typeof x!=='object') return fallback;
+      const h=(x.hostel&&typeof x.hostel==='object')?x.hostel:{};
+      return {
+        version:2,
+        tasks:Array.isArray(x.tasks)?x.tasks.filter(Boolean):[],
+        deadlines:Array.isArray(x.deadlines)?x.deadlines.filter(Boolean):[],
+        events:Array.isArray(x.events)?x.events.filter(Boolean):[],
+        hostel:{
+          totalGoal:Math.max(0,Number(h.totalGoal||250)),
+          adminGoal:Math.max(0,Number(h.adminGoal||100)),
+          socialGoal:Math.max(0,Number(h.socialGoal||150)),
+          work:Array.isArray(h.work)?h.work.filter(Boolean):[],
+          social:Array.isArray(h.social)?h.social.filter(Boolean):[]
+        }
+      };
+    }catch(e){return fallback;}
   }
   let serviceData=serviceLoad();
   function serviceSave(){try{localStorage.setItem(STUDENT_SERVICE_KEY,JSON.stringify(serviceData));}catch(e){}}
   function serviceEsc(s){return escapeHtml(String(s==null?'':s));}
   function serviceDate(s){if(!s)return '';const d=new Date(s+'T00:00:00');return isNaN(d)?s:d.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'});}
+  function serviceDateKey(s){return /^\d{4}-\d{2}-\d{2}$/.test(String(s||''))?String(s):'';}
+  function serviceDeadlineStatus(item){
+    if(item.done)return {cls:'done',label:'Готово'};
+    const d=serviceDateKey(item.date); if(!d)return {cls:'upcoming',label:'Без даты'};
+    const today=isoDate(new Date());
+    if(d<today)return {cls:'overdue',label:'Просрочено'};
+    if(d===today)return {cls:'today',label:'Сегодня'};
+    return {cls:'upcoming',label:'До '+serviceDate(d)};
+  }
+  function serviceSortDeadlines(list){return list.slice().sort(function(a,b){
+    if(!!a.done!==!!b.done)return a.done?1:-1;
+    return String(a.date||'9999-12-31').localeCompare(String(b.date||'9999-12-31'));
+  });}
   function serviceSumWork(){return serviceData.hostel.work.reduce((a,x)=>a+Number(x.points||0),0);}
   function serviceSumSocial(){return serviceData.hostel.social.reduce((a,x)=>a+Number(x.points||0),0);}
   function serviceTotalPoints(){return serviceSumWork()+serviceSumSocial();}
@@ -2806,6 +2844,12 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
           '<div class="service-row"><div class="service-row-main"><div class="service-row-title">'+serviceEsc(x.title)+'</div><div class="service-row-meta">'+serviceDate(x.date)+'</div></div><span class="service-pill">дедлайн</span></div>'
         ).join('') || '<div class="service-empty">Дедлайнов пока нет.</div>')+
         '</div></section>'+
+      '<section><div class="service-section-title"><h2>Ближайшие мероприятия</h2><button class="service-btn" data-service-action="event">+ Добавить</button></div>'+
+        '<div class="service-list">'+
+        (serviceData.events.slice().sort((a,b)=>String(a.date||'9999-12-31').localeCompare(String(b.date||'9999-12-31'))).filter(x=>String(x.date||'9999-12-31')>=isoDate(new Date())).slice(0,3).map(x=>
+          '<div class="service-row"><div class="service-row-main"><div class="service-row-title">'+serviceEsc(x.title)+'</div><div class="service-row-meta">'+serviceDate(x.date)+' · '+Number(x.points||0)+' б.</div></div><span class="service-pill">мероприятие</span></div>'
+        ).join('') || '<div class="service-empty">Ближайших мероприятий нет.</div>')+
+        '</div></section>'+
       '<section><div class="service-section-title"><h2>Последние задачи</h2></div>'+
         '<div class="service-list">'+
         (serviceData.tasks.slice(-4).reverse().map((x,i)=>
@@ -2844,22 +2888,24 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       '</div>';
   }
   function serviceRenderStudy(){
+    const tasks=serviceData.tasks.slice().sort(function(a,b){if(!!a.done!==!!b.done)return a.done?1:-1;return Number(b.createdAt||0)-Number(a.createdAt||0);});
+    const deadlines=serviceSortDeadlines(serviceData.deadlines);
     return '<div class="service-page"><section class="service-hero"><div class="service-kicker">Учёба</div><h1 class="service-title">Задачи и дедлайны</h1><div class="service-sub">Личный учебный слой поверх расписания.</div>'+
       '<div class="service-actions"><button class="service-btn primary" data-service-action="task">+ Задача</button><button class="service-btn" data-service-action="deadline">+ Дедлайн</button><button class="service-btn" data-service-action="service-home">← Мой сервис</button></div></section>'+
       '<section><div class="service-section-title"><h2>Задачи</h2></div><div class="service-list">'+
-      (serviceData.tasks.map(x=>'<div class="service-row"><button class="service-btn" data-service-toggle-task="'+serviceEsc(x.id)+'">'+(x.done?'✓':'○')+'</button><div class="service-row-main"><div class="service-row-title">'+serviceEsc(x.title)+'</div><div class="service-row-meta">'+serviceEsc(x.note||'')+'</div></div><button class="service-btn danger" data-service-del-task="'+serviceEsc(x.id)+'">×</button></div>').join('')||'<div class="service-empty">Задач нет.</div>')+
+      (tasks.map(x=>'<div class="service-row '+(x.done?'is-done':'')+'"><button class="service-btn" data-service-toggle-task="'+serviceEsc(x.id)+'">'+(x.done?'✓':'○')+'</button><div class="service-row-main"><div class="service-row-title">'+serviceEsc(x.title)+'</div><div class="service-row-meta">'+serviceEsc(x.note||'')+'</div></div><button class="service-btn danger" data-service-del-task="'+serviceEsc(x.id)+'">×</button></div>').join('')||'<div class="service-empty">Задач нет.</div>')+
       '</div></section><section><div class="service-section-title"><h2>Дедлайны</h2></div><div class="service-list">'+
-      (serviceData.deadlines.map(x=>'<div class="service-row"><button class="service-btn" data-service-toggle-deadline="'+serviceEsc(x.id)+'">'+(x.done?'✓':'○')+'</button><div class="service-row-main"><div class="service-row-title">'+serviceEsc(x.title)+'</div><div class="service-row-meta">'+serviceDate(x.date)+' · '+serviceEsc(x.note||'')+'</div></div><button class="service-btn danger" data-service-del-deadline="'+serviceEsc(x.id)+'">×</button></div>').join('')||'<div class="service-empty">Дедлайнов нет.</div>')+
+      (deadlines.map(function(x){const st=serviceDeadlineStatus(x);return '<div class="service-row '+(x.done?'is-done':'')+'"><button class="service-btn" data-service-toggle-deadline="'+serviceEsc(x.id)+'">'+(x.done?'✓':'○')+'</button><div class="service-row-main"><div class="service-row-title">'+serviceEsc(x.title)+'</div><div class="service-row-meta">'+serviceDate(x.date)+(x.note?' · '+serviceEsc(x.note):'')+'</div></div><span class="service-status '+st.cls+'">'+serviceEsc(st.label)+'</span><button class="service-btn danger" data-service-del-deadline="'+serviceEsc(x.id)+'">×</button></div>';}).join('')||'<div class="service-empty">Дедлайнов нет.</div>')+
       '</div></section></div>';
   }
   function servicePromptTask(){
     const title=prompt('Название задачи:'); if(!title)return;
     const note=prompt('Комментарий (необязательно):')||'';
-    serviceData.tasks.push({id:'t_'+Date.now(),title:title,note:note,done:false,createdAt:Date.now()});serviceSave();render();
+    serviceData.tasks.push({id:'t_'+Date.now(),title:title.trim(),note:note.trim(),done:false,createdAt:Date.now()});serviceSave();render();
   }
   function servicePromptDeadline(){
     const title=prompt('Что нужно сделать?'); if(!title)return;
-    const date=prompt('Дата дедлайна в формате ГГГГ-ММ-ДД:',isoDate(new Date())); if(!date)return;
+    const date=prompt('Дата дедлайна в формате ГГГГ-ММ-ДД:',isoDate(new Date())); if(!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) { toast('Укажи дату в формате ГГГГ-ММ-ДД'); return; }
     const note=prompt('Комментарий (необязательно):')||'';
     serviceData.deadlines.push({id:'d_'+Date.now(),title:title,date:date,note:note,done:false});serviceSave();render();
   }
@@ -2875,6 +2921,10 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
   function serviceReadFile(file){
     return new Promise(function(resolve){
       if(!file){resolve({name:'',data:''});return;}
+      // localStorage is intentionally only a temporary local cache; large base64
+      // attachments can exceed browser/WebView quotas. Keep the filename if the
+      // file is too large and leave actual sync/storage for the future backend.
+      if(file.size>1500000){toast('Файл больше 1,5 МБ — сохраню только его название');resolve({name:file.name,data:''});return;}
       const r=new FileReader();r.onload=function(){resolve({name:file.name,data:String(r.result||'')});};r.onerror=function(){resolve({name:file.name,data:''});};r.readAsDataURL(file);
     });
   }
