@@ -1,5 +1,5 @@
 name = "kgeu-telegram-miniapp"
-main = "kgeu_service_worker_v21.js"
+main = "worker.js"
 compatibility_date = "2026-09-19"
 
 [[d1_databases]]
