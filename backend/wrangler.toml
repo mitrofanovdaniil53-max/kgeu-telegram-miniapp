@@ -9,3 +9,4 @@ database_id = "e6fccc0d-11ff-43f0-be47-6f15159780dd"
 
 # Store the bot token as a Worker secret, not in source code:
 # npx wrangler secret put TELEGRAM_BOT_TOKEN
+# Cloudflare Worker backend
