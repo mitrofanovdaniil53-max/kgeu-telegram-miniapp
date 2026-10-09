@@ -1563,7 +1563,13 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     try { return Object.assign({ theme: 'auto', autoRefresh: true, density: 'standard', showTeachers: true, showRooms: true, showTypes: true, showBreaks: true }, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); }
     catch (e) { return { theme: 'auto', autoRefresh: true, density: 'standard', showTeachers: true, showRooms: true, showTypes: true, showBreaks: true }; }
   }
-  function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {} }
+  function saveSettings() {
+    try {
+      const next=JSON.stringify(settings), previous=localStorage.getItem(SETTINGS_KEY);
+      localStorage.setItem(SETTINGS_KEY,next);
+      if(previous&&previous!==next&&!window.__kgeuApplyingSharedProfile&&typeof window.kgeuMarkStudentServiceDirty==='function')window.kgeuMarkStudentServiceDirty('profile');
+    } catch (e) {}
+  }
   function getSystemTheme() {
     // Prefer Telegram's own colorScheme (it reflects the client's active theme
     // even when the OS-level prefers-color-scheme differs), fall back to the
@@ -1637,11 +1643,10 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
 
   function saveActiveGroup() {
     try {
-      localStorage.setItem(ACTIVE_GROUP_KEY, JSON.stringify({
-        id: activeGroupId,
-        name: GROUP_NAME,
-        institute: INSTITUTE_NAME || ''
-      }));
+      const next=JSON.stringify({id:activeGroupId,name:GROUP_NAME,institute:INSTITUTE_NAME||''});
+      const previous=localStorage.getItem(ACTIVE_GROUP_KEY);
+      localStorage.setItem(ACTIVE_GROUP_KEY,next);
+      if(previous&&previous!==next&&!window.__kgeuApplyingSharedProfile&&typeof window.kgeuMarkStudentServiceDirty==='function')window.kgeuMarkStudentServiceDirty('profile');
     } catch (e) {}
   }
   if (!activeGroupId) setActiveGroup(DEFAULT_GROUP_ID, DEFAULT_GROUP_NAME);
@@ -2883,8 +2888,38 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       kgeuPersonalData={version:1,notes:(pd.notes&&typeof pd.notes==='object')?pd.notes:{},updatedAt:Date.now()};
       if(typeof kgeuSavePersonalData==='function')kgeuSavePersonalData(kgeuPersonalData);
     }
+    let profileChanged=false;
+    const profile=snapshot.profileData&&typeof snapshot.profileData==='object'?snapshot.profileData:{};
+    try{
+      window.__kgeuApplyingSharedProfile=true;
+      if(profile.activeGroup&&Number(profile.activeGroup.id)){
+        const next={id:Number(profile.activeGroup.id),name:String(profile.activeGroup.name||''),institute:String(profile.activeGroup.institute||'')};
+        const previous=JSON.parse(localStorage.getItem(ACTIVE_GROUP_KEY)||'null');
+        if(!previous||Number(previous.id)!==next.id||String(previous.name||'')!==next.name||String(previous.institute||'')!==next.institute){
+          setActiveGroup(next.id,next.name);
+          INSTITUTE_NAME=next.institute||'';
+          saveActiveGroup();
+          rememberGroup(activeGroupId,GROUP_NAME);
+          updateGroupLabel();
+          profileChanged=true;
+        }
+      }
+      if(profile.settings&&typeof profile.settings==='object'){
+        const nextSettings=Object.assign({},settings,profile.settings);
+        if(JSON.stringify(settings)!==JSON.stringify(nextSettings)){
+          settings=nextSettings;
+          saveSettings();
+          applyTelegramThemeParams();
+          profileChanged=true;
+        }
+      }
+    }catch(e){}finally{window.__kgeuApplyingSharedProfile=false;}
     const m=serviceSyncMeta();m.dirty=false;m.lastLocalSave=Number(serviceData.updatedAt||Date.now());m.lastServerSync=Number(snapshot.updatedAt||Date.now());
     localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(m));
+    if(profileChanged&&!window.__kgeuSharedProfileReloading){
+      window.__kgeuSharedProfileReloading=true;
+      window.location.reload();
+    }
   }
 
   // Refresh only the visible Student Service screen after a remote update.
@@ -3058,7 +3093,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
   }
   function serviceSyncPackage(){
     const meta=serviceSyncMeta();
-    return {format:'kgeu-student-service-sync',formatVersion:1,schemaVersion:STUDENT_SERVICE_SCHEMA,deviceId:meta.deviceId,exportedAt:new Date().toISOString(),serviceData:serviceNormalizeData(serviceData),personalData:(typeof kgeuPersonalData!=='undefined'?kgeuPersonalData:{version:1,notes:{}})};
+    return {format:'kgeu-student-service-sync',formatVersion:1,schemaVersion:STUDENT_SERVICE_SCHEMA,deviceId:meta.deviceId,exportedAt:new Date().toISOString(),serviceData:serviceNormalizeData(serviceData),personalData:(typeof kgeuPersonalData!=='undefined'?kgeuPersonalData:{version:1,notes:{}}),profileData:{activeGroup:{id:Number(activeGroupId)||DEFAULT_GROUP_ID,name:String(GROUP_NAME||DEFAULT_GROUP_NAME),institute:String(INSTITUTE_NAME||DEFAULT_INSTITUTE_NAME)},settings:Object.assign({},settings)}};
   }
   function serviceExportSyncPackage(){
     try{
