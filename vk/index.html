@@ -3775,10 +3775,10 @@ html.vk-light .service-pill {
     const localTime=m.lastLocalSave?new Date(m.lastLocalSave).toLocaleString('ru-RU'):'—';
     const serverTime=m.lastServerSync?new Date(m.lastServerSync).toLocaleString('ru-RU'):'ещё не было';
     const endpoint=serviceSyncEndpoint();
-    const tg=serviceTelegramInitData();
+    const tg=serviceTelegramInitData() || (window.KGEU_VK_PLATFORM && /(^|&)vk_user_id=/.test(String(window.location.search||'').replace(/^\\?/,'').replace(/^\\?/,'') ) ? 'vk' : '');
     return '<div class="service-page"><section class="service-hero"><div class="service-kicker">Мой сервис</div><h1 class="service-title">Синхронизация</h1><div class="service-sub">Изменения синхронизируются автоматически при сохранении, возвращении в приложение и восстановлении интернета. Ручные действия остаются для диагностики и восстановления. Перед восстановлением локальная копия сохраняется автоматически.</div><div class="service-actions"><button class="service-btn" data-service-action="service-home">← Мой сервис</button><button class="service-btn" data-service-action="data">Данные</button></div></section>'+
       '<section class="service-card"><div class="service-section-title"><h2>Состояние</h2><span id="service-sync-status" class="service-status '+(m.dirty?'today':'done')+'">'+(m.dirty?'Есть локальные изменения':'Локально сохранено')+'</span></div><div class="service-data-grid"><div class="service-data-box"><strong>Локально</strong><span>источник данных</span></div><div class="service-data-box"><strong>'+serviceEsc(device||'—')+'</strong><span>ID устройства</span></div><div class="service-data-box"><strong>'+serviceData.tasks.length+'</strong><span>задач</span></div><div class="service-data-box"><strong>'+serviceData.deadlines.length+'</strong><span>дедлайнов</span></div></div><p class="service-data-note">Последнее локальное изменение: '+serviceEsc(localTime)+' · последняя успешная синхронизация: '+serviceEsc(serverTime)+'.</p></section>'+
-      '<section class="service-card"><h2 style="margin:0 0 5px">Worker API</h2><p class="service-data-note">Адрес Cloudflare Worker. Для облачного обмена нужны маршруты <code>/api/health</code> и <code>/api/sync</code> с проверкой Telegram initData.</p><div class="service-form-row"><input id="service-sync-endpoint" class="service-input" type="url" inputmode="url" placeholder="https://kgeu-telegram-miniapp.2vkv544dmd.workers.dev" value="'+serviceEsc(endpoint)+'"></div><div class="service-actions"><button class="service-btn" data-service-action="save-sync-endpoint">Сохранить адрес</button><button class="service-btn" data-service-action="check-sync">Проверить связь</button><button class="service-btn primary" data-service-action="sync-now">Отправить в облако</button><button class="service-btn" data-service-action="pull-cloud">Получить из облака</button></div><p id="service-sync-feedback" class="service-data-note">'+(endpoint?(tg?'Авторизация платформы доступна':'Параметры авторизации платформы пока недоступны'):'Worker пока не настроен.')+'</p></section>'+
+      '<section class="service-card"><h2 style="margin:0 0 5px">Worker API</h2><p class="service-data-note">Адрес Cloudflare Worker. Для облачного обмена нужны маршруты <code>/api/health</code> и <code>/api/sync</code> с проверкой параметров авторизации текущей платформы.</p><div class="service-form-row"><input id="service-sync-endpoint" class="service-input" type="url" inputmode="url" placeholder="https://kgeu-telegram-miniapp.2vkv544dmd.workers.dev" value="'+serviceEsc(endpoint)+'"></div><div class="service-actions"><button class="service-btn" data-service-action="save-sync-endpoint">Сохранить адрес</button><button class="service-btn" data-service-action="check-sync">Проверить связь</button><button class="service-btn primary" data-service-action="sync-now">Отправить в облако</button><button class="service-btn" data-service-action="pull-cloud">Получить из облака</button></div><p id="service-sync-feedback" class="service-data-note">'+(endpoint?(tg?'Авторизация платформы доступна':'Параметры авторизации платформы пока недоступны'):'Worker пока не настроен.')+'</p></section>'+
       '<section class="service-card"><h2 style="margin:0 0 5px">Безопасность</h2><p class="service-data-note">Клиент не передаёт доверенный userId из localStorage. В Telegram Mini App сервер должен проверять <code>Telegram.WebApp.initData</code>; данные <code>initDataUnsafe</code> нельзя считать доверенными. До проверки сервером никакая облачная запись не считается авторизованной.</p></section>'+
       '<section class="service-card"><h2 style="margin:0 0 5px">Ручной пакет</h2><p class="service-data-note">Если backend недоступен, JSON-пакет по-прежнему можно сохранить как резервную копию.</p><div class="service-actions"><button class="service-btn" data-service-action="export-sync">Экспортировать пакет</button></div></section></div>';
   }
@@ -4530,13 +4530,11 @@ document.addEventListener("DOMContentLoaded", () => {
           const profileChanged = !meta.dirtyProfile && await applyProfile(profile);
           if (!meta.dirtyService && typeof window.kgeuApplySharedServiceData === 'function') window.kgeuApplySharedServiceData(snapshot.serviceData, remote.updatedAt);
           applyPersonal(personal);
-          if (profileChanged) {
-            meta.lastServerRevision = Number(remote.revision || 0);
-            meta.lastSyncAt = Date.now();
-            meta.initialized = true;
-            writeMeta(meta);
-            setStatus('Получены общие данные. Выбранная группа и настройки обновлены.');
-          }
+          meta.lastServerRevision = Number(remote.revision || 0);
+          meta.lastSyncAt = Date.now();
+          meta.initialized = true;
+          writeMeta(meta);
+          if (profileChanged) setStatus('Получены общие данные. Выбранная группа и настройки обновлены.');
         }
         if (merged.conflicts) setStatus('Синхронизация выполнена. Есть ' + merged.conflicts + ' заметок с разными версиями — локальная копия сохранена.');
       } else {
