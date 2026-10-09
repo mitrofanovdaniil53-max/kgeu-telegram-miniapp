@@ -1,0 +1,22 @@
+name: Platform checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  syntax-and-migration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check inline JavaScript and Worker syntax
+        run: node scripts/check-inline-js.mjs
+      - name: Test additive D1 migration
+        run: python -m unittest discover -s tests -v
