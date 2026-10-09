@@ -1,6 +1,6 @@
 # Unified Telegram + VK student platform
 
-**Status:** implementation staged in PR #9; not deployed to production. Existing live apps and Workers must remain unchanged until rollout gates pass.
+**Status:** implementation staged in PR #10; not deployed to production. Existing live apps and Workers must remain unchanged until rollout gates pass.
 
 ## Goal
 
@@ -50,7 +50,7 @@ Platform-specific bot IDs, tokens, notification subscriptions and client-only ca
 
 ## Rollout gates
 
-1. Review PR #9 and wait for CI checks.
+1. Review PR #10 and wait for CI checks.
 2. Generate and retain a production D1 export before any mutation.
 3. Apply `backend/migrations/0002_account_linking.sql`; verify table counts and foreign keys.
 4. Configure `VK_APP_SECRET` as a Cloudflare Worker secret. Do not commit or paste it into chat.
