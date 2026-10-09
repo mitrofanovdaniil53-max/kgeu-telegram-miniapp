@@ -32,7 +32,7 @@ Do not change the VK Mini App launch URL until the new path is live and verified
 
 1. Retain a production D1 export before changing the schema.
 2. Apply the additive migration `backend/migrations/0002_account_linking.sql`.
-3. Configure `VK_APP_SECRET` as a Cloudflare Worker secret. Never commit or paste it into chat.
+3. Configure `VK_APP_SECRET` as a Cloudflare Worker secret from the VK Mini App settings (not a community bot token). Never commit or paste it into chat. Optionally set the non-secret `VK_APP_ID` Worker variable to pin the expected app ID.
 4. Deploy the shared Worker and verify `/api/health`.
 5. Publish both frontends and test with a real VK session, including cross-platform edits and conflict recovery.
 6. Only after testing, switch the VK Mini App URL. Keep the old VK repository and bot Workers intact until rollback is verified.
