@@ -3016,7 +3016,7 @@ html.vk-light .service-pill {
     const initData=serviceTelegramInitData();
     if(initData) headers['X-Telegram-Init-Data']=initData;
     else if(window.KGEU_VK_PLATFORM){
-      const vkParams=String(window.location.search||'').replace(/^\\?/,'');
+      const vkParams=String(window.location.search||'').replace(/^\?/,'');
       if(vkParams && /(^|&)vk_user_id=/.test(vkParams) && /(^|&)sign=/.test(vkParams)) headers['X-VK-Launch-Params']=vkParams;
     }
     const res=await fetch(endpoint+path,Object.assign({},options||{},{headers:headers}));
@@ -4520,10 +4520,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         const localService = readCachedService();
         snapshot.serviceData = meta.dirtyService && localService ? localService : (remote.serviceData || DEFAULT_SERVICE);
-        if (!meta.dirtyService) {
-          writeCachedService(snapshot.serviceData);
-          if (typeof window.kgeuApplySharedServiceData === 'function') window.kgeuApplySharedServiceData(snapshot.serviceData, remote.updatedAt);
-        }
+        if (!meta.dirtyService) writeCachedService(snapshot.serviceData);
         const merged = mergeNotes(remote.personalData, local, meta.dirtyNotes || []);
         personal = merged.personalData;
         if (meta.dirtyProfile) profile = localProfile;
@@ -4531,6 +4528,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (merged.addedLocalNotes || merged.conflicts) shouldPush = true;
         if (!meta.initialized || Number(remote.revision || 0) > Number(meta.lastServerRevision || 0)) {
           const profileChanged = !meta.dirtyProfile && await applyProfile(profile);
+          if (!meta.dirtyService && typeof window.kgeuApplySharedServiceData === 'function') window.kgeuApplySharedServiceData(snapshot.serviceData, remote.updatedAt);
           applyPersonal(personal);
           if (profileChanged) {
             meta.lastServerRevision = Number(remote.revision || 0);
