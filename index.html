@@ -1563,7 +1563,14 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     try { return Object.assign({ theme: 'auto', autoRefresh: true, density: 'standard', showTeachers: true, showRooms: true, showTypes: true, showBreaks: true }, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); }
     catch (e) { return { theme: 'auto', autoRefresh: true, density: 'standard', showTeachers: true, showRooms: true, showTypes: true, showBreaks: true }; }
   }
-  function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {} }
+  function saveSettings() {
+    try {
+      const next = JSON.stringify(settings);
+      const previous = localStorage.getItem(SETTINGS_KEY);
+      localStorage.setItem(SETTINGS_KEY, next);
+      if (previous !== next && !window.kgeuSharedSyncApplyingProfile && typeof window.kgeuMarkStudentServiceDirty === 'function') window.kgeuMarkStudentServiceDirty();
+    } catch (e) {}
+  }
   function getSystemTheme() {
     // Prefer Telegram's own colorScheme (it reflects the client's active theme
     // even when the OS-level prefers-color-scheme differs), fall back to the
@@ -1637,11 +1644,10 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
 
   function saveActiveGroup() {
     try {
-      localStorage.setItem(ACTIVE_GROUP_KEY, JSON.stringify({
-        id: activeGroupId,
-        name: GROUP_NAME,
-        institute: INSTITUTE_NAME || ''
-      }));
+      const next = JSON.stringify({ id: activeGroupId, name: GROUP_NAME, institute: INSTITUTE_NAME || '' });
+      const previous = localStorage.getItem(ACTIVE_GROUP_KEY);
+      localStorage.setItem(ACTIVE_GROUP_KEY, next);
+      if (previous && previous !== next && !window.kgeuSharedSyncApplyingProfile && typeof window.kgeuMarkStudentServiceDirty === 'function') window.kgeuMarkStudentServiceDirty();
     } catch (e) {}
   }
   if (!activeGroupId) setActiveGroup(DEFAULT_GROUP_ID, DEFAULT_GROUP_NAME);
@@ -2690,6 +2696,27 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       throw e;
     }
   }
+  window.kgeuApplySharedProfile = async function(profile) {
+    if (!profile || typeof profile !== 'object') return;
+    const previousFlag = !!window.kgeuSharedSyncApplyingProfile;
+    window.kgeuSharedSyncApplyingProfile = true;
+    try {
+      if (profile.settings && typeof profile.settings === 'object') {
+        settings = Object.assign({}, settings, profile.settings);
+        saveSettings();
+        applyTheme();
+        syncAppearanceControls();
+        render();
+      }
+      const group = profile.activeGroup;
+      if (group && Number(group.id) && Number(group.id) !== Number(activeGroupId)) {
+        await switchGroup(Number(group.id), String(group.name || ''), { name: String(group.name || ''), institute: String(group.institute || '') });
+      }
+    } finally {
+      window.kgeuSharedSyncApplyingProfile = previousFlag;
+    }
+  };
+
   function bindGroupModal() {
     const btn=document.getElementById('btn-group'); if(btn) btn.addEventListener('click',openGroupModal);
     const close=document.getElementById('group-close'); if(close) close.addEventListener('click',closeGroupModal);
@@ -2883,6 +2910,18 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       kgeuPersonalData={version:1,notes:(pd.notes&&typeof pd.notes==='object')?pd.notes:{},updatedAt:Date.now()};
       if(typeof kgeuSavePersonalData==='function')kgeuSavePersonalData(kgeuPersonalData);
     }
+    if(snapshot.profileData&&typeof snapshot.profileData==='object'){
+      try{
+        const group=snapshot.profileData.activeGroup;
+        if(group&&Number(group.id))localStorage.setItem('kgeu_tg_active_group_v1',JSON.stringify({id:Number(group.id),name:String(group.name||''),institute:String(group.institute||'')}));
+        const settings=snapshot.profileData.settings;
+        if(settings&&typeof settings==='object'){
+          let current={};try{current=JSON.parse(localStorage.getItem('kgeu_tg_settings_v1')||'{}');}catch(e){}
+          localStorage.setItem('kgeu_tg_settings_v1',JSON.stringify(Object.assign({},current,settings)));
+        }
+      }catch(e){}
+      if(typeof window.kgeuApplySharedProfile==='function')window.kgeuApplySharedProfile(snapshot.profileData).catch(function(){});
+    }
     const m=serviceSyncMeta();m.dirty=false;m.lastLocalSave=Number(serviceData.updatedAt||Date.now());m.lastServerSync=Number(snapshot.updatedAt||Date.now());
     localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(m));
   }
@@ -3056,9 +3095,21 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     },5000);
     setTimeout(function(){serviceAutoSync('startup');},1400);
   }
+  function serviceProfileSnapshot(){
+    let activeGroup=null,settings={};
+    try{activeGroup=JSON.parse(localStorage.getItem('kgeu_tg_active_group_v1')||'null');}catch(e){}
+    try{settings=JSON.parse(localStorage.getItem('kgeu_tg_settings_v1')||'{}');}catch(e){}
+    return {
+      activeGroup:activeGroup&&Number(activeGroup.id)?{id:Number(activeGroup.id),name:String(activeGroup.name||''),institute:String(activeGroup.institute||'')}:null,
+      settings:{
+        theme:settings.theme||'auto',autoRefresh:settings.autoRefresh!==false,density:settings.density||'standard',
+        showTeachers:settings.showTeachers!==false,showRooms:settings.showRooms!==false,showTypes:settings.showTypes!==false,showBreaks:settings.showBreaks!==false
+      }
+    };
+  }
   function serviceSyncPackage(){
     const meta=serviceSyncMeta();
-    return {format:'kgeu-student-service-sync',formatVersion:1,schemaVersion:STUDENT_SERVICE_SCHEMA,deviceId:meta.deviceId,exportedAt:new Date().toISOString(),serviceData:serviceNormalizeData(serviceData),personalData:(typeof kgeuPersonalData!=='undefined'?kgeuPersonalData:{version:1,notes:{}})};
+    return {format:'kgeu-student-service-sync',formatVersion:1,schemaVersion:STUDENT_SERVICE_SCHEMA,deviceId:meta.deviceId,exportedAt:new Date().toISOString(),serviceData:serviceNormalizeData(serviceData),personalData:(typeof kgeuPersonalData!=='undefined'?kgeuPersonalData:{version:1,notes:{}}),profileData:serviceProfileSnapshot()};
   }
   function serviceExportSyncPackage(){
     try{
@@ -3558,8 +3609,11 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     const serverTime=m.lastServerSync?new Date(m.lastServerSync).toLocaleString('ru-RU'):'ещё не было';
     const endpoint=serviceSyncEndpoint();
     const tg=serviceTelegramInitData();
+    let linkCodeData=null;try{linkCodeData=JSON.parse(localStorage.getItem('kgeu_student_service_link_code_v1')||'null');}catch(e){}
+    const linkCodeHtml=linkCodeData&&linkCodeData.code&&Number(linkCodeData.expiresAt)>Date.now()?'<div class="service-code-box"><strong>'+serviceEsc(linkCodeData.code)+'</strong><span>Действует до '+serviceEsc(new Date(linkCodeData.expiresAt).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}))+'</span></div>':'<p class="service-data-note">Создай одноразовый код здесь, затем введи его в разделе «Общий аккаунт Telegram ↔ VK» внутри VK Mini App. Код действует 10 минут.</p>';
     return '<div class="service-page"><section class="service-hero"><div class="service-kicker">Мой сервис</div><h1 class="service-title">Синхронизация</h1><div class="service-sub">Изменения синхронизируются автоматически при сохранении, возвращении в приложение и восстановлении интернета. Ручные действия остаются для диагностики и восстановления. Перед восстановлением локальная копия сохраняется автоматически.</div><div class="service-actions"><button class="service-btn" data-service-action="service-home">← Мой сервис</button><button class="service-btn" data-service-action="data">Данные</button></div></section>'+
       '<section class="service-card"><div class="service-section-title"><h2>Состояние</h2><span id="service-sync-status" class="service-status '+(m.dirty?'today':'done')+'">'+(m.dirty?'Есть локальные изменения':'Локально сохранено')+'</span></div><div class="service-data-grid"><div class="service-data-box"><strong>Локально</strong><span>источник данных</span></div><div class="service-data-box"><strong>'+serviceEsc(device||'—')+'</strong><span>ID устройства</span></div><div class="service-data-box"><strong>'+serviceData.tasks.length+'</strong><span>задач</span></div><div class="service-data-box"><strong>'+serviceData.deadlines.length+'</strong><span>дедлайнов</span></div></div><p class="service-data-note">Последнее локальное изменение: '+serviceEsc(localTime)+' · последняя успешная синхронизация: '+serviceEsc(serverTime)+'.</p></section>'+
+      '<section class="service-card"><h2 style="margin:0 0 5px">Связать Telegram и VK</h2><p class="service-data-note">Создай одноразовый код на этом устройстве, затем введи его в VK. Код связывает аккаунты безопасно и не заменяет данные автоматически.</p>'+linkCodeHtml+'<div class="service-actions"><button class="service-btn primary" data-service-action="create-vk-link-code">Создать код привязки VK</button></div><p id="service-link-feedback" class="service-data-note"></p></section>'+
       '<section class="service-card"><h2 style="margin:0 0 5px">Worker API</h2><p class="service-data-note">Адрес Cloudflare Worker. Для облачного обмена нужны маршруты <code>/api/health</code> и <code>/api/sync</code> с проверкой Telegram initData.</p><div class="service-form-row"><input id="service-sync-endpoint" class="service-input" type="url" inputmode="url" placeholder="https://kgeu-telegram-miniapp.2vkv544dmd.workers.dev" value="'+serviceEsc(endpoint)+'"></div><div class="service-actions"><button class="service-btn" data-service-action="save-sync-endpoint">Сохранить адрес</button><button class="service-btn" data-service-action="check-sync">Проверить связь</button><button class="service-btn primary" data-service-action="sync-now">Отправить в облако</button><button class="service-btn" data-service-action="pull-cloud">Получить из облака</button></div><p id="service-sync-feedback" class="service-data-note">'+(endpoint?(tg?'Telegram initData доступен':'Telegram initData пока не доступен в этом окружении'):'Worker пока не настроен.')+'</p></section>'+
       '<section class="service-card"><h2 style="margin:0 0 5px">Безопасность</h2><p class="service-data-note">Клиент не передаёт доверенный userId из localStorage. В Telegram Mini App сервер должен проверять <code>Telegram.WebApp.initData</code>; данные <code>initDataUnsafe</code> нельзя считать доверенными. До проверки сервером никакая облачная запись не считается авторизованной.</p></section>'+
       '<section class="service-card"><h2 style="margin:0 0 5px">Ручной пакет</h2><p class="service-data-note">Если backend недоступен, JSON-пакет по-прежнему можно сохранить как резервную копию.</p><div class="service-actions"><button class="service-btn" data-service-action="export-sync">Экспортировать пакет</button></div></section></div>';
@@ -3620,6 +3674,19 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
         const input=document.getElementById('service-sync-endpoint');
         serviceSetSyncEndpoint(input?input.value:'');
         document.getElementById('app').innerHTML=serviceRenderSync();serviceBind();toast(serviceSyncEndpoint()?'Адрес Worker сохранён':'Адрес Worker очищен');return;
+      }
+      if(a==='create-vk-link-code'){
+        const feedback=document.getElementById('service-link-feedback');if(feedback)feedback.textContent='Создаю одноразовый код…';
+        try{
+          const result=await serviceSyncRequest('/api/account/link-code',{method:'POST',body:JSON.stringify({})});
+          localStorage.setItem('kgeu_student_service_link_code_v1',JSON.stringify({code:String(result.code||''),expiresAt:Number(result.expiresAt||0)}));
+          document.getElementById('app').innerHTML=serviceRenderSync();serviceBind();
+          toast('Код привязки создан');
+        }catch(e){
+          if(feedback)feedback.textContent='Не удалось создать код: '+serviceEsc(e.message||'неизвестная ошибка');
+          toast('Не удалось создать код привязки');
+        }
+        return;
       }
       if(a==='check-sync'){
         const feedback=document.getElementById('service-sync-feedback');if(feedback)feedback.textContent='Проверяю связь…';
