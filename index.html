@@ -3060,7 +3060,10 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
         }else{
           serviceSetAutoSyncStatus('Все изменения синхронизированы.','ok');
         }
-      }else if(localHasContent){
+      }else{
+        // A missing cloud snapshot is also the first opportunity to publish the active
+        // group and display settings. Upload the normalized empty service envelope too;
+        // the preceding GET has already checked for and hydrated any legacy Telegram row.
         const revisionAtStart=serviceLocalRevision;
         const result=await servicePushToBackend();
         const current=serviceSyncMeta();
@@ -3068,9 +3071,9 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
         if(serviceLocalRevision===revisionAtStart){current.dirty=false;}
         else {current.dirty=true;serviceAutoSyncAgain=true;}
         try{localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(current));}catch(e){}
-        serviceSetAutoSyncStatus(current.dirty?'Есть новые изменения — отправлю их следом.':'Данные автоматически отправлены в облако.','ok');
-      }else{
-        serviceSetAutoSyncStatus('Автосинхронизация включена.','ok');
+        serviceSetAutoSyncStatus(current.dirty
+          ? 'Есть новые изменения — отправлю их следом.'
+          : (localHasContent ? 'Данные автоматически отправлены в облако.' : 'Профиль и начальное состояние сохранены в облаке.'),'ok');
       }
     }catch(e){
       serviceSetAutoSyncStatus('Автосинхронизация ждёт подключения: '+String(e&&e.message||'ошибка сети')+'. Изменения сохранены локально.','error');
