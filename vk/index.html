@@ -1689,6 +1689,9 @@ html.vk-light .service-pill {
       <input class="field" id="shared-link-code" maxlength="8" autocomplete="one-time-code" autocapitalize="characters" placeholder="Например, 8F3KQ2WM">
       <button type="button" class="primary-btn" id="shared-link-submit">Привязать аккаунт</button>
       <button type="button" class="system-theme-btn" id="shared-sync-now">Синхронизировать сейчас</button>
+      <button type="button" class="system-theme-btn" id="shared-force-push">Оставить локальную версию VK</button>
+      <button type="button" class="system-theme-btn" id="shared-force-pull">Заменить локальную версией из облака</button>
+      <div class="mini-note">Кнопки выбора версии нужны только при конфликте; перед заменой локальная или облачная копия будет сохранена.</div>
       <div id="shared-sync-feedback" class="mini-note" role="status"></div>
     </div>
 
@@ -3185,6 +3188,9 @@ html.vk-light .service-pill {
   async function serviceAutoSync(reason){
     if(serviceAutoSyncRunning){serviceAutoSyncAgain=true;return;}
     if(!serviceTelegramInitData()){
+      // VK has its own signed launch-data authentication and a shared sync client below.
+      // Avoid showing a Telegram-only warning or starting a second sync loop in VK mode.
+      if(window.KGEU_VK_PLATFORM) return;
       if(reason==='startup'||reason==='visible') serviceSetAutoSyncStatus('Для облачной синхронизации открой приложение через Telegram.','error');
       return;
     }
@@ -4538,10 +4544,13 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         if (merged.conflicts) setStatus('Синхронизация выполнена. Есть ' + merged.conflicts + ' заметок с разными версиями — локальная копия сохранена.');
       } else {
+        // The link code is generated in Telegram, so Telegram must bootstrap the
+        // shared cloud snapshot first. Never push an empty VK default over local TG data.
         snapshot.serviceData = readCachedService() || DEFAULT_SERVICE;
         personal = local;
         profile = localProfile;
-        shouldPush = true;
+        setStatus('В облаке пока нет данных. Открой Telegram и дождись первой синхронизации; локальные данные VK сохранены.');
+        return;
       }
 
       if (shouldPush) {
@@ -4574,6 +4583,78 @@ document.addEventListener("DOMContentLoaded", () => {
       busy = false;
     }
   }
+  async function forcePushLocalVersion() {
+    if (busy) return;
+    if (!window.confirm('Отправить текущую локальную версию VK в облако? Облачный снимок будет сохранён перед заменой.')) return;
+    busy = true;
+    try {
+      const remote = await request('/api/sync', { method: 'GET' });
+      if (!remote || !remote.found) throw new Error('В облаке пока нет данных. Сначала синхронизируй их в Telegram.');
+      localStorage.setItem('kgeu_vk_cloud_before_force_push_v1', JSON.stringify(remote));
+      const meta = readMeta();
+      const local = localPersonal();
+      const noteKeys = Object.keys(local.notes && typeof local.notes === 'object' ? local.notes : {});
+      const merged = mergeNotes(remote.personalData, local, noteKeys);
+      snapshot.serviceData = readCachedService() || snapshot.serviceData || DEFAULT_SERVICE;
+      const profile = readProfile();
+      const result = await request('/api/sync', { method: 'POST', body: JSON.stringify(payloadForSync(merged.personalData, profile)) });
+      meta.lastServerRevision = Number(result.revision || meta.lastServerRevision || 0);
+      meta.lastSyncAt = Date.now();
+      meta.initialized = true;
+      meta.dirty = false;
+      meta.dirtyNotes = [];
+      meta.dirtyProfile = false;
+      meta.dirtyService = false;
+      writeMeta(meta);
+      snapshot.personalData = merged.personalData;
+      snapshot.profileData = profile;
+      applyPersonal(merged.personalData);
+      if (typeof window.kgeuMarkStudentServiceSynced === 'function') window.kgeuMarkStudentServiceSynced(result.updatedAt);
+      setStatus('Локальная версия VK отправлена в облако. Предыдущая облачная копия сохранена локально.');
+    } catch (error) {
+      setStatus('Не удалось отправить локальную версию', error.message);
+    } finally {
+      busy = false;
+    }
+  }
+  async function forcePullCloudVersion() {
+    if (busy) return;
+    if (!window.confirm('Заменить локальные данные VK текущей облачной версией? Локальная копия будет сохранена.')) return;
+    busy = true;
+    try {
+      const remote = await request('/api/sync', { method: 'GET' });
+      if (!remote || !remote.found) throw new Error('В облаке пока нет данных. Сначала синхронизируй их в Telegram.');
+      localStorage.setItem('kgeu_vk_local_before_force_pull_v1', JSON.stringify({
+        savedAt: Date.now(),
+        serviceData: readCachedService() || snapshot.serviceData || DEFAULT_SERVICE,
+        personalData: localPersonal(),
+        profileData: readProfile()
+      }));
+      snapshot.serviceData = remote.serviceData || DEFAULT_SERVICE;
+      writeCachedService(snapshot.serviceData);
+      snapshot.personalData = remote.personalData || { version: 1, notes: {} };
+      snapshot.profileData = remote.profileData || {};
+      applyPersonal(snapshot.personalData);
+      await applyProfile(snapshot.profileData);
+      const meta = readMeta();
+      meta.lastServerRevision = Number(remote.revision || 0);
+      meta.lastSyncAt = Date.now();
+      meta.initialized = true;
+      meta.dirty = false;
+      meta.dirtyNotes = [];
+      meta.dirtyProfile = false;
+      meta.dirtyService = false;
+      writeMeta(meta);
+      if (typeof window.kgeuApplySharedServiceData === 'function') window.kgeuApplySharedServiceData(snapshot.serviceData, remote.updatedAt);
+      if (typeof window.kgeuMarkStudentServiceSynced === 'function') window.kgeuMarkStudentServiceSynced(remote.updatedAt);
+      setStatus('Облачная версия загружена. Предыдущая локальная копия сохранена.');
+    } catch (error) {
+      setStatus('Не удалось загрузить облачную версию', error.message);
+    } finally {
+      busy = false;
+    }
+  }
+
   async function linkAccount() {
     const input = document.getElementById('shared-link-code');
     const code = String(input && input.value || '').trim().toUpperCase();
@@ -4602,6 +4683,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (link) link.addEventListener('click', linkAccount);
     const sync = document.getElementById('shared-sync-now');
     if (sync) sync.addEventListener('click', function () { syncNow('manual'); });
+    const push = document.getElementById('shared-force-push');
+    if (push) push.addEventListener('click', forcePushLocalVersion);
+    const pull = document.getElementById('shared-force-pull');
+    if (pull) pull.addEventListener('click', forcePullCloudVersion);
     const input = document.getElementById('shared-link-code');
     if (input) input.addEventListener('input', function () { input.value = input.value.toUpperCase().replace(/[^23456789ABCDEFGHJKLMNPQRSTUVWXYZ]/g, '').slice(0, 8); });
   }
