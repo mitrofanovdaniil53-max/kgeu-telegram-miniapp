@@ -3318,6 +3318,9 @@ html.vk-light .service-pill {
   }
   let serviceData=serviceLoad();
   function serviceSave(){try{serviceData=serviceNormalizeData(serviceData);serviceData.updatedAt=Date.now();localStorage.setItem(STUDENT_SERVICE_KEY,JSON.stringify(serviceData));serviceMarkDirty();return true;}catch(e){toast('Не удалось сохранить данные');return false;}}
+  window.kgeuGetStudentServiceData=function(){
+    try{return JSON.parse(JSON.stringify(serviceData));}catch(e){return serviceEmptyData();}
+  };
   window.kgeuApplySharedServiceData=function(data,updatedAt){
     try{
       serviceBackupBeforeCloudRestore();
@@ -4480,7 +4483,9 @@ document.addEventListener("DOMContentLoaded", () => {
       schemaVersion: 4,
       deviceId: getDeviceId(),
       exportedAt: new Date().toISOString(),
-      serviceData: readCachedService() || snapshot.serviceData || DEFAULT_SERVICE,
+      serviceData: (window.KGEU_VK_PLATFORM && typeof window.kgeuGetStudentServiceData === 'function')
+        ? window.kgeuGetStudentServiceData()
+        : (readCachedService() || snapshot.serviceData || DEFAULT_SERVICE),
       personalData: personal || localPersonal(),
       profileData: profile || readProfile()
     };
@@ -4520,11 +4525,13 @@ document.addEventListener("DOMContentLoaded", () => {
       if (remote && remote.found) {
         const serviceMeta = (()=>{try{return JSON.parse(localStorage.getItem(STUDENT_SERVICE_SYNC_KEY)||'{}');}catch(e){return {};}})();
         if (meta.dirtyService && Number(remote.updatedAt||0) > Number(serviceMeta.lastServerSync||0)) {
-          try { localStorage.setItem('kgeu_student_service_conflict_backup_v1', JSON.stringify({savedAt:Date.now(),serviceData:readCachedService(),cloudUpdatedAt:Number(remote.updatedAt||0)})); } catch(e) {}
+          try { localStorage.setItem('kgeu_student_service_conflict_backup_v1', JSON.stringify({savedAt:Date.now(),serviceData:(typeof window.kgeuGetStudentServiceData==='function'?window.kgeuGetStudentServiceData():readCachedService()),cloudUpdatedAt:Number(remote.updatedAt||0)})); } catch(e) {}
           setStatus('Сервисные данные изменены на этом устройстве, а в облаке есть более новая версия. Локальная копия сохранена; автоматическая перезапись остановлена.');
           return;
         }
-        const localService = readCachedService();
+        const localService = (window.KGEU_VK_PLATFORM && typeof window.kgeuGetStudentServiceData === 'function')
+          ? window.kgeuGetStudentServiceData()
+          : readCachedService();
         snapshot.serviceData = meta.dirtyService && localService ? localService : (remote.serviceData || DEFAULT_SERVICE);
         if (!meta.dirtyService) writeCachedService(snapshot.serviceData);
         const merged = mergeNotes(remote.personalData, local, meta.dirtyNotes || []);
@@ -4546,7 +4553,7 @@ document.addEventListener("DOMContentLoaded", () => {
       } else {
         // The link code is generated in Telegram, so Telegram must bootstrap the
         // shared cloud snapshot first. Never push an empty VK default over local TG data.
-        snapshot.serviceData = readCachedService() || DEFAULT_SERVICE;
+        snapshot.serviceData = (window.KGEU_VK_PLATFORM && typeof window.kgeuGetStudentServiceData === 'function') ? window.kgeuGetStudentServiceData() : (readCachedService() || DEFAULT_SERVICE);
         personal = local;
         profile = localProfile;
         setStatus('В облаке пока нет данных. Открой Telegram и дождись первой синхронизации; локальные данные VK сохранены.');
@@ -4595,7 +4602,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const local = localPersonal();
       const noteKeys = Object.keys(local.notes && typeof local.notes === 'object' ? local.notes : {});
       const merged = mergeNotes(remote.personalData, local, noteKeys);
-      snapshot.serviceData = readCachedService() || snapshot.serviceData || DEFAULT_SERVICE;
+      snapshot.serviceData = (window.KGEU_VK_PLATFORM && typeof window.kgeuGetStudentServiceData === 'function') ? window.kgeuGetStudentServiceData() : (readCachedService() || snapshot.serviceData || DEFAULT_SERVICE);
       const profile = readProfile();
       const result = await request('/api/sync', { method: 'POST', body: JSON.stringify(payloadForSync(merged.personalData, profile)) });
       meta.lastServerRevision = Number(result.revision || meta.lastServerRevision || 0);
@@ -4626,7 +4633,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!remote || !remote.found) throw new Error('В облаке пока нет данных. Сначала синхронизируй их в Telegram.');
       localStorage.setItem('kgeu_vk_local_before_force_pull_v1', JSON.stringify({
         savedAt: Date.now(),
-        serviceData: readCachedService() || snapshot.serviceData || DEFAULT_SERVICE,
+        serviceData: (window.KGEU_VK_PLATFORM && typeof window.kgeuGetStudentServiceData === 'function') ? window.kgeuGetStudentServiceData() : (readCachedService() || snapshot.serviceData || DEFAULT_SERVICE),
         personalData: localPersonal(),
         profileData: readProfile()
       }));
