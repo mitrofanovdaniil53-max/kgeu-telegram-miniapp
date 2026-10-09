@@ -44,6 +44,18 @@ CREATE TABLE IF NOT EXISTS account_link_codes (
 CREATE INDEX IF NOT EXISTS idx_account_link_codes_expiry
   ON account_link_codes(expires_at, consumed_at);
 
+-- Limit guessing attempts for short-lived account-link codes.
+CREATE TABLE IF NOT EXISTS account_link_attempts (
+  provider TEXT NOT NULL CHECK (provider IN ('telegram', 'vk')),
+  provider_user_id TEXT NOT NULL,
+  window_started_at INTEGER NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (provider, provider_user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_account_link_attempts_window
+  ON account_link_attempts(window_started_at);
+
 INSERT OR IGNORE INTO accounts (account_id, created_at, updated_at)
 SELECT 'tg:' || telegram_user_id, updated_at, updated_at
 FROM student_services;
