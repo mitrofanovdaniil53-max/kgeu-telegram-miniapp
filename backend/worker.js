@@ -68,7 +68,8 @@ function normalizeIncoming(payload) {
   if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('service_data_missing');
   const personal = payload.personalData && typeof payload.personalData === 'object' && !Array.isArray(payload.personalData)
     ? payload.personalData : { version: 1, notes: {} };
-  const profile = payload.profileData && typeof payload.profileData === 'object' && !Array.isArray(payload.profileData) ? payload.profileData : {};
+  const hasProfileData = !!(payload.profileData && typeof payload.profileData === 'object' && !Array.isArray(payload.profileData));
+  const profile = hasProfileData ? payload.profileData : {};
   const envelope = { envelopeVersion: SYNC_ENVELOPE_VERSION, serviceData: data, personalData: personal, profileData: profile };
   if (new TextEncoder().encode(JSON.stringify(envelope)).byteLength > MAX_BODY_BYTES) {
     throw new Error('payload_too_large');
@@ -76,6 +77,7 @@ function normalizeIncoming(payload) {
   return {
     schemaVersion: Number(payload.schemaVersion || data.schemaVersion || data.version || 1),
     deviceId: String(payload.deviceId || '').slice(0, 120),
+    hasProfileData,
     envelope,
   };
 }
@@ -232,6 +234,15 @@ async function unpackAccountState(env, accountId) {
 async function saveAccountState(env, identity, accountId, incoming) {
   const now = Date.now();
   await env.DB.prepare('UPDATE accounts SET updated_at = ? WHERE account_id = ?').bind(now, accountId).run();
+  if (!incoming.hasProfileData) {
+    const current = await env.DB.prepare('SELECT state_json FROM account_state WHERE account_id = ? LIMIT 1').bind(accountId).first();
+    if (current) {
+      try {
+        const existingEnvelope = JSON.parse(current.state_json);
+        incoming.envelope.profileData = existingEnvelope && existingEnvelope.profileData && typeof existingEnvelope.profileData === 'object' ? existingEnvelope.profileData : {};
+      } catch (_) { incoming.envelope.profileData = {}; }
+    }
+  }
   await env.DB.prepare(
     `INSERT INTO account_state (account_id, state_json, schema_version, revision, updated_at)
      VALUES (?, ?, ?, 1, ?)
