@@ -18,7 +18,7 @@ A student's supported personal data follows a deliberately linked account across
 ## Cloudflare topology
 
 - Shared sync Worker: `kgeu-telegram-miniapp`, D1 binding `DB` to `kgeu-student-db`, existing secret `TELEGRAM_BOT_TOKEN`.
-- The production Worker currently does not have `VK_APP_SECRET`; VK authentication must remain unavailable until the owner configures that secret from the official VK Mini App settings.
+- The production Worker currently does not have `VK_APP_SECRET`; VK authentication must remain unavailable until the owner configures that secret from the official VK Mini App settings. `VK_APP_ID` is an optional non-secret binding that additionally pins the expected app ID.
 - `kgeu-vk-bot` is a separate VK Callback API bot Worker; `kgeu-schedule-bot` is a separate Telegram notification Worker. Keep them and their platform-specific notification subscriptions untouched.
 - The existing D1 `student_services` table and rows must remain during the first migration.
 
@@ -53,7 +53,7 @@ Platform-specific bot IDs, tokens, notification subscriptions and client-only ca
 1. Review PR #10 and wait for CI checks.
 2. Generate and retain a production D1 export before any mutation.
 3. Apply `backend/migrations/0002_account_linking.sql`; verify table counts and foreign keys.
-4. Configure `VK_APP_SECRET` as a Cloudflare Worker secret. Do not commit or paste it into chat.
+4. Configure `VK_APP_SECRET` as a Cloudflare Worker secret from the VK Mini App settings, not the community bot token. Do not commit or paste it into chat. Optionally set `VK_APP_ID` as a plain Worker variable to pin the app ID.
 5. Deploy the Worker and verify `/api/health` reports the shared API version and `vkAuthConfigured: true`.
 6. Publish the Telegram root frontend and VK at `/apps/vk/`.
 7. Test with a real VK session: link Telegram→VK, verify notes/group/settings in both directions, create and edit Student Service data in both clients, test phone/desktop updates, offline/reopen behavior, conflict backups and rejection of invalid/expired codes.
