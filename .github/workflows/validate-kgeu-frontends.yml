@@ -46,7 +46,7 @@ jobs:
           }
 
           const worker = fs.readFileSync('backend/worker.js', 'utf8')
-            .replace(/^export default\s*\{/, 'const workerModule = {');
+            .replace(/\bexport default\s*\{/, 'const workerModule = {');
           try {
             new Function(worker);
           } catch (error) {
