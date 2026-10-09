@@ -2886,6 +2886,59 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     const m=serviceSyncMeta();m.dirty=false;m.lastLocalSave=Number(serviceData.updatedAt||Date.now());m.lastServerSync=Number(snapshot.updatedAt||Date.now());
     localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(m));
   }
+
+  // Refresh only the visible Student Service screen after a remote update.
+  // Keep the current section, scroll position, and unsaved form values intact.
+  function serviceRefreshVisibleView(){
+    const app=document.getElementById('app');
+    if(!app||!app.querySelector('.service-page'))return false;
+    const titleNode=app.querySelector('.service-title');
+    const kickerNode=app.querySelector('.service-kicker');
+    const title=titleNode?String(titleNode.textContent||'').trim():'';
+    const kicker=kickerNode?String(kickerNode.textContent||'').trim():'';
+    const fields=Array.from(app.querySelectorAll('input[id],textarea[id],select[id]'));
+    // Do not replace a form while a file is selected; that could discard the user's pending attachment.
+    if(fields.some(function(el){return el.type==='file'&&el.files&&el.files.length;}))return false;
+    const savedFields=fields.map(function(el){
+      const item={id:el.id,tag:el.tagName,value:el.value};
+      if('checked' in el)item.checked=el.checked;
+      if(typeof el.selectionStart==='number'){item.selectionStart=el.selectionStart;item.selectionEnd=el.selectionEnd;}
+      return item;
+    });
+    const active=app.contains(document.activeElement)?document.activeElement:null;
+    const activeId=active&&active.id?active.id:'';
+    const scrollY=window.scrollY||window.pageYOffset||0;
+    let markup='';
+    if(kicker==='Предмет')markup=serviceOpenSubject(title);
+    else if(title==='Учёт баллов')markup=serviceRenderHostel();
+    else if(title==='Учёба')markup=serviceRenderStudy();
+    else if(title==='Календарь')markup=serviceRenderCalendar();
+    else if(title==='Аналитика')markup=serviceRenderAnalytics();
+    else if(title==='Напоминания')markup=serviceRenderReminders();
+    else if(title==='Синхронизация')markup=serviceRenderSync();
+    else if(title==='Данные и резервная копия')markup=serviceRenderData();
+    else if(title==='Мой сервис')markup=serviceRenderToday();
+    else return false;
+    app.innerHTML=markup;
+    serviceBind();
+    savedFields.forEach(function(saved){
+      const el=document.getElementById(saved.id);
+      if(!el||el.tagName!==saved.tag||el.type==='file')return;
+      el.value=saved.value;
+      if(saved.checked!==undefined)el.checked=saved.checked;
+      if(typeof saved.selectionStart==='number'&&typeof el.setSelectionRange==='function'){
+        try{el.setSelectionRange(saved.selectionStart,saved.selectionEnd);}catch(e){}
+      }
+    });
+    if(activeId){
+      const next=document.getElementById(activeId);
+      if(next&&app.contains(next)&&/^(INPUT|TEXTAREA|SELECT)$/.test(next.tagName)){
+        try{next.focus({preventScroll:true});}catch(e){try{next.focus();}catch(ignore){}}
+      }
+    }
+    window.scrollTo(0,scrollY);
+    return true;
+  }
   function serviceSyncMeta(){
     try{
       const x=JSON.parse(localStorage.getItem(STUDENT_SERVICE_SYNC_KEY)||'null');
@@ -2955,12 +3008,14 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
           serviceSetAutoSyncStatus(current.dirty?'Есть новые изменения — отправлю их следом.':'Все изменения сохранены в облаке.','ok');
         }else if(!localHasContent){
           serviceApplyCloudSnapshot(remote);
+          serviceRefreshVisibleView();
           serviceSetAutoSyncStatus('Данные автоматически получены из облака.','ok');
         }else if(!lastSync){
           // First run with data on both sides is ambiguous: do not pick a winner automatically.
           serviceSetAutoSyncStatus('Данные есть и локально, и в облаке, но устройство ещё не связано с облачной версией. Автоматическая перезапись остановлена ради сохранности данных.','conflict');
         }else if(remoteAt>lastSync){
           serviceApplyCloudSnapshot(remote);
+          serviceRefreshVisibleView();
           serviceSetAutoSyncStatus('Получены более свежие данные из облака.','ok');
         }else{
           serviceSetAutoSyncStatus('Все изменения синхронизированы.','ok');
@@ -2994,10 +3049,11 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     document.addEventListener('visibilitychange',function(){
       if(document.visibilityState==='visible') serviceAutoSync('visible');
     });
-    // Retry unsent changes and check the cloud while the app remains open.
+    // Poll frequently while visible so other open devices reflect cloud changes quickly.
+    // This is a lightweight fallback to push notifications; background tabs are skipped.
     setInterval(function(){
       if(document.visibilityState==='visible'&&navigator.onLine!==false) serviceAutoSync('periodic');
-    },30000);
+    },5000);
     setTimeout(function(){serviceAutoSync('startup');},1400);
   }
   function serviceSyncPackage(){
