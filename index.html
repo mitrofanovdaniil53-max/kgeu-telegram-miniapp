@@ -2837,7 +2837,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
   const STUDENT_SERVICE_BACKUP_KEY = 'kgeu_student_service_backup_v1';
   const STUDENT_SERVICE_SYNC_KEY = 'kgeu_student_service_sync_v1';
   const STUDENT_SERVICE_ENDPOINT_KEY = 'kgeu_student_service_endpoint_v1';
-  function serviceSyncEndpoint(){try{return String(localStorage.getItem(STUDENT_SERVICE_ENDPOINT_KEY)||'').trim().replace(/\/+$/,'');}catch(e){return '';}}
+  function serviceSyncEndpoint(){try{return String(localStorage.getItem(STUDENT_SERVICE_ENDPOINT_KEY)||'https://kgeu-telegram-miniapp.2vkv544dmd.workers.dev').trim().replace(/\/+$/,'');}catch(e){return 'https://kgeu-telegram-miniapp.2vkv544dmd.workers.dev';}}
   function serviceSetSyncEndpoint(value){try{localStorage.setItem(STUDENT_SERVICE_ENDPOINT_KEY,String(value||'').trim().replace(/\/+$/,''));}catch(e){}}
   function serviceTelegramInitData(){try{return (window.Telegram&&window.Telegram.WebApp&&window.Telegram.WebApp.initData)?String(window.Telegram.WebApp.initData):'';}catch(e){return '';}}
   async function serviceSyncRequest(path, options){
@@ -2859,6 +2859,30 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
   async function servicePushToBackend(){
     const payload=serviceSyncPackage();
     return await serviceSyncRequest('/api/sync',{method:'POST',body:JSON.stringify(payload)});
+  }
+  async function servicePullFromBackend(){
+    return await serviceSyncRequest('/api/sync',{method:'GET'});
+  }
+  function serviceHasLocalContent(){
+    const notes=(typeof kgeuPersonalData!=='undefined'&&kgeuPersonalData.notes&&typeof kgeuPersonalData.notes==='object')?Object.keys(kgeuPersonalData.notes).length:0;
+    return serviceData.tasks.length+serviceData.deadlines.length+serviceData.events.length+serviceData.hostel.work.length+serviceData.hostel.social.length+notes>0;
+  }
+  function serviceBackupBeforeCloudRestore(){
+    try{localStorage.setItem(STUDENT_SERVICE_BACKUP_KEY,JSON.stringify(serviceData));}catch(e){}
+    try{localStorage.setItem('kgeu_student_personal_backup_before_cloud_restore_v1',JSON.stringify(kgeuPersonalData||{version:1,notes:{}}));}catch(e){}
+  }
+  function serviceApplyCloudSnapshot(snapshot){
+    if(!snapshot||!snapshot.found||!snapshot.serviceData||typeof snapshot.serviceData!=='object')throw new Error('cloud_data_not_found');
+    serviceBackupBeforeCloudRestore();
+    serviceData=serviceNormalizeData(snapshot.serviceData);
+    localStorage.setItem(STUDENT_SERVICE_KEY,JSON.stringify(serviceData));
+    if(snapshot.personalData&&typeof snapshot.personalData==='object'){
+      const pd=snapshot.personalData;
+      kgeuPersonalData={version:1,notes:(pd.notes&&typeof pd.notes==='object')?pd.notes:{},updatedAt:Date.now()};
+      if(typeof kgeuSavePersonalData==='function')kgeuSavePersonalData(kgeuPersonalData);
+    }
+    const m=serviceSyncMeta();m.dirty=false;m.lastLocalSave=Number(serviceData.updatedAt||Date.now());m.lastServerSync=Number(snapshot.updatedAt||Date.now());
+    localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(m));
   }
   function serviceSyncMeta(){
     try{
@@ -3376,9 +3400,9 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     const serverTime=m.lastServerSync?new Date(m.lastServerSync).toLocaleString('ru-RU'):'ещё не было';
     const endpoint=serviceSyncEndpoint();
     const tg=serviceTelegramInitData();
-    return '<div class="service-page"><section class="service-hero"><div class="service-kicker">Мой сервис</div><h1 class="service-title">Синхронизация</h1><div class="service-sub">v21: клиент уже умеет обращаться к Worker API, но сервер подключается только после указания адреса Worker.</div><div class="service-actions"><button class="service-btn" data-service-action="service-home">← Мой сервис</button><button class="service-btn" data-service-action="data">Данные</button></div></section>'+
+    return '<div class="service-page"><section class="service-hero"><div class="service-kicker">Мой сервис</div><h1 class="service-title">Синхронизация</h1><div class="service-sub">Данные можно отправить в облако или восстановить на этом устройстве. Перед восстановлением локальная копия сохраняется автоматически.</div><div class="service-actions"><button class="service-btn" data-service-action="service-home">← Мой сервис</button><button class="service-btn" data-service-action="data">Данные</button></div></section>'+
       '<section class="service-card"><div class="service-section-title"><h2>Состояние</h2><span id="service-sync-status" class="service-status '+(m.dirty?'today':'done')+'">'+(m.dirty?'Есть локальные изменения':'Локально сохранено')+'</span></div><div class="service-data-grid"><div class="service-data-box"><strong>Локально</strong><span>источник данных</span></div><div class="service-data-box"><strong>'+serviceEsc(device||'—')+'</strong><span>ID устройства</span></div><div class="service-data-box"><strong>'+serviceData.tasks.length+'</strong><span>задач</span></div><div class="service-data-box"><strong>'+serviceData.deadlines.length+'</strong><span>дедлайнов</span></div></div><p class="service-data-note">Последнее локальное изменение: '+serviceEsc(localTime)+' · последняя успешная синхронизация: '+serviceEsc(serverTime)+'.</p></section>'+
-      '<section class="service-card"><h2 style="margin:0 0 5px">Worker API</h2><p class="service-data-note">Укажи URL развернутого Cloudflare Worker. Он должен иметь маршруты <code>/api/health</code> и <code>/api/sync</code>. Пока поле пустое, приложение работает полностью локально.</p><div class="service-form-row"><input id="service-sync-endpoint" class="service-input" type="url" inputmode="url" placeholder="https://kgeu-service.example.workers.dev" value="'+serviceEsc(endpoint)+'"></div><div class="service-actions"><button class="service-btn" data-service-action="save-sync-endpoint">Сохранить адрес</button><button class="service-btn" data-service-action="check-sync">Проверить связь</button><button class="service-btn primary" data-service-action="sync-now">Синхронизировать</button></div><p id="service-sync-feedback" class="service-data-note">'+(endpoint?(tg?'Telegram initData доступен':'Telegram initData пока не доступен в этом окружении'):'Worker пока не настроен.')+'</p></section>'+
+      '<section class="service-card"><h2 style="margin:0 0 5px">Worker API</h2><p class="service-data-note">Адрес Cloudflare Worker. Для облачного обмена нужны маршруты <code>/api/health</code> и <code>/api/sync</code> с проверкой Telegram initData.</p><div class="service-form-row"><input id="service-sync-endpoint" class="service-input" type="url" inputmode="url" placeholder="https://kgeu-telegram-miniapp.2vkv544dmd.workers.dev" value="'+serviceEsc(endpoint)+'"></div><div class="service-actions"><button class="service-btn" data-service-action="save-sync-endpoint">Сохранить адрес</button><button class="service-btn" data-service-action="check-sync">Проверить связь</button><button class="service-btn primary" data-service-action="sync-now">Отправить в облако</button><button class="service-btn" data-service-action="pull-cloud">Получить из облака</button></div><p id="service-sync-feedback" class="service-data-note">'+(endpoint?(tg?'Telegram initData доступен':'Telegram initData пока не доступен в этом окружении'):'Worker пока не настроен.')+'</p></section>'+
       '<section class="service-card"><h2 style="margin:0 0 5px">Безопасность</h2><p class="service-data-note">Клиент не передаёт доверенный userId из localStorage. В Telegram Mini App сервер должен проверять <code>Telegram.WebApp.initData</code>; данные <code>initDataUnsafe</code> нельзя считать доверенными. До проверки сервером никакая облачная запись не считается авторизованной.</p></section>'+
       '<section class="service-card"><h2 style="margin:0 0 5px">Ручной пакет</h2><p class="service-data-note">Если backend недоступен, JSON-пакет по-прежнему можно сохранить как резервную копию.</p><div class="service-actions"><button class="service-btn" data-service-action="export-sync">Экспортировать пакет</button></div></section></div>';
   }
@@ -3446,14 +3470,44 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
         return;
       }
       if(a==='sync-now'){
-        const feedback=document.getElementById('service-sync-feedback');if(feedback)feedback.textContent='Синхронизирую…';
+        const feedback=document.getElementById('service-sync-feedback');if(feedback)feedback.textContent='Проверяю облачную версию…';
         try{
+          const meta=serviceSyncMeta();
+          const remote=await servicePullFromBackend();
+          if(remote&&remote.found&&meta.lastServerSync&&Number(remote.updatedAt||0)>Number(meta.lastServerSync||0)){
+            throw new Error('cloud_is_newer_pull_first');
+          }
+          if(remote&&remote.found&&!meta.lastServerSync){
+            const localHasContent=serviceHasLocalContent();
+            const warning=localHasContent?'В облаке уже есть данные. Отправка заменит их текущими локальными данными. Продолжить?':'В облаке уже есть данные. Сначала лучше получить их, чтобы не затереть чужие данные. Всё равно перезаписать облако?';
+            if(!window.confirm(warning)){if(feedback)feedback.textContent='Отправка отменена. Можно сначала получить данные из облака.';return;}
+          }
           const result=await servicePushToBackend();
-          const m=serviceSyncMeta();m.dirty=false;m.lastServerSync=Date.now();try{localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(m));}catch(e){}
-          if(feedback)feedback.textContent='Синхронизация завершена: '+serviceEsc(result&&result.status?result.status:'OK');
-          toast('Данные отправлены на сервер');
+          const m=serviceSyncMeta();m.dirty=false;m.lastServerSync=Number(result&&result.updatedAt||Date.now());try{localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(m));}catch(e){}
+          if(feedback)feedback.textContent='Отправка завершена: '+serviceEsc(result&&result.status?result.status:'OK');
+          toast('Данные отправлены в облако');
           document.getElementById('app').innerHTML=serviceRenderSync();serviceBind();
-        }catch(e){if(feedback)feedback.textContent='Ошибка синхронизации: '+serviceEsc(e.message||'неизвестная ошибка');toast('Синхронизация не выполнена');}
+        }catch(e){
+          const message=e.message==='cloud_is_newer_pull_first'?'В облаке есть более новая версия. Сначала нажми «Получить из облака».':(e.message||'неизвестная ошибка');
+          if(feedback)feedback.textContent='Ошибка отправки: '+serviceEsc(message);toast('Данные не отправлены');
+        }
+        return;
+      }
+      if(a==='pull-cloud'){
+        const feedback=document.getElementById('service-sync-feedback');if(feedback)feedback.textContent='Получаю данные из облака…';
+        try{
+          const snapshot=await servicePullFromBackend();
+          if(!snapshot||!snapshot.found){throw new Error('cloud_data_not_found');}
+          if((serviceHasLocalContent()||serviceSyncMeta().dirty)&&!window.confirm('Данные на этом устройстве будут заменены облачной версией. Перед заменой текущие данные сохранятся в резервную копию. Продолжить?')){
+            if(feedback)feedback.textContent='Восстановление отменено. Локальные данные не изменены.';return;
+          }
+          serviceApplyCloudSnapshot(snapshot);
+          toast('Данные получены из облака');
+          document.getElementById('app').innerHTML=serviceRenderSync();serviceBind();
+        }catch(e){
+          const message=e.message==='cloud_data_not_found'?'В облаке пока нет сохранённых данных. Сначала отправь их с устройства, где они есть.':(e.message||'неизвестная ошибка');
+          if(feedback)feedback.textContent='Ошибка получения: '+serviceEsc(message);toast('Не удалось получить данные из облака');
+        }
         return;
       }
       if(a==='export-sync'){return serviceExportSyncPackage();}
