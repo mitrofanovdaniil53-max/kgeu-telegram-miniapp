@@ -3676,7 +3676,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
         try{
           const initData=serviceTelegramInitData();
           if(!initData)throw new Error('Открой приложение через Telegram, чтобы подтвердить аккаунт.');
-          const endpoint=serviceSyncEndpoint().replace(/\\/+$/,'');
+          let endpoint=serviceSyncEndpoint(); while(endpoint.endsWith('/'))endpoint=endpoint.slice(0,-1);
           const response=await fetch(endpoint+'/api/account/link-code',{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':initData},body:'{}'});
           const data=await response.json();
           if(!response.ok||!data.ok)throw new Error(data.error||('HTTP '+response.status));
