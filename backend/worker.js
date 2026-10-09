@@ -104,7 +104,8 @@ function unpackStoredValue(raw) {
   throw new Error('stored_data_invalid');
 }
 
-const VK_MINI_APP_ID = '54754459';
+// The VK secret is specific to the configured Mini App. VK_APP_ID is an optional
+// additional pin; the HMAC signature remains the primary authenticity check.
 const LINK_CODE_TTL_MS = 10 * 60 * 1000;
 const LINK_CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 
@@ -114,13 +115,13 @@ function base64Url(bytes) {
   return btoa(binary).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
 }
 
-async function validateVkLaunchParams(raw, appSecret) {
+async function validateVkLaunchParams(raw, appSecret, envAppId) {
   if (!raw || !appSecret) throw new Error('vk_auth_unavailable');
   const params = new URLSearchParams(String(raw).replace(/^\?/, ''));
   const receivedSign = params.get('sign') || '';
   const appId = params.get('vk_app_id') || '';
   const userId = params.get('vk_user_id') || '';
-  if (!receivedSign || appId !== VK_MINI_APP_ID || !/^\d+$/.test(userId) || Number(userId) <= 0) {
+  if (!receivedSign || ((envAppId && appId !== String(envAppId)) || !/^\d+$/.test(appId)) || !/^\d+$/.test(userId) || Number(userId) <= 0) {
     throw new Error('vk_auth_invalid');
   }
 
@@ -145,13 +146,11 @@ async function validateVkLaunchParams(raw, appSecret) {
     key,
     new TextEncoder().encode(signedString)
   ));
-  if (!timingSafeEqualHex(calculated, receivedSign)) {
-    // VK signatures are base64url strings, so compare them in constant time as text.
-    if (calculated.length !== receivedSign.length) throw new Error('vk_auth_invalid');
-    let diff = 0;
-    for (let i = 0; i < calculated.length; i++) diff |= calculated.charCodeAt(i) ^ receivedSign.charCodeAt(i);
-    if (diff !== 0) throw new Error('vk_auth_invalid');
-  }
+  // VK signatures are base64url text, not hex; compare in constant time.
+  if (calculated.length !== receivedSign.length) throw new Error('vk_auth_invalid');
+  let diff = 0;
+  for (let i = 0; i < calculated.length; i++) diff |= calculated.charCodeAt(i) ^ receivedSign.charCodeAt(i);
+  if (diff !== 0) throw new Error('vk_auth_invalid');
   return { provider: 'vk', userId };
 }
 
@@ -162,7 +161,7 @@ async function authenticateIdentity(request, env) {
     const auth = await validateTelegramInitData(telegramData, env.TELEGRAM_BOT_TOKEN, 86400);
     return { provider: 'telegram', userId: auth.userId };
   }
-  if (vkLaunchParams) return validateVkLaunchParams(vkLaunchParams, env.VK_APP_SECRET);
+  if (vkLaunchParams) return validateVkLaunchParams(vkLaunchParams, env.VK_APP_SECRET, env.VK_APP_ID);
   throw new Error('auth_required');
 }
 
