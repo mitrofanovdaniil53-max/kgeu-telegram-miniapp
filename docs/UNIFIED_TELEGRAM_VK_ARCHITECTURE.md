@@ -67,6 +67,26 @@ Exact SQL and migration mechanics are to be reviewed before applying. Existing `
 - Telegram/VK bot IDs, push/reminder subscriptions, tokens, VK bridge state, and client-only caches.
 - Schedule payloads and public group directory cache unless a later measured need justifies central caching.
 
+## Repository consolidation goal
+
+The desired end state is one GitHub monorepository after the shared API and both clients are proven stable. The proposed layout is:
+
+```text
+kgeu-student-service/
+├── apps/
+│   ├── telegram/
+│   └── vk/
+├── backend/
+│   ├── worker.js
+│   ├── schema.sql
+│   └── migrations/
+└── shared/
+    ├── data-model/
+    └── sync-contract/
+```
+
+Keep the Telegram and VK deployment entry points and bot Workers separate where platform-specific behavior requires it; the repository is unified, not the platform APIs or notification delivery. Preserve Git history where practical, and do not delete the old repositories until the monorepo is deployed and rollback is verified.
+
 ## Rollout and safety plan
 
 1. Finish inventory of all persisted fields and data owners in both Mini Apps and both bot Workers.
@@ -76,6 +96,7 @@ Exact SQL and migration mechanics are to be reviewed before applying. Existing `
 5. Migrate Telegram sync to canonical accounts without removing backward compatibility for existing Telegram IDs.
 6. Test old Telegram sync, VK local-only behavior, link/unlink errors, stale/conflicting writes, backups, and all four phone/desktop cross-platform directions.
 7. Deploy progressively and retain a rollback path. Do not archive or delete either repository or Worker during rollout.
+8. Once cross-platform sync passes acceptance tests, consolidate both Mini App frontends and shared contracts into the monorepository above; keep separate deployment targets and verify both platform URLs before considering repository archival.
 
 ## External configuration that may be needed
 
