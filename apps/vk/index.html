@@ -3227,7 +3227,7 @@ html.vk-light .service-pill {
             return;
           }
           const revisionAtStart=serviceLocalRevision;
-          const result=await servicePushToBackend();
+          const result=await servicePushToBackend();if(window.KGEU_VK_PLATFORM&&typeof window.kgeuSharedSyncMarkClean==='function')window.kgeuSharedSyncMarkClean(result);
           const current=serviceSyncMeta();
           current.lastServerSync=Number(result&&result.updatedAt||Date.now());
           if(serviceLocalRevision===revisionAtStart){current.dirty=false;}
@@ -3908,6 +3908,7 @@ html.vk-light .service-pill {
             if(feedback)feedback.textContent='Восстановление отменено. Локальные данные не изменены.';return;
           }
           serviceApplyCloudSnapshot(snapshot);
+          if(window.KGEU_VK_PLATFORM&&typeof window.kgeuSharedSyncMarkClean==='function')window.kgeuSharedSyncMarkClean(snapshot);
           toast('Данные получены из облака');
           document.getElementById('app').innerHTML=serviceRenderSync();serviceBind();
         }catch(e){
@@ -4600,6 +4601,17 @@ document.addEventListener("DOMContentLoaded", () => {
     if (kind === 'note' && key && meta.dirtyNotes.indexOf(key) < 0) meta.dirtyNotes.push(key);
     writeMeta(meta);
     scheduleSync();
+  };
+  window.kgeuSharedSyncMarkClean = function(result) {
+    const meta = readMeta();
+    meta.lastServerRevision = Number(result && result.revision || meta.lastServerRevision || 0);
+    meta.lastSyncAt = Date.now();
+    meta.initialized = true;
+    meta.dirty = false;
+    meta.dirtyNotes = [];
+    meta.dirtyProfile = false;
+    meta.dirtyService = false;
+    writeMeta(meta);
   };
   async function syncNow(reason) {
     if (busy || navigator.onLine === false || document.visibilityState !== 'visible') return;
