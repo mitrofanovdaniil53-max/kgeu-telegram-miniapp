@@ -2894,7 +2894,8 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
   }
   function serviceHasLocalContent(){
     const notes=(typeof kgeuPersonalData!=='undefined'&&kgeuPersonalData.notes&&typeof kgeuPersonalData.notes==='object')?Object.keys(kgeuPersonalData.notes).length:0;
-    return serviceData.tasks.length+serviceData.deadlines.length+serviceData.events.length+serviceData.hostel.work.length+serviceData.hostel.social.length+notes>0;
+    const profile=serviceProfileSnapshot();
+    return serviceData.tasks.length+serviceData.deadlines.length+serviceData.events.length+serviceData.hostel.work.length+serviceData.hostel.social.length+notes+(profile.activeGroup&&profile.activeGroup.id?1:0)>0;
   }
   function serviceBackupBeforeCloudRestore(){
     try{localStorage.setItem(STUDENT_SERVICE_BACKUP_KEY,JSON.stringify(serviceData));}catch(e){}
