@@ -4585,6 +4585,9 @@ document.addEventListener("DOMContentLoaded", () => {
       if (input) input.value = '';
       const meta = readMeta();
       meta.dirty = true;
+      // Telegram is the source account for this one-time link; merge local notes,
+      // but adopt its active group/settings rather than overwriting them from VK.
+      meta.dirtyProfile = false;
       writeMeta(meta);
       setStatus('Аккаунты связаны. Переношу данные и заметки…');
       await syncNow('linked');
