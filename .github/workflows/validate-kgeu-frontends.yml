@@ -1,0 +1,56 @@
+name: Validate KGEU frontends and Worker
+
+on:
+  pull_request:
+    paths:
+      - "index.html"
+      - "apps/vk/index.html"
+      - "backend/**"
+      - ".github/workflows/validate-kgeu-frontends.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "index.html"
+      - "apps/vk/index.html"
+      - "backend/**"
+      - ".github/workflows/validate-kgeu-frontends.yml"
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Parse inline frontend scripts and Worker
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+
+          for (const file of ['index.html', 'apps/vk/index.html']) {
+            const html = fs.readFileSync(file, 'utf8');
+            const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)]
+              .map(match => match[1])
+              .filter(code => code.trim());
+
+            if (!scripts.length) throw new Error(file + ': no inline scripts found');
+            scripts.forEach((code, index) => {
+              try {
+                new Function(code);
+              } catch (error) {
+                throw new Error(file + ': inline script ' + (index + 1) + ': ' + error.message);
+              }
+            });
+            console.log(file + ': ' + scripts.length + ' inline scripts parsed');
+          }
+
+          const worker = fs.readFileSync('backend/worker.js', 'utf8')
+            .replace(/^export default\s*\{/, 'const workerModule = {');
+          try {
+            new Function(worker);
+          } catch (error) {
+            throw new Error('backend/worker.js: ' + error.message);
+          }
+          console.log('backend/worker.js: parsed');
+          NODE
