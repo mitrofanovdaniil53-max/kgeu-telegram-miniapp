@@ -22,7 +22,7 @@ The existing Telegram bot identity and Telegram-specific launch/authentication r
 
 ## Current integration status
 
-The integration branch contains the server API, Telegram one-time-code UI and VK client-side linking/sync logic. The VK frontend currently exposes timetable notes, selected group and display settings; it does **not yet reproduce the full Student Service UI**. Shared service data can be stored in the common envelope, but matching create/edit screens in VK remain a follow-up task.
+The integration branch contains the server API, Telegram one-time-code UI and VK client-side linking/sync logic. The VK frontend now includes a Student Service entry point and the task, deadline, event, hostel-points, study, calendar, analytics, reminders, backup and sync screens copied from the Telegram implementation. The two entry points remain separate because their platform launch/authentication differs; the Student Service model is kept compatible through the shared data envelope.
 
 The Worker changes are not safe to deploy until the additive D1 migration has been backed up and applied, and the Cloudflare Worker secret `VK_APP_SECRET` has been configured. Never put that secret in this repository or in a message.
 
