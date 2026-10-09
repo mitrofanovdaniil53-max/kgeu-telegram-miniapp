@@ -231,6 +231,7 @@ async function unpackAccountState(env, accountId) {
 
 async function saveAccountState(env, identity, accountId, incoming) {
   const now = Date.now();
+  await env.DB.prepare('UPDATE accounts SET updated_at = ? WHERE account_id = ?').bind(now, accountId).run();
   await env.DB.prepare(
     `INSERT INTO account_state (account_id, state_json, schema_version, revision, updated_at)
      VALUES (?, ?, ?, 1, ?)
@@ -246,6 +247,10 @@ async function saveAccountState(env, identity, accountId, incoming) {
     "SELECT provider_user_id FROM account_identities WHERE account_id = ? AND provider = 'telegram' LIMIT 1"
   ).bind(accountId).first();
   if (telegramIdentity) {
+    const legacyDevice = await env.DB.prepare(
+      'SELECT device_id FROM student_services WHERE telegram_user_id = ? LIMIT 1'
+    ).bind(String(telegramIdentity.provider_user_id)).first();
+    const storedDeviceId = incoming.deviceId || String(legacyDevice && legacyDevice.device_id || '');
     await env.DB.prepare(`
       INSERT INTO student_services (telegram_user_id, service_json, schema_version, device_id, updated_at)
       VALUES (?, ?, ?, ?, ?)
@@ -258,7 +263,7 @@ async function saveAccountState(env, identity, accountId, incoming) {
       String(telegramIdentity.provider_user_id),
       JSON.stringify(incoming.envelope),
       incoming.schemaVersion,
-      incoming.deviceId,
+      storedDeviceId,
       now
     ).run();
   }
