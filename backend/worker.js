@@ -6,7 +6,7 @@ function corsHeaders(request) {
   const origin = request.headers.get('Origin');
   return {
     'Access-Control-Allow-Origin': origin || '*',
-    'Access-Control-Allow-Headers': 'Content-Type, X-Telegram-Init-Data',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Telegram-Init-Data, X-VK-Launch-Params',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Vary': 'Origin',
     'Content-Type': 'application/json; charset=utf-8',
@@ -313,6 +313,7 @@ async function consumeAccountLinkCode(env, identity, code) {
   ).bind(codeHash, now).first();
   if (!link) throw new Error('link_code_expired_or_invalid');
 
+  if (String(link.source_provider) === identity.provider) throw new Error('link_requires_other_platform');
   const sourceAccountId = String(link.source_account_id);
   const currentAccountId = await resolveAccount(env, identity);
   if (currentAccountId === sourceAccountId) {
@@ -322,10 +323,19 @@ async function consumeAccountLinkCode(env, identity, code) {
     return { linked: true, alreadyLinked: true, accountId: sourceAccountId };
   }
 
+  // Hydrate legacy Telegram cloud data before deciding whether the target account is empty.
+  await unpackAccountState(env, currentAccountId);
   const targetState = await env.DB.prepare(
     'SELECT 1 AS has_state FROM account_state WHERE account_id = ? LIMIT 1'
   ).bind(currentAccountId).first();
   if (targetState) throw new Error('target_account_has_data');
+
+  const existingProviderLink = await env.DB.prepare(
+    'SELECT provider_user_id FROM account_identities WHERE account_id = ? AND provider = ? LIMIT 1'
+  ).bind(sourceAccountId, identity.provider).first();
+  if (existingProviderLink && String(existingProviderLink.provider_user_id) !== identity.userId) {
+    throw new Error('provider_already_linked');
+  }
 
   const claim = await env.DB.prepare(
     'UPDATE account_link_codes SET consumed_at = ? WHERE code_hash = ? AND consumed_at IS NULL AND expires_at > ?'
@@ -363,7 +373,7 @@ export default {
 
     const url = new URL(request.url);
     if (url.pathname === '/api/health' && request.method === 'GET') {
-      return json(request, { ok: true, service: 'kgeu-student-service', version: 'v22', database: !!env.DB });
+      return json(request, { ok: true, service: 'kgeu-student-service', version: 'v23-shared', database: !!env.DB, vkAuthConfigured: !!env.VK_APP_SECRET });
     }
 
     const syncPath = url.pathname === '/api/sync';
@@ -442,11 +452,10 @@ export default {
       });
     } catch (error) {
       const code = error && error.message ? error.message : 'server_error';
-      const status = code.startsWith('telegram_') || code.startsWith('vk_auth') || code === 'auth_required'
-        ? 401
+      const status = code === 'database_not_configured' || code === 'vk_auth_unavailable' ? 503
+        : code.startsWith('telegram_') || code.startsWith('vk_auth') || code === 'auth_required' ? 401
         : code === 'payload_too_large' ? 413
-        : code === 'target_account_has_data' ? 409
-        : code === 'database_not_configured' || code === 'vk_auth_unavailable' ? 503
+        : code === 'target_account_has_data' || code === 'provider_already_linked' || code === 'link_requires_other_platform' ? 409
         : 400;
       return json(request, { ok: false, error: code }, status);
     }
