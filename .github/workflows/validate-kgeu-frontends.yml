@@ -6,6 +6,8 @@ on:
       - "index.html"
       - "apps/vk/index.html"
       - "backend/**"
+      - "tests/**"
+      - "docs/**"
       - ".github/workflows/validate-kgeu-frontends.yml"
   push:
     branches: ["main"]
@@ -13,6 +15,8 @@ on:
       - "index.html"
       - "apps/vk/index.html"
       - "backend/**"
+      - "tests/**"
+      - "docs/**"
       - ".github/workflows/validate-kgeu-frontends.yml"
 
 jobs:
@@ -54,3 +58,8 @@ jobs:
           }
           console.log('backend/worker.js: parsed');
           NODE
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test additive D1 migration
+        run: python -m unittest discover -s tests -v
