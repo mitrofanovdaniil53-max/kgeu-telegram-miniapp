@@ -8,5 +8,7 @@ database_name = "kgeu-student-db"
 database_id = "e6fccc0d-11ff-43f0-be47-6f15159780dd"
 
 # Store the bot token as a Worker secret, not in source code:
-# npx wrangler secret put TELEGRAM_BOT_TOKEN
+# npx wrangler secret put TELEGRAM_BOT_TOKEN --config backend/wrangler.toml
+# Store the VK Mini App application secret separately (not the VK community bot token):
+# npx wrangler secret put VK_APP_SECRET --config backend/wrangler.toml
 # Cloudflare Worker backend
