@@ -12,6 +12,8 @@ A student's supported personal data must follow their linked account across Tele
 - Telegram Mini App: `mitrofanovdaniil53-max/kgeu-telegram-miniapp`, default branch `main`.
 - VK Mini App: `mitrofanovdaniil53-max/kgeu-schedule-vk`, default branch `main`.
 - Both frontends are currently single-file `index.html` applications. Telegram repo also contains `backend/worker.js`, `backend/schema.sql`, and `backend/wrangler.toml`.
+- Both Mini App URLs currently use the same GitHub Pages origin `https://mitrofanovdaniil53-max.github.io`; Telegram's bot Worker points to `/kgeu-telegram-miniapp/`, and the VK bot Worker points to `/kgeu-schedule-vk/index.html`.
+- The VK Mini App ID in the current VK bot Worker is `54754459` (community ID `241328142`).
 
 ### Cloudflare Workers
 - `kgeu-telegram-miniapp`: D1 binding `DB` to `kgeu-student-db`; secret binding `TELEGRAM_BOT_TOKEN`.
