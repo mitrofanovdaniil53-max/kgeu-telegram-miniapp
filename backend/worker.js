@@ -71,8 +71,8 @@ function normalizeIncoming(payload) {
   if (!payload || typeof payload !== 'object') throw new Error('invalid_payload');
   const data = payload.serviceData;
   if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('service_data_missing');
-  const personal = payload.personalData && typeof payload.personalData === 'object' && !Array.isArray(payload.personalData)
-    ? payload.personalData : { version: 1, notes: {} };
+  const hasPersonalData = !!(payload.personalData && typeof payload.personalData === 'object' && !Array.isArray(payload.personalData));
+  const personal = hasPersonalData ? payload.personalData : { version: 1, notes: {} };
   const hasProfileData = !!(payload.profileData && typeof payload.profileData === 'object' && !Array.isArray(payload.profileData));
   const profile = hasProfileData ? payload.profileData : {};
   const envelope = { envelopeVersion: SYNC_ENVELOPE_VERSION, serviceData: data, personalData: personal, profileData: profile };
@@ -82,6 +82,7 @@ function normalizeIncoming(payload) {
   return {
     schemaVersion: Number(payload.schemaVersion || data.schemaVersion || data.version || 1),
     deviceId: String(payload.deviceId || '').slice(0, 120),
+    hasPersonalData,
     hasProfileData,
     envelope,
   };
@@ -237,13 +238,22 @@ async function unpackAccountState(env, accountId) {
 async function saveAccountState(env, identity, accountId, incoming) {
   const now = Date.now();
   await env.DB.prepare('UPDATE accounts SET updated_at = ? WHERE account_id = ?').bind(now, accountId).run();
-  if (!incoming.hasProfileData) {
+  if (!incoming.hasProfileData || !incoming.hasPersonalData) {
     const current = await env.DB.prepare('SELECT state_json FROM account_state WHERE account_id = ? LIMIT 1').bind(accountId).first();
     if (current) {
       try {
         const existingEnvelope = JSON.parse(current.state_json);
-        incoming.envelope.profileData = existingEnvelope && existingEnvelope.profileData && typeof existingEnvelope.profileData === 'object' ? existingEnvelope.profileData : {};
-      } catch (_) { incoming.envelope.profileData = {}; }
+        if (!incoming.hasProfileData) {
+          incoming.envelope.profileData = existingEnvelope && existingEnvelope.profileData && typeof existingEnvelope.profileData === 'object' ? existingEnvelope.profileData : {};
+        }
+        if (!incoming.hasPersonalData) {
+          incoming.envelope.personalData = existingEnvelope && existingEnvelope.personalData && typeof existingEnvelope.personalData === 'object'
+            ? existingEnvelope.personalData : { version: 1, notes: {} };
+        }
+      } catch (_) {
+        if (!incoming.hasProfileData) incoming.envelope.profileData = {};
+        if (!incoming.hasPersonalData) incoming.envelope.personalData = { version: 1, notes: {} };
+      }
     }
   }
   await env.DB.prepare(
@@ -485,6 +495,9 @@ export default {
       }
 
       const payload = await request.json();
+      // Hydrate legacy Telegram data before accepting a write, so older clients cannot
+      // accidentally replace an existing account envelope with an empty bootstrap state.
+      await unpackAccountState(env, accountId);
       const incoming = normalizeIncoming(payload);
       const result = await saveAccountState(env, identity, accountId, incoming);
       return json(request, {
