@@ -125,9 +125,8 @@ async function validateVkLaunchParams(raw, appSecret) {
   }
 
   const timestamp = Number(params.get('vk_ts') || 0);
-  if (timestamp && Math.abs(Math.floor(Date.now() / 1000) - timestamp) > 3600) {
-    throw new Error('vk_auth_expired');
-  }
+  if (!Number.isFinite(timestamp) || timestamp <= 0) throw new Error('vk_auth_invalid');
+  if (Math.abs(Math.floor(Date.now() / 1000) - timestamp) > 3600) throw new Error('vk_auth_expired');
 
   const signedEntries = [...params.entries()]
     .filter(([key]) => key.startsWith('vk_'))
@@ -324,10 +323,32 @@ async function createAccountLinkCode(env, identity, accountId) {
   throw new Error('link_code_generation_failed');
 }
 
+async function enforceLinkAttemptLimit(env, identity, now) {
+  const windowMs = 10 * 60 * 1000;
+  await env.DB.prepare(`
+    INSERT INTO account_link_attempts (provider, provider_user_id, window_started_at, attempts)
+    VALUES (?, ?, ?, 1)
+    ON CONFLICT(provider, provider_user_id) DO UPDATE SET
+      window_started_at = CASE
+        WHEN account_link_attempts.window_started_at <= ? THEN excluded.window_started_at
+        ELSE account_link_attempts.window_started_at
+      END,
+      attempts = CASE
+        WHEN account_link_attempts.window_started_at <= ? THEN 1
+        ELSE account_link_attempts.attempts + 1
+      END
+  `).bind(identity.provider, identity.userId, now, now - windowMs, now - windowMs).run();
+  const row = await env.DB.prepare(
+    'SELECT attempts FROM account_link_attempts WHERE provider = ? AND provider_user_id = ? LIMIT 1'
+  ).bind(identity.provider, identity.userId).first();
+  if (Number(row && row.attempts || 0) > 10) throw new Error('link_rate_limited');
+}
+
 async function consumeAccountLinkCode(env, identity, code) {
   const normalized = String(code || '').trim().toUpperCase();
-  if (!/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{8}$/.test(normalized)) throw new Error('link_code_invalid');
   const now = Date.now();
+  await enforceLinkAttemptLimit(env, identity, now);
+  if (!/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{8}$/.test(normalized)) throw new Error('link_code_invalid');
   const codeHash = await hashLinkCode(normalized);
   const link = await env.DB.prepare(
     'SELECT source_account_id, source_provider FROM account_link_codes WHERE code_hash = ? AND consumed_at IS NULL AND expires_at > ? LIMIT 1'
@@ -476,6 +497,7 @@ export default {
       const status = code === 'database_not_configured' || code === 'vk_auth_unavailable' ? 503
         : code.startsWith('telegram_') || code.startsWith('vk_auth') || code === 'auth_required' ? 401
         : code === 'payload_too_large' ? 413
+        : code === 'link_rate_limited' ? 429
         : code === 'target_account_has_data' || code === 'provider_already_linked' || code === 'link_requires_other_platform' ? 409
         : 400;
       return json(request, { ok: false, error: code }, status);
