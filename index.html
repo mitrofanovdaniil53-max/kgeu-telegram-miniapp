@@ -83,6 +83,8 @@ function kgeuSetNote(subject, value) {
   if (note) kgeuPersonalData.notes[key] = note;
   else delete kgeuPersonalData.notes[key];
   kgeuSavePersonalData(kgeuPersonalData);
+  // Keep subject notes in the same automatic cloud-sync queue as Student Service data.
+  try { if (typeof window !== "undefined" && typeof window.kgeuMarkStudentServiceDirty === "function") window.kgeuMarkStudentServiceDirty(); } catch (e) {}
 }
 </script>
 
@@ -2893,10 +2895,110 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     try{localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(meta));}catch(e){}
     return meta;
   }
+  let serviceLocalRevision=0;
+  let serviceAutoSyncTimer=null;
+  let serviceAutoSyncRunning=false;
+  let serviceAutoSyncAgain=false;
+  const SERVICE_AUTO_SYNC_DELAY=1200;
+
+  function serviceSetAutoSyncStatus(message, kind){
+    const feedback=document.getElementById('service-sync-feedback');
+    if(feedback) feedback.textContent=message;
+    const badge=document.getElementById('service-sync-status');
+    if(badge){
+      badge.textContent=kind==='error'?'Ожидает сети':kind==='conflict'?'Нужна проверка':kind==='busy'?'Синхронизация…':'Автосинхронизация включена';
+      badge.className='service-status '+(kind==='error'?'today':kind==='conflict'?'overdue':kind==='busy'?'upcoming':'done');
+    }
+  }
+  function serviceScheduleAutoSync(){
+    if(serviceAutoSyncTimer) clearTimeout(serviceAutoSyncTimer);
+    serviceAutoSyncTimer=setTimeout(function(){serviceAutoSync('local-change');},SERVICE_AUTO_SYNC_DELAY);
+  }
   function serviceMarkDirty(){
     const meta=serviceSyncMeta();
     meta.dirty=true;meta.lastLocalSave=Date.now();
+    serviceLocalRevision++;
     try{localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(meta));}catch(e){}
+    serviceScheduleAutoSync();
+  }
+  // Used by the separate subject-notes script without coupling the two modules.
+  try{window.kgeuMarkStudentServiceDirty=serviceMarkDirty;}catch(e){}
+
+  async function serviceAutoSync(reason){
+    if(serviceAutoSyncRunning){serviceAutoSyncAgain=true;return;}
+    if(!serviceTelegramInitData()){
+      if(reason==='startup'||reason==='visible') serviceSetAutoSyncStatus('Для облачной синхронизации открой приложение через Telegram.','error');
+      return;
+    }
+    serviceAutoSyncRunning=true;
+    serviceSetAutoSyncStatus('Синхронизирую изменения…','busy');
+    try{
+      const meta=serviceSyncMeta();
+      const localHasContent=serviceHasLocalContent();
+      const remote=await servicePullFromBackend();
+      if(remote&&remote.found){
+        const remoteAt=Number(remote.updatedAt||0);
+        const lastSync=Number(meta.lastServerSync||0);
+        if(meta.dirty){
+          // Never silently overwrite a newer cloud snapshot with unsynced local edits.
+          if(!lastSync || remoteAt>lastSync){
+            serviceSetAutoSyncStatus('Есть несинхронизированные изменения на этом устройстве и более новая версия в облаке. Автоматическая запись приостановлена, чтобы не потерять данные. Открой «Синхронизация» для проверки.','conflict');
+            return;
+          }
+          const revisionAtStart=serviceLocalRevision;
+          const result=await servicePushToBackend();
+          const current=serviceSyncMeta();
+          current.lastServerSync=Number(result&&result.updatedAt||Date.now());
+          if(serviceLocalRevision===revisionAtStart){current.dirty=false;}
+          else {current.dirty=true;serviceAutoSyncAgain=true;}
+          try{localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(current));}catch(e){}
+          serviceSetAutoSyncStatus(current.dirty?'Есть новые изменения — отправлю их следом.':'Все изменения сохранены в облаке.','ok');
+        }else if(!localHasContent){
+          serviceApplyCloudSnapshot(remote);
+          serviceSetAutoSyncStatus('Данные автоматически получены из облака.','ok');
+        }else if(!lastSync){
+          // First run with data on both sides is ambiguous: do not pick a winner automatically.
+          serviceSetAutoSyncStatus('Данные есть и локально, и в облаке, но устройство ещё не связано с облачной версией. Автоматическая перезапись остановлена ради сохранности данных.','conflict');
+        }else if(remoteAt>lastSync){
+          serviceApplyCloudSnapshot(remote);
+          serviceSetAutoSyncStatus('Получены более свежие данные из облака.','ok');
+        }else{
+          serviceSetAutoSyncStatus('Все изменения синхронизированы.','ok');
+        }
+      }else if(localHasContent){
+        const revisionAtStart=serviceLocalRevision;
+        const result=await servicePushToBackend();
+        const current=serviceSyncMeta();
+        current.lastServerSync=Number(result&&result.updatedAt||Date.now());
+        if(serviceLocalRevision===revisionAtStart){current.dirty=false;}
+        else {current.dirty=true;serviceAutoSyncAgain=true;}
+        try{localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(current));}catch(e){}
+        serviceSetAutoSyncStatus(current.dirty?'Есть новые изменения — отправлю их следом.':'Данные автоматически отправлены в облако.','ok');
+      }else{
+        serviceSetAutoSyncStatus('Автосинхронизация включена.','ok');
+      }
+    }catch(e){
+      serviceSetAutoSyncStatus('Автосинхронизация ждёт подключения: '+String(e&&e.message||'ошибка сети')+'. Изменения сохранены локально.','error');
+    }finally{
+      serviceAutoSyncRunning=false;
+      if(serviceAutoSyncAgain){
+        serviceAutoSyncAgain=false;
+        setTimeout(function(){serviceAutoSync('queued-change');},300);
+      }
+    }
+  }
+  function serviceStartAutoSync(){
+    if(window.__kgeuStudentAutoSyncStarted)return;
+    window.__kgeuStudentAutoSyncStarted=true;
+    window.addEventListener('online',function(){serviceAutoSync('online');});
+    document.addEventListener('visibilitychange',function(){
+      if(document.visibilityState==='visible') serviceAutoSync('visible');
+    });
+    // Retry unsent changes and check the cloud while the app remains open.
+    setInterval(function(){
+      if(document.visibilityState==='visible'&&navigator.onLine!==false) serviceAutoSync('periodic');
+    },30000);
+    setTimeout(function(){serviceAutoSync('startup');},1400);
   }
   function serviceSyncPackage(){
     const meta=serviceSyncMeta();
@@ -3400,7 +3502,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     const serverTime=m.lastServerSync?new Date(m.lastServerSync).toLocaleString('ru-RU'):'ещё не было';
     const endpoint=serviceSyncEndpoint();
     const tg=serviceTelegramInitData();
-    return '<div class="service-page"><section class="service-hero"><div class="service-kicker">Мой сервис</div><h1 class="service-title">Синхронизация</h1><div class="service-sub">Данные можно отправить в облако или восстановить на этом устройстве. Перед восстановлением локальная копия сохраняется автоматически.</div><div class="service-actions"><button class="service-btn" data-service-action="service-home">← Мой сервис</button><button class="service-btn" data-service-action="data">Данные</button></div></section>'+
+    return '<div class="service-page"><section class="service-hero"><div class="service-kicker">Мой сервис</div><h1 class="service-title">Синхронизация</h1><div class="service-sub">Изменения синхронизируются автоматически при сохранении, возвращении в приложение и восстановлении интернета. Ручные действия остаются для диагностики и восстановления. Перед восстановлением локальная копия сохраняется автоматически.</div><div class="service-actions"><button class="service-btn" data-service-action="service-home">← Мой сервис</button><button class="service-btn" data-service-action="data">Данные</button></div></section>'+
       '<section class="service-card"><div class="service-section-title"><h2>Состояние</h2><span id="service-sync-status" class="service-status '+(m.dirty?'today':'done')+'">'+(m.dirty?'Есть локальные изменения':'Локально сохранено')+'</span></div><div class="service-data-grid"><div class="service-data-box"><strong>Локально</strong><span>источник данных</span></div><div class="service-data-box"><strong>'+serviceEsc(device||'—')+'</strong><span>ID устройства</span></div><div class="service-data-box"><strong>'+serviceData.tasks.length+'</strong><span>задач</span></div><div class="service-data-box"><strong>'+serviceData.deadlines.length+'</strong><span>дедлайнов</span></div></div><p class="service-data-note">Последнее локальное изменение: '+serviceEsc(localTime)+' · последняя успешная синхронизация: '+serviceEsc(serverTime)+'.</p></section>'+
       '<section class="service-card"><h2 style="margin:0 0 5px">Worker API</h2><p class="service-data-note">Адрес Cloudflare Worker. Для облачного обмена нужны маршруты <code>/api/health</code> и <code>/api/sync</code> с проверкой Telegram initData.</p><div class="service-form-row"><input id="service-sync-endpoint" class="service-input" type="url" inputmode="url" placeholder="https://kgeu-telegram-miniapp.2vkv544dmd.workers.dev" value="'+serviceEsc(endpoint)+'"></div><div class="service-actions"><button class="service-btn" data-service-action="save-sync-endpoint">Сохранить адрес</button><button class="service-btn" data-service-action="check-sync">Проверить связь</button><button class="service-btn primary" data-service-action="sync-now">Отправить в облако</button><button class="service-btn" data-service-action="pull-cloud">Получить из облака</button></div><p id="service-sync-feedback" class="service-data-note">'+(endpoint?(tg?'Telegram initData доступен':'Telegram initData пока не доступен в этом окружении'):'Worker пока не настроен.')+'</p></section>'+
       '<section class="service-card"><h2 style="margin:0 0 5px">Безопасность</h2><p class="service-data-note">Клиент не передаёт доверенный userId из localStorage. В Telegram Mini App сервер должен проверять <code>Telegram.WebApp.initData</code>; данные <code>initDataUnsafe</code> нельзя считать доверенными. До проверки сервером никакая облачная запись не считается авторизованной.</p></section>'+
@@ -3782,6 +3884,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
         if (!teacherView) render();
       }
     });
+    serviceStartAutoSync();
   })();
 })();
 </script>
