@@ -4,7 +4,7 @@
 
 - `/index.html` — Telegram Mini App frontend and full Student Service.
 - `/apps/vk/index.html` — VK Mini App frontend, including the Student Service tab.
-- `/backend/worker.js` — shared Cloudflare Worker API, staged in PR #9.
+- `/backend/worker.js` — shared Cloudflare Worker API, staged in PR #10.
 - `/backend/schema.sql` — original D1 schema.
 - `/backend/migrations/0002_account_linking.sql` — additive migration for canonical accounts and linked platform identities.
 - `/tests/test_account_linking_migration.py` — local/CI migration test.
