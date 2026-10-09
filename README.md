@@ -20,7 +20,7 @@ Telegram and VK bot identities, notification subscriptions, tokens and client-on
 
 ## Current status
 
-The unified integration is staged in [PR #9](https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp/pull/9). It has passed static JavaScript syntax checks and migration tests in CI, but production account linking has not yet been enabled.
+The unified integration is staged in [PR #10](https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp/pull/10). It has passed static JavaScript syntax checks and migration tests in CI, but production account linking has not yet been enabled.
 
 The VK frontend's canonical path after publication will be:
 
