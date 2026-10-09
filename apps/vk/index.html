@@ -990,6 +990,10 @@ function kgeuSetNote(subject, value) {
     #shared-service-section .shared-service-details summary{cursor:pointer;font-weight:650}
     #shared-service-section .shared-service-list{padding-left:18px;margin:10px 0;display:grid;gap:10px}
     #shared-service-section .shared-service-list li{display:grid;gap:3px}
+    #shared-service-section .shared-service-form{display:grid;gap:8px;padding:10px 0;border-top:1px solid var(--border)}
+    #shared-service-section .shared-service-form strong{font-size:13px}
+    #shared-service-section .shared-service-row-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+    #shared-service-section .shared-service-row-actions button{font-size:11px;padding:6px 8px}
 </style>
 
 <script>
@@ -1276,12 +1280,15 @@ body.dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,.10
       <input class="field" id="shared-link-code" maxlength="8" autocomplete="one-time-code" autocapitalize="characters" placeholder="Например, 8F3KQ2WM">
       <button type="button" class="primary-btn" id="shared-link-submit">Привязать аккаунт</button>
       <button type="button" class="system-theme-btn" id="shared-sync-now">Синхронизировать сейчас</button>
+      <button type="button" class="system-theme-btn" id="shared-force-push">Оставить локальную версию VK</button>
+      <button type="button" class="system-theme-btn" id="shared-force-pull">Заменить локальную версией из облака</button>
+      <div class="mini-note">Кнопки выбора версии нужны только при конфликте; перед заменой локальная или облачная копия будет сохранена.</div>
       <div id="shared-sync-feedback" class="mini-note" role="status"></div>
     </div>
 
     <div class="settings-section" id="shared-service-section">
       <div class="settings-section-title">Мой сервис из Telegram</div>
-      <div class="mini-note">Общие задачи, дедлайны, события и баллы ЖБС. В первой версии данные здесь доступны для просмотра; редактирование выполняется в Telegram.</div>
+      <div class="mini-note">Общие задачи, дедлайны, события и баллы ЖБС можно просматривать и редактировать здесь. Подтверждающие файлы к записям ЖБС пока добавляются в Telegram.</div>
       <div id="shared-service-view" aria-live="polite"></div>
     </div>
     <div class="settings-section about-section">
@@ -2962,9 +2969,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function readMeta() {
     try {
-      return Object.assign({ deviceId: '', lastServerRevision: 0, lastSyncAt: 0, initialized: false, dirty: false, dirtyNotes: [], dirtyProfile: false }, JSON.parse(localStorage.getItem(META_KEY) || '{}'));
+      return Object.assign({ deviceId: '', lastServerRevision: 0, lastSyncAt: 0, initialized: false, dirty: false, dirtyNotes: [], dirtyProfile: false, dirtyService: false }, JSON.parse(localStorage.getItem(META_KEY) || '{}'));
     } catch (e) {
-      return { deviceId: '', lastServerRevision: 0, lastSyncAt: 0, initialized: false, dirty: false, dirtyNotes: [], dirtyProfile: false };
+      return { deviceId: '', lastServerRevision: 0, lastSyncAt: 0, initialized: false, dirty: false, dirtyNotes: [], dirtyProfile: false, dirtyService: false };
     }
   }
   function writeMeta(meta) { try { localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch (e) {} }
@@ -3108,7 +3115,10 @@ document.addEventListener("DOMContentLoaded", () => {
   function renderSharedServiceView() {
     const root = document.getElementById('shared-service-view');
     if (!root) return;
-    const data = readCachedService() || DEFAULT_SERVICE;
+    const previouslyOpen = new Set([...root.querySelectorAll('details[open][data-shared-service-detail]')].map(node => node.dataset.sharedServiceDetail));
+    const meta = readMeta();
+    const canEdit = !!meta.initialized && Number(meta.lastServerRevision || 0) > 0;
+    const data = readCachedService() || snapshot.serviceData || DEFAULT_SERVICE;
     const tasks = Array.isArray(data.tasks) ? data.tasks : [];
     const deadlines = Array.isArray(data.deadlines) ? data.deadlines : [];
     const events = Array.isArray(data.events) ? data.events : [];
@@ -3124,25 +3134,42 @@ document.addEventListener("DOMContentLoaded", () => {
         + (items.length > 30 ? '<p class="mini-note">Показаны первые 30 из ' + items.length + ' записей.</p>' : '');
     }
     function recordDate(value) { return sharedServiceEscape(value || 'Без даты'); }
+    function rowActions(kind, item, toggleLabel) {
+      const id = sharedServiceEscape(item.id || '');
+      const toggle = toggleLabel ? '<button type="button" class="system-theme-btn" data-shared-service-action="toggle-' + kind + '" data-id="' + id + '">' + toggleLabel + '</button>' : '';
+      return '<div class="shared-service-row-actions">' + toggle + '<button type="button" class="system-theme-btn" data-shared-service-action="delete-' + kind + '" data-id="' + id + '">Удалить</button></div>';
+    }
+    const editForms = canEdit
+      ? '<details class="shared-service-details" data-shared-service-detail="add"><summary>Добавить запись</summary>' +
+        '<form class="shared-service-form" data-shared-service-form="task"><strong>Задача</strong><input class="field" name="title" required maxlength="180" placeholder="Название задачи"><input class="field" name="date" type="date" aria-label="Срок задачи"><input class="field" name="subject" maxlength="100" placeholder="Предмет (необязательно)"><button type="submit" class="primary-btn">Добавить задачу</button></form>' +
+        '<form class="shared-service-form" data-shared-service-form="deadline"><strong>Дедлайн</strong><input class="field" name="title" required maxlength="180" placeholder="Название дедлайна"><input class="field" name="date" type="date" aria-label="Дата дедлайна"><input class="field" name="subject" maxlength="100" placeholder="Предмет (необязательно)"><button type="submit" class="primary-btn">Добавить дедлайн</button></form>' +
+        '<form class="shared-service-form" data-shared-service-form="event"><strong>Событие</strong><input class="field" name="title" required maxlength="180" placeholder="Название события"><input class="field" name="date" type="date" aria-label="Дата события"><input class="field" name="points" type="number" min="0" max="250" step="1" value="0" aria-label="Баллы"><button type="submit" class="primary-btn">Добавить событие</button></form>' +
+        '<form class="shared-service-form" data-shared-service-form="hostel"><strong>Запись ЖБС</strong><select class="field" name="kind"><option value="work">Работа</option><option value="social">Мероприятие</option></select><input class="field" name="title" required maxlength="180" placeholder="Что сделал(а)"><input class="field" name="date" type="date" aria-label="Дата"><input class="field" name="points" type="number" min="0" max="250" step="1" value="1" aria-label="Баллы"><input class="field" name="minutes" type="number" min="0" max="10000" step="5" value="0" aria-label="Минуты работы"><p class="mini-note">Загрузка подтверждающих файлов пока доступна в Telegram.</p><button type="submit" class="primary-btn">Добавить запись ЖБС</button></form>' +
+      '</details>'
+      : '<p class="mini-note">Чтобы не перезаписать данные Telegram до первой синхронизации, редактирование включится после загрузки общей облачной версии.</p>';
     root.innerHTML =
       '<div class="shared-service-stats">' +
         '<div><strong>' + tasks.filter(x => !x.done).length + '</strong><span>активных задач</span></div>' +
         '<div><strong>' + deadlines.filter(x => !x.done).length + '</strong><span>дедлайнов</span></div>' +
         '<div><strong>' + events.length + '</strong><span>событий</span></div>' +
         '<div><strong>' + points + ' / ' + goal + '</strong><span>баллов ЖБС</span></div>' +
-      '</div>' +
-      '<details class="shared-service-details"><summary>Задачи (' + tasks.length + ')</summary>' +
-        list(tasks, item => '<li><strong>' + sharedServiceEscape(item.title || 'Без названия') + '</strong><span>' + recordDate(item.dueDate) + (item.done ? ' · Выполнена' : ' · Активна') + '</span>' + (item.subject ? '<small>' + sharedServiceEscape(item.subject) + '</small>' : '') + '</li>') +
+      '</div>' + editForms +
+      '<details class="shared-service-details" data-shared-service-detail="tasks"><summary>Задачи (' + tasks.length + ')</summary>' +
+        list(tasks, item => '<li><strong>' + sharedServiceEscape(item.title || 'Без названия') + '</strong><span>' + recordDate(item.dueDate) + (item.done ? ' · Выполнена' : ' · Активна') + '</span>' + (item.subject ? '<small>' + sharedServiceEscape(item.subject) + '</small>' : '') + (canEdit ? rowActions('task', item, item.done ? 'Вернуть в активные' : 'Выполнена') : '') + '</li>') +
       '</details>' +
-      '<details class="shared-service-details"><summary>Дедлайны (' + deadlines.length + ')</summary>' +
-        list(deadlines, item => '<li><strong>' + sharedServiceEscape(item.title || 'Без названия') + '</strong><span>' + recordDate(item.date) + (item.done ? ' · Выполнен' : ' · Не выполнен') + '</span>' + (item.subject ? '<small>' + sharedServiceEscape(item.subject) + '</small>' : '') + '</li>') +
+      '<details class="shared-service-details" data-shared-service-detail="deadlines"><summary>Дедлайны (' + deadlines.length + ')</summary>' +
+        list(deadlines, item => '<li><strong>' + sharedServiceEscape(item.title || 'Без названия') + '</strong><span>' + recordDate(item.date) + (item.done ? ' · Выполнен' : ' · Не выполнен') + '</span>' + (item.subject ? '<small>' + sharedServiceEscape(item.subject) + '</small>' : '') + (canEdit ? rowActions('deadline', item, item.done ? 'Вернуть' : 'Выполнен') : '') + '</li>') +
       '</details>' +
-      '<details class="shared-service-details"><summary>События (' + events.length + ')</summary>' +
-        list(events, item => '<li><strong>' + sharedServiceEscape(item.title || 'Без названия') + '</strong><span>' + recordDate(item.date) + ' · ' + Math.max(0, Number(item.points || 0)) + ' балл(ов)</span></li>') +
+      '<details class="shared-service-details" data-shared-service-detail="events"><summary>События (' + events.length + ')</summary>' +
+        list(events, item => '<li><strong>' + sharedServiceEscape(item.title || 'Без названия') + '</strong><span>' + recordDate(item.date) + ' · ' + Math.max(0, Number(item.points || 0)) + ' балл(ов)</span>' + (canEdit ? rowActions('event', item, '') : '') + '</li>') +
       '</details>' +
-      '<details class="shared-service-details"><summary>ЖБС: работа и мероприятия (' + (work.length + social.length) + ')</summary>' +
-        list(work.concat(social), item => '<li><strong>' + sharedServiceEscape(item.title || 'Запись') + '</strong><span>' + recordDate(item.date) + ' · ' + Math.max(0, Number(item.points || 0)) + ' балл(ов)' + (item.minutes ? ' · ' + Math.max(0, Number(item.minutes)) + ' мин.' : '') + '</span></li>') +
+      '<details class="shared-service-details" data-shared-service-detail="hostel"><summary>ЖБС: работа (' + work.length + ') и мероприятия (' + social.length + ')</summary>' +
+        (work.length ? '<h4>Работа</h4>' + list(work, item => '<li><strong>' + sharedServiceEscape(item.title || 'Запись') + '</strong><span>' + recordDate(item.date) + ' · ' + Math.max(0, Number(item.points || 0)) + ' балл(ов) · ' + Math.max(0, Number(item.minutes || 0)) + ' мин.</span>' + (canEdit ? '<div class="shared-service-row-actions"><button type="button" class="system-theme-btn" data-shared-service-action="delete-hostel" data-kind="work" data-id="' + sharedServiceEscape(item.id || '') + '">Удалить</button></div>' : '') + '</li>') : '<p class="mini-note">Записей о работе пока нет.</p>') +
+        (social.length ? '<h4>Мероприятия</h4>' + list(social, item => '<li><strong>' + sharedServiceEscape(item.title || 'Запись') + '</strong><span>' + recordDate(item.date) + ' · ' + Math.max(0, Number(item.points || 0)) + ' балл(ов)</span>' + (canEdit ? '<div class="shared-service-row-actions"><button type="button" class="system-theme-btn" data-shared-service-action="delete-hostel" data-kind="social" data-id="' + sharedServiceEscape(item.id || '') + '">Удалить</button></div>' : '') + '</li>') : '<p class="mini-note">Записей о мероприятиях пока нет.</p>') +
       '</details>';
+    root.querySelectorAll('details[data-shared-service-detail]').forEach(node => {
+      node.open = previouslyOpen.has(node.dataset.sharedServiceDetail);
+    });
   }
 
   function payloadForSync(personal, profile) {
@@ -3166,6 +3193,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const meta = readMeta();
     meta.dirty = true;
     if (kind === 'profile') meta.dirtyProfile = true;
+    if (kind === 'service') meta.dirtyService = true;
     if (kind === 'note' && key && meta.dirtyNotes.indexOf(key) < 0) meta.dirtyNotes.push(key);
     writeMeta(meta);
     scheduleSync();
@@ -3190,9 +3218,25 @@ document.addEventListener("DOMContentLoaded", () => {
       let profile = localProfile;
 
       if (remote && remote.found) {
-        snapshot.serviceData = remote.serviceData || DEFAULT_SERVICE;
-        writeCachedService(snapshot.serviceData);
-        renderSharedServiceView();
+        const remoteRevision = Number(remote.revision || 0);
+        const cachedService = readCachedService();
+        if (meta.dirtyService && cachedService) {
+          if (!meta.lastServerRevision || remoteRevision > Number(meta.lastServerRevision || 0)) {
+            snapshot.serviceData = cachedService;
+            renderSharedServiceView();
+            setStatus('Есть конфликт: в Telegram изменились данные после последней синхронизации. Локальная версия VK сохранена; выбери, какую версию оставить, в настройках синхронизации.');
+            return;
+          }
+          snapshot.serviceData = cachedService;
+          shouldPush = true;
+        } else {
+          const revisionChanged = !meta.initialized || !cachedService || remoteRevision > Number(meta.lastServerRevision || 0);
+          snapshot.serviceData = remote.serviceData || DEFAULT_SERVICE;
+          if (revisionChanged) {
+            writeCachedService(snapshot.serviceData);
+            renderSharedServiceView();
+          }
+        }
         const merged = mergeNotes(remote.personalData, local, meta.dirtyNotes || []);
         personal = merged.personalData;
         if (meta.dirtyProfile) profile = localProfile;
@@ -3230,10 +3274,12 @@ document.addEventListener("DOMContentLoaded", () => {
         meta.dirty = false;
         meta.dirtyNotes = [];
         meta.dirtyProfile = false;
+        meta.dirtyService = false;
         writeMeta(meta);
         snapshot.personalData = personal;
         snapshot.profileData = profile;
         applyPersonal(personal);
+        renderSharedServiceView();
         setStatus('Данные VK и Telegram синхронизированы.');
       } else {
         meta.lastServerRevision = Number(remote && remote.revision || meta.lastServerRevision || 0);
@@ -3242,6 +3288,7 @@ document.addEventListener("DOMContentLoaded", () => {
         writeMeta(meta);
         snapshot.personalData = personal;
         snapshot.profileData = profile;
+        renderSharedServiceView();
         setStatus('Данные VK и Telegram синхронизированы.');
       }
     } catch (e) {
@@ -3270,13 +3317,181 @@ document.addEventListener("DOMContentLoaded", () => {
       if (button) button.disabled = false;
     }
   }
+  function localSharedService() {
+    const cached = readCachedService();
+    const data = JSON.parse(JSON.stringify(cached || snapshot.serviceData || DEFAULT_SERVICE));
+    data.tasks = Array.isArray(data.tasks) ? data.tasks : [];
+    data.deadlines = Array.isArray(data.deadlines) ? data.deadlines : [];
+    data.events = Array.isArray(data.events) ? data.events : [];
+    data.hostel = data.hostel && typeof data.hostel === 'object' ? data.hostel : {};
+    data.hostel.work = Array.isArray(data.hostel.work) ? data.hostel.work : [];
+    data.hostel.social = Array.isArray(data.hostel.social) ? data.hostel.social : [];
+    return data;
+  }
+  function saveSharedServiceData(data) {
+    data.version = Number(data.version || 4);
+    data.schemaVersion = Number(data.schemaVersion || data.version || 4);
+    data.updatedAt = Date.now();
+    snapshot.serviceData = data;
+    writeCachedService(data);
+    window.kgeuSharedSyncMarkDirty('service');
+    renderSharedServiceView();
+    setStatus('Изменения сервиса сохранены локально и поставлены в очередь синхронизации.');
+  }
+  function sharedServiceNewId(prefix) {
+    return prefix + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 9);
+  }
+  function bindSharedServiceEditor() {
+    const root = document.getElementById('shared-service-section');
+    if (!root || root.dataset.editorBound === '1') return;
+    root.dataset.editorBound = '1';
+    root.addEventListener('submit', function (event) {
+      const form = event.target && event.target.closest ? event.target.closest('form[data-shared-service-form]') : null;
+      if (!form) return;
+      event.preventDefault();
+      const kind = form.getAttribute('data-shared-service-form');
+      const fields = new FormData(form);
+      const title = String(fields.get('title') || '').trim();
+      if (!title) return;
+      const data = localSharedService();
+      const now = Date.now();
+      const date = String(fields.get('date') || '');
+      if (kind === 'task') {
+        data.tasks = Array.isArray(data.tasks) ? data.tasks : [];
+        data.tasks.unshift({ id: sharedServiceNewId('t'), title, dueDate: date, subject: String(fields.get('subject') || '').trim(), note: '', done: false, createdAt: now, updatedAt: now });
+      } else if (kind === 'deadline') {
+        data.deadlines = Array.isArray(data.deadlines) ? data.deadlines : [];
+        data.deadlines.unshift({ id: sharedServiceNewId('d'), title, date, subject: String(fields.get('subject') || '').trim(), note: '', done: false, createdAt: now, updatedAt: now });
+      } else if (kind === 'event') {
+        data.events = Array.isArray(data.events) ? data.events : [];
+        data.events.unshift({ id: sharedServiceNewId('e'), title, date, points: Math.max(0, Number(fields.get('points') || 0)), createdAt: now, updatedAt: now });
+      } else if (kind === 'hostel') {
+        data.hostel = data.hostel && typeof data.hostel === 'object' ? data.hostel : { totalGoal: 250, adminGoal: 100, socialGoal: 150, work: [], social: [] };
+        const category = String(fields.get('kind') || 'work') === 'social' ? 'social' : 'work';
+        data.hostel[category] = Array.isArray(data.hostel[category]) ? data.hostel[category] : [];
+        const record = { id: sharedServiceNewId(category === 'work' ? 'w' : 's'), title, date, points: Math.max(0, Number(fields.get('points') || 0)), createdAt: now, updatedAt: now };
+        if (category === 'work') record.minutes = Math.max(0, Number(fields.get('minutes') || 0));
+        else { record.note = ''; record.fileName = ''; record.fileData = ''; }
+        data.hostel[category].unshift(record);
+      } else return;
+      saveSharedServiceData(data);
+      form.reset();
+    });
+    root.addEventListener('click', function (event) {
+      const button = event.target && event.target.closest ? event.target.closest('[data-shared-service-action]') : null;
+      if (!button) return;
+      const action = button.getAttribute('data-shared-service-action');
+      const id = button.getAttribute('data-id') || '';
+      const data = localSharedService();
+      const now = Date.now();
+      let changed = false;
+      if (action === 'toggle-task') {
+        const item = (data.tasks || []).find(x => String(x.id) === id);
+        if (item) { item.done = !item.done; item.updatedAt = now; changed = true; }
+      } else if (action === 'toggle-deadline') {
+        const item = (data.deadlines || []).find(x => String(x.id) === id);
+        if (item) { item.done = !item.done; item.updatedAt = now; changed = true; }
+      } else if (action === 'delete-task') {
+        if (window.confirm('Удалить задачу?')) { data.tasks = (data.tasks || []).filter(x => String(x.id) !== id); changed = true; }
+      } else if (action === 'delete-deadline') {
+        if (window.confirm('Удалить дедлайн?')) { data.deadlines = (data.deadlines || []).filter(x => String(x.id) !== id); changed = true; }
+      } else if (action === 'delete-event') {
+        if (window.confirm('Удалить событие?')) { data.events = (data.events || []).filter(x => String(x.id) !== id); changed = true; }
+      } else if (action === 'delete-hostel') {
+        const category = button.getAttribute('data-kind') === 'social' ? 'social' : 'work';
+        if (window.confirm('Удалить запись ЖБС?')) {
+          data.hostel = data.hostel && typeof data.hostel === 'object' ? data.hostel : {};
+          data.hostel[category] = (Array.isArray(data.hostel[category]) ? data.hostel[category] : []).filter(x => String(x.id) !== id);
+          changed = true;
+        }
+      }
+      if (changed) saveSharedServiceData(data);
+    });
+  }
+  async function forcePushLocalVersion() {
+    if (busy) return;
+    if (!window.confirm('Отправить текущую локальную версию VK в облако? Данные Student Service в облаке будут заменены, а перед этим сохранены в резервную копию.')) return;
+    busy = true;
+    try {
+      const remote = await request('/api/sync', { method: 'GET' });
+      if (!remote || !remote.found) throw new Error('В облаке пока нет версии, которую можно безопасно сравнить. Сначала синхронизируй данные в Telegram.');
+      localStorage.setItem('kgeu_vk_cloud_before_force_push_v1', JSON.stringify(remote));
+      const meta = readMeta();
+      const local = localPersonal();
+      const allLocalNoteKeys = Object.keys(local.notes && typeof local.notes === 'object' ? local.notes : {});
+      const merged = mergeNotes(remote.personalData, local, allLocalNoteKeys);
+      snapshot.serviceData = localSharedService();
+      const profile = readProfile();
+      const result = await request('/api/sync', { method: 'POST', body: JSON.stringify(payloadForSync(merged.personalData, profile)) });
+      meta.lastServerRevision = Number(result.revision || meta.lastServerRevision || 0);
+      meta.lastSyncAt = Date.now();
+      meta.initialized = true;
+      meta.dirty = false;
+      meta.dirtyNotes = [];
+      meta.dirtyProfile = false;
+      meta.dirtyService = false;
+      writeMeta(meta);
+      writeCachedService(snapshot.serviceData);
+      snapshot.personalData = merged.personalData;
+      snapshot.profileData = profile;
+      applyPersonal(merged.personalData);
+      renderSharedServiceView();
+      setStatus('Локальная версия VK отправлена в облако. Предыдущая облачная копия сохранена локально.');
+    } catch (error) {
+      setStatus('Не удалось отправить локальную версию', error.message);
+    } finally {
+      busy = false;
+    }
+  }
+  async function forcePullCloudVersion() {
+    if (busy) return;
+    if (!window.confirm('Заменить локальные данные VK текущей облачной версией? Локальная копия будет сохранена.')) return;
+    busy = true;
+    try {
+      const remote = await request('/api/sync', { method: 'GET' });
+      if (!remote || !remote.found) throw new Error('В облаке пока нет данных. Сначала синхронизируй их в Telegram.');
+      localStorage.setItem('kgeu_vk_local_before_force_pull_v1', JSON.stringify({
+        savedAt: Date.now(),
+        serviceData: localSharedService(),
+        personalData: localPersonal(),
+        profileData: readProfile()
+      }));
+      snapshot.serviceData = remote.serviceData || DEFAULT_SERVICE;
+      writeCachedService(snapshot.serviceData);
+      applyPersonal(remote.personalData || { version: 1, notes: {} });
+      snapshot.personalData = remote.personalData || { version: 1, notes: {} };
+      snapshot.profileData = remote.profileData || {};
+      await applyProfile(snapshot.profileData);
+      const meta = readMeta();
+      meta.lastServerRevision = Number(remote.revision || 0);
+      meta.lastSyncAt = Date.now();
+      meta.initialized = true;
+      meta.dirty = false;
+      meta.dirtyNotes = [];
+      meta.dirtyProfile = false;
+      meta.dirtyService = false;
+      writeMeta(meta);
+      renderSharedServiceView();
+      setStatus('Облачная версия загружена. Предыдущая локальная копия сохранена.');
+    } catch (error) {
+      setStatus('Не удалось загрузить облачную версию', error.message);
+    } finally {
+      busy = false;
+    }
+  }
+
   function bindControls() {
     const link = document.getElementById('shared-link-submit');
     if (link) link.addEventListener('click', linkAccount);
     const sync = document.getElementById('shared-sync-now');
     if (sync) sync.addEventListener('click', function () { syncNow('manual'); });
+    const push = document.getElementById('shared-force-push');
+    if (push) push.addEventListener('click', forcePushLocalVersion);
+    const pull = document.getElementById('shared-force-pull');
+    if (pull) pull.addEventListener('click', forcePullCloudVersion);
     const input = document.getElementById('shared-link-code');
     if (input) input.addEventListener('input', function () { input.value = input.value.toUpperCase().replace(/[^23456789ABCDEFGHJKLMNPQRSTUVWXYZ]/g, '').slice(0, 8); });
+    bindSharedServiceEditor();
   }
   bindControls();
   renderSharedServiceView();
