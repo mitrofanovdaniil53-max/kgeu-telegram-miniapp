@@ -3,15 +3,20 @@ const SYNC_ENVELOPE_VERSION = 1;
 
 
 function corsHeaders(request) {
-  const origin = request.headers.get('Origin');
-  return {
-    'Access-Control-Allow-Origin': origin || '*',
+  const origin = request.headers.get('Origin') || '';
+  const headers = {
     'Access-Control-Allow-Headers': 'Content-Type, X-Telegram-Init-Data, X-VK-Launch-Params',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Vary': 'Origin',
     'Content-Type': 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
   };
+  // Both production Mini Apps are served from the same GitHub Pages origin.
+  // Do not reflect arbitrary Origin values for endpoints that read/write personal data.
+  if (origin === 'https://mitrofanovdaniil53-max.github.io') {
+    headers['Access-Control-Allow-Origin'] = origin;
+  }
+  return headers;
 }
 
 function json(request, data, status = 200) {
