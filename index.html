@@ -3561,6 +3561,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     return '<div class="service-page"><section class="service-hero"><div class="service-kicker">Мой сервис</div><h1 class="service-title">Синхронизация</h1><div class="service-sub">Изменения синхронизируются автоматически при сохранении, возвращении в приложение и восстановлении интернета. Ручные действия остаются для диагностики и восстановления. Перед восстановлением локальная копия сохраняется автоматически.</div><div class="service-actions"><button class="service-btn" data-service-action="service-home">← Мой сервис</button><button class="service-btn" data-service-action="data">Данные</button></div></section>'+
       '<section class="service-card"><div class="service-section-title"><h2>Состояние</h2><span id="service-sync-status" class="service-status '+(m.dirty?'today':'done')+'">'+(m.dirty?'Есть локальные изменения':'Локально сохранено')+'</span></div><div class="service-data-grid"><div class="service-data-box"><strong>Локально</strong><span>источник данных</span></div><div class="service-data-box"><strong>'+serviceEsc(device||'—')+'</strong><span>ID устройства</span></div><div class="service-data-box"><strong>'+serviceData.tasks.length+'</strong><span>задач</span></div><div class="service-data-box"><strong>'+serviceData.deadlines.length+'</strong><span>дедлайнов</span></div></div><p class="service-data-note">Последнее локальное изменение: '+serviceEsc(localTime)+' · последняя успешная синхронизация: '+serviceEsc(serverTime)+'.</p></section>'+
       '<section class="service-card"><h2 style="margin:0 0 5px">Worker API</h2><p class="service-data-note">Адрес Cloudflare Worker. Для облачного обмена нужны маршруты <code>/api/health</code> и <code>/api/sync</code> с проверкой Telegram initData.</p><div class="service-form-row"><input id="service-sync-endpoint" class="service-input" type="url" inputmode="url" placeholder="https://kgeu-telegram-miniapp.2vkv544dmd.workers.dev" value="'+serviceEsc(endpoint)+'"></div><div class="service-actions"><button class="service-btn" data-service-action="save-sync-endpoint">Сохранить адрес</button><button class="service-btn" data-service-action="check-sync">Проверить связь</button><button class="service-btn primary" data-service-action="sync-now">Отправить в облако</button><button class="service-btn" data-service-action="pull-cloud">Получить из облака</button></div><p id="service-sync-feedback" class="service-data-note">'+(endpoint?(tg?'Telegram initData доступен':'Telegram initData пока не доступен в этом окружении'):'Worker пока не настроен.')+'</p></section>'+
+      '<section class="service-card"><h2 style="margin:0 0 5px">Связать VK с Telegram</h2><p class="service-data-note">Создай одноразовый код здесь, затем открой VK-версию расписания и введи его в разделе «Настройки → Общий аккаунт Telegram ↔ VK». Код действует 10 минут и связывает только аккаунты, в которых ты сам авторизован.</p><div class="service-actions"><button class="service-btn primary" data-service-action="create-vk-link-code">Создать код привязки</button></div><div id="service-link-code-wrap" class="service-data-box" hidden><strong id="service-link-code" style="font-size:24px;letter-spacing:.12em"></strong><span id="service-link-code-expiry"></span></div><p id="service-link-feedback" class="service-data-note" role="status">После привязки заметки и поддерживаемые общие данные будут доступны на обеих платформах.</p></section>'+
       '<section class="service-card"><h2 style="margin:0 0 5px">Безопасность</h2><p class="service-data-note">Клиент не передаёт доверенный userId из localStorage. В Telegram Mini App сервер должен проверять <code>Telegram.WebApp.initData</code>; данные <code>initDataUnsafe</code> нельзя считать доверенными. До проверки сервером никакая облачная запись не считается авторизованной.</p></section>'+
       '<section class="service-card"><h2 style="margin:0 0 5px">Ручной пакет</h2><p class="service-data-note">Если backend недоступен, JSON-пакет по-прежнему можно сохранить как резервную копию.</p><div class="service-actions"><button class="service-btn" data-service-action="export-sync">Экспортировать пакет</button></div></section></div>';
   }
@@ -3665,6 +3666,29 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
         }catch(e){
           const message=e.message==='cloud_data_not_found'?'В облаке пока нет сохранённых данных. Сначала отправь их с устройства, где они есть.':(e.message||'неизвестная ошибка');
           if(feedback)feedback.textContent='Ошибка получения: '+serviceEsc(message);toast('Не удалось получить данные из облака');
+        }
+        return;
+      }
+      if(a==='create-vk-link-code'){
+        const feedback=document.getElementById('service-link-feedback');
+        const codeWrap=document.getElementById('service-link-code-wrap');
+        if(feedback)feedback.textContent='Создаю одноразовый код…';
+        try{
+          const initData=serviceTelegramInitData();
+          if(!initData)throw new Error('Открой приложение через Telegram, чтобы подтвердить аккаунт.');
+          const endpoint=serviceSyncEndpoint().replace(/\\/+$/,'');
+          const response=await fetch(endpoint+'/api/account/link-code',{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':initData},body:'{}'});
+          const data=await response.json();
+          if(!response.ok||!data.ok)throw new Error(data.error||('HTTP '+response.status));
+          const code=document.getElementById('service-link-code');
+          const expiry=document.getElementById('service-link-code-expiry');
+          if(code)code.textContent=data.code||'';
+          if(expiry)expiry.textContent='Действует до '+new Date(Number(data.expiresAt||0)).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+          if(codeWrap)codeWrap.hidden=false;
+          if(feedback)feedback.textContent='Введи этот код в VK. Не отправляй его другим людям.';
+        }catch(e){
+          if(feedback)feedback.textContent='Не удалось создать код: '+String(e&&e.message||'ошибка');
+          toast('Не удалось создать код привязки');
         }
         return;
       }
