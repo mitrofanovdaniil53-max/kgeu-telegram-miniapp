@@ -4771,10 +4771,14 @@ document.addEventListener("DOMContentLoaded", () => {
       await request('/api/account/link', { method: 'POST', body: JSON.stringify({ code: code }) });
       if (input) input.value = '';
       const meta = readMeta();
+      // The Worker merges both cloud snapshots during linking. Mark this device initialized
+      // so the first post-link pull applies that merged snapshot instead of raising a conflict.
+      meta.initialized = true;
       meta.dirty = true;
+      meta.dirtyService = false;
       meta.dirtyProfile = false;
       writeMeta(meta);
-      setStatus('Аккаунты связаны. Переношу данные и заметки…');
+      setStatus('Аккаунты связаны. Объединяю данные и заметки…');
       await syncNow('linked');
     } catch (e) {
       setStatus('Не удалось связать аккаунты', e.message);
