@@ -353,6 +353,61 @@ async function enforceLinkAttemptLimit(env, identity, now) {
   if (Number(row && row.attempts || 0) > 10) throw new Error('link_rate_limited');
 }
 
+function mergeRecordLists(primary, secondary) {
+  const result = [];
+  const positions = new Map();
+  for (const item of [...(Array.isArray(primary) ? primary : []), ...(Array.isArray(secondary) ? secondary : [])]) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const key = item.id != null && String(item.id) ? String(item.id) : 'json:' + JSON.stringify(item);
+    if (!positions.has(key)) { positions.set(key, result.length); result.push(item); continue; }
+    const index = positions.get(key), current = result[index];
+    if (Number(item.updatedAt || item.createdAt || 0) > Number(current.updatedAt || current.createdAt || 0)) result[index] = item;
+  }
+  return result;
+}
+
+function mergeAccountSnapshots(source, target, now) {
+  const sourceService = source && source.found && source.serviceData && typeof source.serviceData === 'object' ? source.serviceData : {};
+  const targetService = target && target.found && target.serviceData && typeof target.serviceData === 'object' ? target.serviceData : {};
+  const sourceHostel = sourceService.hostel && typeof sourceService.hostel === 'object' ? sourceService.hostel : {};
+  const targetHostel = targetService.hostel && typeof targetService.hostel === 'object' ? targetService.hostel : {};
+  const sourcePersonal = source && source.personalData && typeof source.personalData === 'object' ? source.personalData : { version: 1, notes: {} };
+  const targetPersonal = target && target.personalData && typeof target.personalData === 'object' ? target.personalData : { version: 1, notes: {} };
+  const sourceNotes = sourcePersonal.notes && typeof sourcePersonal.notes === 'object' && !Array.isArray(sourcePersonal.notes) ? sourcePersonal.notes : {};
+  const targetNotes = targetPersonal.notes && typeof targetPersonal.notes === 'object' && !Array.isArray(targetPersonal.notes) ? targetPersonal.notes : {};
+  const notes = { ...targetNotes, ...sourceNotes };
+  for (const key of Object.keys(sourceNotes)) {
+    const a = sourceNotes[key], b = targetNotes[key];
+    if (a && b && typeof a === 'object' && typeof b === 'object'
+        && Number(b.updatedAt || b.updated_at || 0) > Number(a.updatedAt || a.updated_at || 0)) notes[key] = b;
+  }
+  const sourceProfile = source && source.profileData && typeof source.profileData === 'object' ? source.profileData : {};
+  const targetProfile = target && target.profileData && typeof target.profileData === 'object' ? target.profileData : {};
+  const mergedService = {
+    ...targetService, ...sourceService,
+    tasks: mergeRecordLists(sourceService.tasks, targetService.tasks),
+    deadlines: mergeRecordLists(sourceService.deadlines, targetService.deadlines),
+    events: mergeRecordLists(sourceService.events, targetService.events),
+    updatedAt: Number(now || Date.now()),
+    hostel: {
+      ...targetHostel, ...sourceHostel,
+      work: mergeRecordLists(sourceHostel.work, targetHostel.work),
+      social: mergeRecordLists(sourceHostel.social, targetHostel.social),
+    },
+    reminders: sourceService.reminders || targetService.reminders || { enabled: false, taskDays: 1, deadlineDays: 1, eventDays: 1 },
+  };
+  return {
+    schemaVersion: Math.max(Number(source && source.schemaVersion || 1), Number(target && target.schemaVersion || 1)),
+    deviceId: '', hasPersonalData: true, hasProfileData: true,
+    envelope: {
+      envelopeVersion: SYNC_ENVELOPE_VERSION,
+      serviceData: mergedService,
+      personalData: { ...targetPersonal, ...sourcePersonal, version: 1, notes, updatedAt: Math.max(Number(sourcePersonal.updatedAt || 0), Number(targetPersonal.updatedAt || 0), Number(now || Date.now())) },
+      profileData: { ...targetProfile, ...sourceProfile, activeGroup: sourceProfile.activeGroup || targetProfile.activeGroup || null, settings: { ...(targetProfile.settings || {}), ...(sourceProfile.settings || {}) } },
+    },
+  };
+}
+
 async function consumeAccountLinkCode(env, identity, code) {
   const normalized = String(code || '').trim().toUpperCase();
   const now = Date.now();
@@ -374,12 +429,9 @@ async function consumeAccountLinkCode(env, identity, code) {
     return { linked: true, alreadyLinked: true, accountId: sourceAccountId };
   }
 
-  // Hydrate legacy Telegram cloud data before deciding whether the target account is empty.
-  await unpackAccountState(env, currentAccountId);
-  const targetState = await env.DB.prepare(
-    'SELECT 1 AS has_state FROM account_state WHERE account_id = ? LIMIT 1'
-  ).bind(currentAccountId).first();
-  if (targetState) throw new Error('target_account_has_data');
+  // Hydrate both accounts, including legacy Telegram data. Keep records from both accounts.
+  const sourceState = await unpackAccountState(env, sourceAccountId);
+  const targetState = await unpackAccountState(env, currentAccountId);
 
   const existingProviderLink = await env.DB.prepare(
     'SELECT provider_user_id FROM account_identities WHERE account_id = ? AND provider = ? LIMIT 1'
@@ -393,16 +445,28 @@ async function consumeAccountLinkCode(env, identity, code) {
   ).bind(now, codeHash, now).run();
   if (!claim.meta || Number(claim.meta.changes || 0) !== 1) throw new Error('link_code_expired_or_invalid');
 
+  let mergedIncoming = null;
+  if (targetState.found) {
+    mergedIncoming = mergeAccountSnapshots(sourceState, targetState, now);
+    // Persist the union before moving the identity or deleting the old snapshot.
+    await saveAccountState(env, identity, sourceAccountId, mergedIncoming);
+  }
+
   await env.DB.prepare(
     'DELETE FROM account_identities WHERE provider = ? AND provider_user_id = ?'
   ).bind(identity.provider, identity.userId).run();
   await env.DB.prepare(
     'INSERT INTO account_identities (provider, provider_user_id, account_id, linked_at) VALUES (?, ?, ?, ?)'
   ).bind(identity.provider, identity.userId, sourceAccountId, now).run();
-  await env.DB.prepare(
-    'UPDATE accounts SET updated_at = ? WHERE account_id = ?'
-  ).bind(now, sourceAccountId).run();
+  await env.DB.prepare('UPDATE accounts SET updated_at = ? WHERE account_id = ?').bind(now, sourceAccountId).run();
 
+  // If Telegram is the identity being moved into a VK-origin account, update its legacy row too.
+  if (mergedIncoming && identity.provider === 'telegram') {
+    await saveAccountState(env, identity, sourceAccountId, mergedIncoming);
+  }
+
+  // The merged source snapshot is durable; remove the redundant target snapshot.
+  await env.DB.prepare('DELETE FROM account_state WHERE account_id = ?').bind(currentAccountId).run();
   const remaining = await env.DB.prepare(
     'SELECT 1 AS has_identity FROM account_identities WHERE account_id = ? LIMIT 1'
   ).bind(currentAccountId).first();
@@ -412,7 +476,7 @@ async function consumeAccountLinkCode(env, identity, code) {
     ).bind(currentAccountId, currentAccountId).run();
   }
 
-  return { linked: true, alreadyLinked: false, accountId: sourceAccountId };
+  return { linked: true, alreadyLinked: false, accountId: sourceAccountId, mergedExistingData: !!targetState.found };
 }
 
 
