@@ -4602,6 +4602,61 @@ document.addEventListener("DOMContentLoaded", () => {
       return false;
     }
   }
+  // Merge pre-existing VK-local records with Telegram's cloud state on the first link.
+  // Records with distinct IDs are unioned; conflicting records with the same ID are
+  // preserved as separate entries so a first link never silently drops either version.
+  function mergeServiceRecords(cloudValue, localValue) {
+    const cloud = cloudValue && typeof cloudValue === 'object' ? cloudValue : DEFAULT_SERVICE;
+    const local = localValue && typeof localValue === 'object' ? localValue : DEFAULT_SERVICE;
+    const merged = Object.assign({}, cloud, local, {
+      schemaVersion: Math.max(Number(cloud.schemaVersion || 4), Number(local.schemaVersion || 4)),
+      version: Math.max(Number(cloud.version || 4), Number(local.version || 4)),
+      updatedAt: Date.now()
+    });
+    function union(cloudItems, localItems, prefix) {
+      const result = [];
+      const byId = new Map();
+      (Array.isArray(cloudItems) ? cloudItems : []).forEach(item => {
+        if (!item || typeof item !== 'object') return;
+        const id = item.id == null ? '' : String(item.id);
+        if (id) byId.set(id, result.length);
+        result.push(item);
+      });
+      (Array.isArray(localItems) ? localItems : []).forEach(item => {
+        if (!item || typeof item !== 'object') return;
+        const id = item.id == null ? '' : String(item.id);
+        if (!id) {
+          if (!result.some(existing => sameServiceContent(existing, item))) result.push(item);
+          return;
+        }
+        if (!byId.has(id)) {
+          byId.set(id, result.length);
+          result.push(item);
+          return;
+        }
+        const index = byId.get(id);
+        if (!sameServiceContent(result[index], item)) {
+          let suffix = 1;
+          let duplicateId = id + '-vk-' + prefix;
+          while (byId.has(duplicateId)) duplicateId = id + '-vk-' + prefix + '-' + (++suffix);
+          const duplicate = Object.assign({}, item, { id: duplicateId });
+          byId.set(duplicateId, result.length);
+          result.push(duplicate);
+        }
+      });
+      return result;
+    }
+    ['tasks', 'deadlines', 'events'].forEach(key => {
+      merged[key] = union(cloud[key], local[key], key);
+    });
+    const cloudHostel = cloud.hostel && typeof cloud.hostel === 'object' ? cloud.hostel : {};
+    const localHostel = local.hostel && typeof local.hostel === 'object' ? local.hostel : {};
+    merged.hostel = Object.assign({}, cloudHostel, localHostel);
+    ['work', 'social'].forEach(key => {
+      merged.hostel[key] = union(cloudHostel[key], localHostel[key], key);
+    });
+    return merged;
+  }
   function sharedServiceEscape(value) {
     return String(value == null ? '' : value).replace(/[&<>"']/g, function (ch) {
       return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
@@ -4739,6 +4794,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (remote && remote.found) {
         const remoteRevision = Number(remote.revision || 0);
         const cachedService = readCachedService();
+        let mergedFirstLink = false;
         // First link is an identity merge, not permission to discard pre-existing VK-local Student Service data.
         // If both sides contain different meaningful service records, pause automatic sync and let the user choose
         // one of the explicit, backup-protected conflict actions in Settings.
@@ -4747,13 +4803,20 @@ document.addEventListener("DOMContentLoaded", () => {
           const backupKey = 'kgeu_vk_local_before_first_link_v1';
           try {
             if (!localStorage.getItem(backupKey)) {
-              localStorage.setItem(backupKey, JSON.stringify({ savedAt: Date.now(), serviceData: cachedService }));
+              localStorage.setItem(backupKey, JSON.stringify({
+                savedAt: Date.now(),
+                serviceData: cachedService,
+                cloudServiceData: remote.serviceData || DEFAULT_SERVICE
+              }));
             }
           } catch (e) {}
-          snapshot.serviceData = cachedService;
-          renderSharedServiceView();
-          setStatus('Перед первой синхронизацией найдены разные данные «Моего сервиса» в VK и Telegram. Ничего не перезаписано: выбери в настройках «Оставить локальную версию VK» или «Заменить локальную версией из облака». Локальная копия сохранена.');
-          return;
+          // First link is a merge, not a winner-takes-all overwrite. Preserve records
+          // from both platforms and keep a local backup before publishing the union.
+          snapshot.serviceData = mergeServiceRecords(remote.serviceData || DEFAULT_SERVICE, cachedService);
+          writeCachedService(snapshot.serviceData);
+          shouldPush = true;
+          mergedFirstLink = true;
+          setStatus('Первичная привязка: объединяю задачи, дедлайны, мероприятия и записи ЖБС из Telegram и VK. Обе исходные версии сохранены в резервной копии.');
         }
         if (meta.dirtyService && cachedService) {
           if (!meta.lastServerRevision || remoteRevision > Number(meta.lastServerRevision || 0)) {
@@ -4764,6 +4827,8 @@ document.addEventListener("DOMContentLoaded", () => {
           }
           snapshot.serviceData = cachedService;
           shouldPush = true;
+        } else if (mergedFirstLink) {
+          // Keep the just-created union; the ordinary first-sync pull must not replace it.
         } else {
           const revisionChanged = !meta.initialized || !cachedService || remoteRevision > Number(meta.lastServerRevision || 0);
           snapshot.serviceData = remote.serviceData || DEFAULT_SERVICE;
