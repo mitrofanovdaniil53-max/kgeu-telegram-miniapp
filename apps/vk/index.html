@@ -10,6 +10,19 @@
 <script id="kgeu-vk-personal-notes-v1">
 const KGEU_PERSONAL_DATA_KEY = "kgeu_vk_personal_data_v1";
 
+function kgeuVkLaunchParams() {
+  // VK normally supplies signed launch parameters in the query string.
+  // Some app shells preserve them in the URL hash; support that form too.
+  const candidates = [window.location.search, window.location.hash];
+  for (let raw of candidates) {
+    raw = String(raw || '').replace(/^[?#]/, '');
+    const question = raw.indexOf('?');
+    if (question >= 0) raw = raw.slice(question + 1);
+    if (/(^|&)vk_user_id=/.test(raw) && /(^|&)sign=/.test(raw)) return raw;
+  }
+  return '';
+}
+
 function kgeuDefaultPersonalData() {
   return { version: 1, notes: {}, updatedAt: Date.now() };
 }
@@ -3043,8 +3056,8 @@ html.vk-light .service-pill {
     const initData=serviceTelegramInitData();
     if(initData) headers['X-Telegram-Init-Data']=initData;
     else if(window.KGEU_VK_PLATFORM){
-      const vkParams=String(window.location.search||'').replace(/^\?/,'');
-      if(vkParams && /(^|&)vk_user_id=/.test(vkParams) && /(^|&)sign=/.test(vkParams)) headers['X-VK-Launch-Params']=vkParams;
+      const vkParams=typeof kgeuVkLaunchParams==='function'?kgeuVkLaunchParams():'';
+      if(vkParams) headers['X-VK-Launch-Params']=vkParams;
     }
     const res=await fetch(endpoint+path,Object.assign({},options||{},{headers:headers}));
     const text=await res.text();
@@ -4458,7 +4471,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return meta.deviceId;
   }
   function launchParams() {
-    return String(window.location.search || '').replace(/^\?/, '');
+    return typeof kgeuVkLaunchParams === 'function' ? kgeuVkLaunchParams() : String(window.location.search || '').replace(/^\?/, '');
   }
   function setStatus(message, error) {
     const node = document.getElementById('shared-sync-status');
