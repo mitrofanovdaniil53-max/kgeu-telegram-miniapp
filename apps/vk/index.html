@@ -1052,6 +1052,10 @@ function kgeuSetNote(subject, value) {
 
 
 <style id="kgeu-vk-notes-ui-v2">
+/* Match Telegram: compact note control aligned with room/teacher metadata. */
+.card .card-meta{position:relative !important;padding-right:30px !important;min-height:24px;display:flex;flex-direction:column;align-items:flex-start;gap:3px}
+.card .card-meta .kgeu-note-inline{top:50% !important;right:0 !important;bottom:auto !important;transform:translateY(-50%) !important}
+.card .card-meta .row{justify-content:flex-start;text-align:left;width:100%}
 .kgeu-note-inline{
   position:absolute;
   top:10px;
@@ -2225,7 +2229,10 @@ html.vk-light .service-pill {
           : escapeHtml(formatTeacherFullName(x.teacher)))
       : '';
 
-    return '<article class="' + cls + '">' +
+    // Stable hooks used by the shared subject-note button, matching Telegram.
+    const lessonId = (x.date || '') + '_' + (x.start || '') + '_' + (x.teacherId || x.teacher || '');
+
+    return '<article class="' + cls + '" data-lesson-card="1" data-subject="' + escapeHtml(x.subject || '') + '" data-lesson-id="' + escapeHtml(lessonId) + '">' +
       '<div class="card-bar ' + type + '"></div>' +
       '<div class="card-body">' +
         '<div class="card-top">' +
@@ -4318,7 +4325,7 @@ function kgeuPrepareCard(card) {
   const subject = kgeuFindLessonSubject(card);
   if (!subject) return;
 
-  // Keep the action visually inside the card without disturbing existing layout.
+  // Keep the note button on the compact metadata line, as in Telegram.
   const computed = getComputedStyle(card);
   if (computed.position === "static") card.style.position = "relative";
 
@@ -4356,14 +4363,16 @@ function kgeuPrepareCard(card) {
   actions.append(close, save);
   panel.append(textarea, actions);
 
-  // Put the expandable content into the card itself.
+  // Keep the expandable editor inside the card, but place the icon in metadata.
   const contentTarget =
     card.querySelector(".lesson-content, .card-content, .lesson-info, .schedule-card-content") ||
     card;
+  const metaTarget = card.querySelector(".card-meta") || contentTarget;
 
   contentTarget.appendChild(panel);
   wrap.appendChild(button);
-  card.appendChild(wrap);
+  metaTarget.appendChild(wrap);
+  card.classList.add("has-kgeu-note");
 
   const refreshState = () => {
     const has = Boolean(kgeuGetNote(subject).trim());
