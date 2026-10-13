@@ -235,6 +235,101 @@ async function unpackAccountState(env, accountId) {
   };
 }
 
+function stableSyncValue(value) {
+  if (Array.isArray(value)) return value.map(stableSyncValue);
+  if (!value || typeof value !== 'object') return value;
+  const out = {};
+  Object.keys(value).filter(key => !['updatedAt', 'version', 'schemaVersion'].includes(key)).sort().forEach(key => {
+    out[key] = stableSyncValue(value[key]);
+  });
+  return out;
+}
+
+function sameSyncValue(a, b) {
+  try { return JSON.stringify(stableSyncValue(a)) === JSON.stringify(stableSyncValue(b)); }
+  catch (_) { return false; }
+}
+
+function mergeSyncRecords(sourceItems, targetItems, suffix) {
+  const result = [];
+  const byId = new Map();
+  const add = (item, fromTarget) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return;
+    const id = item.id == null ? '' : String(item.id);
+    if (!id) {
+      if (!result.some(existing => sameSyncValue(existing, item))) result.push(item);
+      return;
+    }
+    if (!byId.has(id)) {
+      byId.set(id, result.length);
+      result.push(item);
+      return;
+    }
+    const index = byId.get(id);
+    if (sameSyncValue(result[index], item)) return;
+    if (!fromTarget) {
+      // Source account wins for a conflicting ID; preserve the other copy when added below.
+      return;
+    }
+    let n = 1;
+    let alternateId = id + '-' + suffix;
+    while (byId.has(alternateId)) alternateId = id + '-' + suffix + '-' + (++n);
+    const alternate = Object.assign({}, item, { id: alternateId });
+    byId.set(alternateId, result.length);
+    result.push(alternate);
+  };
+  (Array.isArray(sourceItems) ? sourceItems : []).forEach(item => add(item, false));
+  (Array.isArray(targetItems) ? targetItems : []).forEach(item => add(item, true));
+  return result;
+}
+
+function mergeAccountEnvelopes(source, target) {
+  const sourceService = source && source.serviceData && typeof source.serviceData === 'object' ? source.serviceData : {};
+  const targetService = target && target.serviceData && typeof target.serviceData === 'object' ? target.serviceData : {};
+  const serviceData = Object.assign({}, targetService, sourceService, {
+    schemaVersion: Math.max(Number(sourceService.schemaVersion || 4), Number(targetService.schemaVersion || 4)),
+    version: Math.max(Number(sourceService.version || 4), Number(targetService.version || 4)),
+    updatedAt: Date.now()
+  });
+  ['tasks', 'deadlines', 'events'].forEach(key => {
+    serviceData[key] = mergeSyncRecords(sourceService[key], targetService[key], 'vk-' + key);
+  });
+  const sourceHostel = sourceService.hostel && typeof sourceService.hostel === 'object' ? sourceService.hostel : {};
+  const targetHostel = targetService.hostel && typeof targetService.hostel === 'object' ? targetService.hostel : {};
+  serviceData.hostel = Object.assign({}, targetHostel, sourceHostel);
+  ['work', 'social'].forEach(key => {
+    serviceData.hostel[key] = mergeSyncRecords(sourceHostel[key], targetHostel[key], 'vk-' + key);
+  });
+
+  const sourcePersonal = source && source.personalData && typeof source.personalData === 'object' ? source.personalData : { version: 1, notes: {} };
+  const targetPersonal = target && target.personalData && typeof target.personalData === 'object' ? target.personalData : { version: 1, notes: {} };
+  const notes = Object.assign({}, targetPersonal.notes && typeof targetPersonal.notes === 'object' ? targetPersonal.notes : {});
+  const sourceNotes = sourcePersonal.notes && typeof sourcePersonal.notes === 'object' ? sourcePersonal.notes : {};
+  Object.keys(sourceNotes).forEach(key => {
+    if (!Object.prototype.hasOwnProperty.call(notes, key) || String(notes[key]) === String(sourceNotes[key])) {
+      notes[key] = sourceNotes[key];
+      return;
+    }
+    let alternateKey = key + ' (Telegram)';
+    let n = 1;
+    while (Object.prototype.hasOwnProperty.call(notes, alternateKey) && String(notes[alternateKey]) !== String(sourceNotes[key])) {
+      alternateKey = key + ' (Telegram ' + (++n) + ')';
+    }
+    notes[alternateKey] = sourceNotes[key];
+  });
+
+  const sourceProfile = source && source.profileData && typeof source.profileData === 'object' ? source.profileData : {};
+  const targetProfile = target && target.profileData && typeof target.profileData === 'object' ? target.profileData : {};
+  const profileData = Object.assign({}, targetProfile, sourceProfile);
+  if (!sourceProfile.activeGroup && targetProfile.activeGroup) profileData.activeGroup = targetProfile.activeGroup;
+  profileData.settings = Object.assign({}, targetProfile.settings || {}, sourceProfile.settings || {});
+  return {
+    serviceData,
+    personalData: { version: 1, notes, updatedAt: Date.now() },
+    profileData
+  };
+}
+
 async function saveAccountState(env, identity, accountId, incoming) {
   const now = Date.now();
   await env.DB.prepare('UPDATE accounts SET updated_at = ? WHERE account_id = ?').bind(now, accountId).run();
@@ -374,12 +469,9 @@ async function consumeAccountLinkCode(env, identity, code) {
     return { linked: true, alreadyLinked: true, accountId: sourceAccountId };
   }
 
-  // Hydrate legacy Telegram cloud data before deciding whether the target account is empty.
-  await unpackAccountState(env, currentAccountId);
-  const targetState = await env.DB.prepare(
-    'SELECT 1 AS has_state FROM account_state WHERE account_id = ? LIMIT 1'
-  ).bind(currentAccountId).first();
-  if (targetState) throw new Error('target_account_has_data');
+  // Hydrate both accounts (including legacy Telegram storage) before linking.
+  const sourceState = await unpackAccountState(env, sourceAccountId);
+  const targetState = await unpackAccountState(env, currentAccountId);
 
   const existingProviderLink = await env.DB.prepare(
     'SELECT provider_user_id FROM account_identities WHERE account_id = ? AND provider = ? LIMIT 1'
@@ -392,6 +484,21 @@ async function consumeAccountLinkCode(env, identity, code) {
     'UPDATE account_link_codes SET consumed_at = ? WHERE code_hash = ? AND consumed_at IS NULL AND expires_at > ?'
   ).bind(now, codeHash, now).run();
   if (!claim.meta || Number(claim.meta.changes || 0) !== 1) throw new Error('link_code_expired_or_invalid');
+
+  // The VK identity may already have its own cloud state (for example, tasks were
+  // created before linking). Merge both accounts into the Telegram/source account
+  // before moving the identity; never reject or overwrite that existing state.
+  if (targetState.found) {
+    const sourceEnvelope = sourceState.found ? sourceState : { serviceData: {}, personalData: { version: 1, notes: {} }, profileData: {} };
+    const merged = mergeAccountEnvelopes(sourceEnvelope, targetState);
+    const incoming = normalizeIncoming({
+      schemaVersion: Math.max(Number(sourceState.schemaVersion || 1), Number(targetState.schemaVersion || 1), 4),
+      serviceData: merged.serviceData,
+      personalData: merged.personalData,
+      profileData: merged.profileData
+    });
+    await saveAccountState(env, identity, sourceAccountId, incoming);
+  }
 
   await env.DB.prepare(
     'DELETE FROM account_identities WHERE provider = ? AND provider_user_id = ?'
