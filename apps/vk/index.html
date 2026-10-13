@@ -4818,7 +4818,7 @@ document.addEventListener("DOMContentLoaded", () => {
           mergedFirstLink = true;
           setStatus('Первичная привязка: объединяю задачи, дедлайны, мероприятия и записи ЖБС из Telegram и VK. Обе исходные версии сохранены в резервной копии.');
         }
-        if (meta.dirtyService && cachedService) {
+        if (meta.dirtyService && cachedService && !mergedFirstLink) {
           if (!meta.lastServerRevision || remoteRevision > Number(meta.lastServerRevision || 0)) {
             snapshot.serviceData = cachedService;
             renderSharedServiceView();
