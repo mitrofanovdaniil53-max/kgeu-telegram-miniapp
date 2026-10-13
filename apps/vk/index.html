@@ -3506,11 +3506,9 @@ html.vk-light .service-pill {
     const s=String(subject||'').trim();
     if(!s){toast('Укажи предмет');return;}
     const current=kgeuGetNote(s);
-    const value=prompt('Заметка к предмету «'+s+'»:',current);
-    if(value===null)return;
-    kgeuSetNote(s,value);
-    toast(value.trim()?'Заметка сохранена':'Заметка удалена');
-    render();
+    document.getElementById('app').innerHTML='<div class="service-page"><section class="service-hero"><div class="service-kicker">Учёба · Заметки</div><h1 class="service-title">'+serviceEsc(s)+'</h1><div class="service-sub">Заметка сохранится по названию предмета и будет доступна в разделе «Заметки».</div></section><form class="service-form" id="service-note-edit-form" data-subject="'+serviceEsc(s)+'"><div><label for="note-content">Текст заметки</label><textarea id="note-content" name="note" maxlength="5000" rows="7" placeholder="Запиши важные даты, вопросы или материалы">'+serviceEsc(current)+'</textarea></div><div class="service-actions"><button class="service-btn primary" type="submit">Сохранить заметку</button><button class="service-btn" type="button" data-service-action="notes">Отмена</button></div></form></div>';
+    serviceBind();
+    window.scrollTo({top:0,behavior:'smooth'});
   }
 
   function serviceOpenSubject(subject){
@@ -3867,6 +3865,17 @@ html.vk-light .service-pill {
   })();
 
   function serviceBind(){
+    const noteEditForm=document.getElementById('service-note-edit-form');
+    if(noteEditForm)noteEditForm.addEventListener('submit',function(e){
+      e.preventDefault();
+      const subject=String(noteEditForm.getAttribute('data-subject')||'').trim();
+      const field=noteEditForm.querySelector('[name="note"]');
+      const note=String(field?field.value:'');
+      kgeuSetNote(subject,note);
+      document.getElementById('app').innerHTML=serviceRenderNotes();
+      serviceBind();
+      toast(note.trim()?'Заметка сохранена':'Заметка удалена');
+    });
     const noteForm=document.getElementById('service-note-form');
     if(noteForm)noteForm.addEventListener('submit',function(e){
       e.preventDefault();
