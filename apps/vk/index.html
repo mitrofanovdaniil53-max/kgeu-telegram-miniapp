@@ -3997,8 +3997,10 @@ html.vk-light .service-pill {
         try{
           const initData=serviceTelegramInitData();
           if(!initData)throw new Error('Открой приложение через Telegram, чтобы подтвердить аккаунт.');
-          let endpoint=serviceSyncEndpoint(); while(endpoint.endsWith('/'))endpoint=endpoint.slice(0,-1);
-          const response=await fetch(endpoint+'/api/account/link-code',{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':initData},body:'{}'});
+          // Account linking must use the same canonical Worker as the VK-side code verifier.
+          // The configurable sync endpoint may point at a different/stale backend.
+          const linkEndpoint='https://kgeu-telegram-miniapp.2vkv544dmd.workers.dev';
+          const response=await fetch(linkEndpoint+'/api/account/link-code',{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':initData},body:'{}'});
           const data=await response.json();
           if(!response.ok||!data.ok)throw new Error(data.error||('HTTP '+response.status));
           const code=document.getElementById('service-link-code');
