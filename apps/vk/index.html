@@ -4794,6 +4794,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (remote && remote.found) {
         const remoteRevision = Number(remote.revision || 0);
         const cachedService = readCachedService();
+        let mergedFirstLink = false;
         // First link is an identity merge, not permission to discard pre-existing VK-local Student Service data.
         // If both sides contain different meaningful service records, pause automatic sync and let the user choose
         // one of the explicit, backup-protected conflict actions in Settings.
@@ -4814,6 +4815,7 @@ document.addEventListener("DOMContentLoaded", () => {
           snapshot.serviceData = mergeServiceRecords(remote.serviceData || DEFAULT_SERVICE, cachedService);
           writeCachedService(snapshot.serviceData);
           shouldPush = true;
+          mergedFirstLink = true;
           setStatus('Первичная привязка: объединяю задачи, дедлайны, мероприятия и записи ЖБС из Telegram и VK. Обе исходные версии сохранены в резервной копии.');
         }
         if (meta.dirtyService && cachedService) {
@@ -4825,6 +4827,8 @@ document.addEventListener("DOMContentLoaded", () => {
           }
           snapshot.serviceData = cachedService;
           shouldPush = true;
+        } else if (mergedFirstLink) {
+          // Keep the just-created union; the ordinary first-sync pull must not replace it.
         } else {
           const revisionChanged = !meta.initialized || !cachedService || remoteRevision > Number(meta.lastServerRevision || 0);
           snapshot.serviceData = remote.serviceData || DEFAULT_SERVICE;
