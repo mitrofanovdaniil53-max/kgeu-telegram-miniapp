@@ -1591,11 +1591,11 @@ html.vk-light .service-pill {
   </div>
 
   <div class="tabs" id="tabs">
+    <button class="tab" data-mode="service">Мой сервис</button>
     <button class="tab active" data-mode="today">Сегодня</button>
     <button class="tab" data-mode="tomorrow">Завтра</button>
     <button class="tab" data-mode="week">Неделя</button>
     <button class="tab" data-mode="month">Месяц</button>
-    <button class="tab" data-mode="service">Мой сервис</button>
     <button class="tab" data-mode="teachers">Преподаватели</button>
   </div>
   </div>
@@ -3408,7 +3408,7 @@ html.vk-light .service-pill {
         '<div class="service-actions">'+
           '<button class="service-btn primary" data-service-action="task">+ Задача</button>'+
           '<button class="service-btn" data-service-action="deadline">+ Дедлайн</button>'+
-          '<button class="service-btn" data-service-action="event">+ Мероприятие</button><button class="service-btn" data-service-action="calendar">Календарь</button><button class="service-btn" data-service-action="study">Учёба</button><button class="service-btn" data-service-action="analytics">Аналитика</button><button class="service-btn" data-service-action="reminders">Напоминания</button><button class="service-btn" data-service-action="analytics">Аналитика</button><button class="service-btn" data-service-action="data">Данные</button><button class="service-btn" data-service-action="sync">Синхронизация</button>'+
+          '<button class="service-btn" data-service-action="event">+ Мероприятие</button><button class="service-btn" data-service-action="calendar">Календарь</button><button class="service-btn" data-service-action="study">Учёба</button><button class="service-btn" data-service-action="analytics">Аналитика</button><button class="service-btn" data-service-action="reminders">Напоминания</button><button class="service-btn" data-service-action="notes">Заметки</button><button class="service-btn" data-service-action="data">Данные</button><button class="service-btn" data-service-action="sync">Синхронизация</button>'+
         '</div>'+
       '</section>'+
       '<div class="service-grid">'+
@@ -3506,11 +3506,9 @@ html.vk-light .service-pill {
     const s=String(subject||'').trim();
     if(!s){toast('Укажи предмет');return;}
     const current=kgeuGetNote(s);
-    const value=prompt('Заметка к предмету «'+s+'»:',current);
-    if(value===null)return;
-    kgeuSetNote(s,value);
-    toast(value.trim()?'Заметка сохранена':'Заметка удалена');
-    render();
+    document.getElementById('app').innerHTML='<div class="service-page"><section class="service-hero"><div class="service-kicker">Учёба · Заметки</div><h1 class="service-title">'+serviceEsc(s)+'</h1><div class="service-sub">Заметка сохранится по названию предмета и будет доступна в разделе «Заметки».</div></section><form class="service-form" id="service-note-edit-form" data-subject="'+serviceEsc(s)+'"><div><label for="note-content">Текст заметки</label><textarea id="note-content" name="note" maxlength="5000" rows="7" placeholder="Запиши важные даты, вопросы или материалы">'+serviceEsc(current)+'</textarea></div><div class="service-actions"><button class="service-btn primary" type="submit">Сохранить заметку</button><button class="service-btn" type="button" data-service-action="notes">Отмена</button></div></form></div>';
+    serviceBind();
+    window.scrollTo({top:0,behavior:'smooth'});
   }
 
   function serviceOpenSubject(subject){
@@ -3604,6 +3602,36 @@ html.vk-light .service-pill {
       '<section><div class="service-section-title"><h2>Задачи</h2></div><div class="service-list">'+(taskRows||'<div class="service-empty">Задач нет.</div>')+'<div class="service-filter-empty">По текущим фильтрам задач не найдено.</div></div></section>'+
       '<section><div class="service-section-title"><h2>Дедлайны</h2></div><div class="service-list">'+(deadlineRows||'<div class="service-empty">Дедлайнов нет.</div>')+'<div class="service-filter-empty">По текущим фильтрам дедлайнов не найдено.</div></div></section>'+
       '<section><div class="service-section-title"><h2>Предметы и заметки</h2></div><div class="service-list">'+(subjectRows||'<div class="service-empty">Предметы появятся после загрузки расписания.</div>')+'</div><div class="service-actions"><button class="service-btn" data-service-action="today">Сегодня →</button></div></section></div>';
+  }
+  function serviceRenderEntryForm(kind){
+    const cfg={
+      task:{title:'Новая задача',name:'Название задачи',dateLabel:'Срок (необязательно)',dateId:'entry-date',dateValue:'',extra:'Комментарий'},
+      deadline:{title:'Новый дедлайн',name:'Название дедлайна',dateLabel:'Дата дедлайна',dateId:'entry-date',dateValue:isoDate(new Date()),extra:'Комментарий'},
+      event:{title:'Новое мероприятие',name:'Название мероприятия',dateLabel:'Дата мероприятия',dateId:'entry-date',dateValue:isoDate(new Date()),extra:'Комментарий'}
+    }[kind];
+    if(!cfg)return serviceRenderToday();
+    return '<div class="service-page"><section class="service-hero"><div class="service-kicker">Мой сервис</div><h1 class="service-title">'+cfg.title+'</h1><div class="service-sub">Запись сохранится в данных сервиса на этом устройстве.</div></section>'+
+      '<form class="service-form" id="service-entry-form" data-kind="'+kind+'">'+
+      '<div><label for="entry-title">'+cfg.name+'</label><input id="entry-title" name="title" required maxlength="180" placeholder="'+cfg.name+'"></div>'+
+      '<div class="service-form-row"><div><label for="entry-date">'+cfg.dateLabel+'</label><input id="entry-date" name="date" type="date" '+(kind==='task'?'':'required')+' value="'+cfg.dateValue+'"></div>'+
+      (kind==='event'?'<div><label for="entry-points">Социальные баллы</label><input id="entry-points" name="points" type="number" min="0" step="1" value="10"></div>':'<div><label for="entry-subject">Предмет (необязательно)</label><input id="entry-subject" name="subject" maxlength="180" placeholder="Например, Промышленная экология"></div>')+'</div>'+
+      (kind==='event'?'<div><label for="entry-subject">Предмет/организатор (необязательно)</label><input id="entry-subject" name="subject" maxlength="180" placeholder="Организатор или комментарий"></div>':'')+
+      '<div><label for="entry-note">Комментарий (необязательно)</label><textarea id="entry-note" name="note" maxlength="2000" placeholder="Дополнительная информация"></textarea></div>'+
+      '<div class="service-actions"><button class="service-btn primary" type="submit">Сохранить</button><button class="service-btn" type="button" data-service-action="service-home">Отмена</button></div></form></div>';
+  }
+  function serviceRenderNotes(){
+    const subjects=serviceSubjectList();
+    const rows=subjects.map(function(subject){
+      const note=kgeuGetNote(subject);
+      return '<div class="service-row"><div class="service-row-main"><div class="service-row-title">'+serviceEsc(subject)+'</div><div class="service-row-meta">'+(note?'Заметка сохранена':'Заметки пока нет')+'</div></div><button class="service-btn" data-service-note-subject="'+serviceEsc(subject)+'">'+(note?'Открыть':'Добавить')+'</button></div>';
+    }).join('');
+    return '<div class="service-page"><section class="service-hero"><div class="service-kicker">Учёба</div><h1 class="service-title">Заметки</h1><div class="service-sub">Заметки привязаны к названию учебного предмета.</div><div class="service-actions"><button class="service-btn" data-service-action="study">Учёба</button><button class="service-btn" data-service-action="service-home">← Мой сервис</button></div></section><section><div class="service-section-title"><h2>Предметы</h2></div><div class="service-list">'+(rows||'<div class="service-empty">Предметы появятся после загрузки расписания. Открой «Учёба», чтобы добавить заметку к предмету.</div>')+'</div><div class="service-actions"><button class="service-btn" data-service-action="note-custom">+ Заметка по предмету</button></div></section></div>';
+  }
+  function serviceOpenCustomNote(){
+    const subjects=serviceSubjectList();
+    const options=subjects.map(function(subject){return '<option value="'+serviceEsc(subject)+'"></option>';}).join('');
+    document.getElementById('app').innerHTML='<div class="service-page"><section class="service-hero"><div class="service-kicker">Учёба</div><h1 class="service-title">Новая заметка</h1><div class="service-sub">Введи название предмета. Если расписание уже загружено, можно выбрать предмет из подсказок.</div></section><form class="service-form" id="service-note-form"><div><label for="note-subject">Предмет</label><input id="note-subject" name="subject" list="note-subject-options" required maxlength="180" placeholder="Название предмета"><datalist id="note-subject-options">'+options+'</datalist></div><div><label for="note-content">Заметка</label><textarea id="note-content" name="note" maxlength="5000" rows="5" placeholder="Запиши важные даты, вопросы или материалы"></textarea></div><div class="service-actions"><button class="service-btn primary" type="submit">Сохранить заметку</button><button class="service-btn" type="button" data-service-action="notes">Отмена</button></div></form></div>';
+    serviceBind();
   }
   function servicePromptTask(){
     const title=prompt('Название задачи:');if(!title)return;
@@ -3837,6 +3865,50 @@ html.vk-light .service-pill {
   })();
 
   function serviceBind(){
+    const noteEditForm=document.getElementById('service-note-edit-form');
+    if(noteEditForm)noteEditForm.addEventListener('submit',function(e){
+      e.preventDefault();
+      const subject=String(noteEditForm.getAttribute('data-subject')||'').trim();
+      const field=noteEditForm.querySelector('[name="note"]');
+      const note=String(field?field.value:'');
+      kgeuSetNote(subject,note);
+      document.getElementById('app').innerHTML=serviceRenderNotes();
+      serviceBind();
+      toast(note.trim()?'Заметка сохранена':'Заметка удалена');
+    });
+    const noteForm=document.getElementById('service-note-form');
+    if(noteForm)noteForm.addEventListener('submit',function(e){
+      e.preventDefault();
+      const fd=new FormData(noteForm),subject=String(fd.get('subject')||'').trim(),note=String(fd.get('note')||'');
+      if(!subject){toast('Введи название предмета');return;}
+      kgeuSetNote(subject,note);
+      document.getElementById('app').innerHTML=serviceRenderNotes();
+      serviceBind();
+      toast(note.trim()?'Заметка сохранена':'Пустая заметка удалена');
+    });
+    const entryForm=document.getElementById('service-entry-form');
+    if(entryForm)entryForm.addEventListener('submit',function(e){
+      e.preventDefault();
+      const fd=new FormData(entryForm),kind=entryForm.getAttribute('data-kind');
+      const title=String(fd.get('title')||'').trim(),date=String(fd.get('date')||'').trim();
+      const subject=String(fd.get('subject')||'').trim(),note=String(fd.get('note')||'').trim();
+      if(!title){toast('Введи название');return;}
+      if(kind!=='task'&&!/^\d{4}-\d{2}-\d{2}$/.test(date)){toast('Выбери дату');return;}
+      if(kind==='task'){
+        if(date&&!/^\d{4}-\d{2}-\d{2}$/.test(date)){toast('Проверь срок задачи');return;}
+        serviceData.tasks.push({id:'t_'+Date.now(),title:title,dueDate:date,subject:subject,note:note,done:false,createdAt:Date.now()});
+      }else if(kind==='deadline'){
+        serviceData.deadlines.push({id:'d_'+Date.now(),title:title,date:date,subject:subject,note:note,done:false});
+      }else if(kind==='event'){
+        const points=Math.max(0,Number(fd.get('points')||0));
+        serviceData.events.push({id:'e_'+Date.now(),title:title,date:date,points:points});
+        serviceData.hostel.social.push({id:'s_'+Date.now(),title:title,date:date,points:points,note:note||subject||'Добавлено из раздела мероприятий',fileName:''});
+      }
+      serviceSave();
+      document.getElementById('app').innerHTML=serviceRenderToday();
+      serviceBind();
+      toast('Запись сохранена');
+    });
     document.querySelectorAll('[data-calendar-date]').forEach(function(b){b.addEventListener('click',function(){serviceCalendarSelected=b.getAttribute('data-calendar-date')||serviceCalendarSelected;serviceCalendarDate=new Date(serviceCalendarSelected+'T00:00:00');document.getElementById('app').innerHTML=serviceRenderCalendar();serviceBind();});});
     const calPrev=document.querySelector('[data-calendar-prev]');
     if(calPrev)calPrev.addEventListener('click',function(){serviceCalendarDate=new Date(serviceCalendarDate.getFullYear(),serviceCalendarDate.getMonth()-1,1);serviceCalendarSelected=serviceCalendarMonthKey(serviceCalendarDate)+'-01';document.getElementById('app').innerHTML=serviceRenderCalendar();serviceBind();});
@@ -3856,9 +3928,10 @@ html.vk-light .service-pill {
     if(reminderToggle) reminderToggle.addEventListener('click',function(){serviceData.reminders=serviceData.reminders||{taskDays:1,deadlineDays:1,eventDays:1};serviceData.reminders.enabled=!serviceData.reminders.enabled;serviceSave();document.getElementById('app').innerHTML=serviceRenderReminders();serviceBind();});
     document.querySelectorAll('[data-service-action]').forEach(function(b){b.addEventListener('click',async function(){
       const a=b.getAttribute('data-service-action');
-      if(a==='task')return servicePromptTask();
-      if(a==='deadline')return servicePromptDeadline();
-      if(a==='event')return servicePromptEvent();
+      if(a==='task'||a==='deadline'||a==='event'){document.getElementById('app').innerHTML=serviceRenderEntryForm(a);serviceBind();window.scrollTo({top:0,behavior:'smooth'});return;}
+      if(a==='notes'){document.getElementById('app').innerHTML=serviceRenderNotes();serviceBind();window.scrollTo({top:0,behavior:'smooth'});return;}
+      if(a==='note-custom')return serviceOpenCustomNote();
+      if(a==='service-home'){document.getElementById('app').innerHTML=serviceRenderToday();serviceBind();window.scrollTo({top:0,behavior:'smooth'});return;}
       if(a==='calendar'){document.getElementById('app').innerHTML=serviceRenderCalendar();serviceBind();window.scrollTo({top:0,behavior:'smooth'});return;}
       if(a==='reminders'){document.getElementById('app').innerHTML=serviceRenderReminders();serviceBind();window.scrollTo({top:0,behavior:'smooth'});return;}
       if(a==='analytics'){document.getElementById('app').innerHTML=serviceRenderAnalytics();serviceBind();window.scrollTo({top:0,behavior:'smooth'});return;}
