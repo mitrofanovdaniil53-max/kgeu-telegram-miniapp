@@ -20,13 +20,16 @@ Telegram and VK bot identities, notification subscriptions, tokens and client-on
 
 ## Current status
 
-The unified integration is staged in [PR #10](https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp/pull/10). It has passed static JavaScript syntax checks and migration tests in CI, but production account linking has not yet been enabled.
+- Telegram and VK frontends share the Cloudflare Worker API after explicit account linking.
+- Automated checks parse inline JavaScript and the Worker, and test the additive SQLite migration.
+- Regression checks cover VK launch-parameter extraction and subject-note button hooks.
+- The owner has manually confirmed bidirectional sync, including subject notes, in both platforms. This is not a substitute for a full end-to-end test on a fresh account and a second device.
+- Shared-sync fixes are merged into `main`. GitHub Pages deployment is automatic, but each published build should be verified in the actual Telegram/VK shells before announcing a release.
 
-The VK frontend's canonical path after publication will be:
-
+Canonical VK path:
 `https://mitrofanovdaniil53-max.github.io/kgeu-telegram-miniapp/apps/vk/`
 
-Do not change the VK Mini App launch URL until the new path is live and verified.
+Do not change the VK Mini App launch URL or retire the old VK app until the canonical path has been opened successfully inside VK and rollback is confirmed.
 
 ## Safe rollout
 
