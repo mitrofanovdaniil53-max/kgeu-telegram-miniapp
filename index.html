@@ -3056,8 +3056,8 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
           serviceApplyCloudSnapshot(remote);
           serviceRefreshVisibleView();
           serviceSetAutoSyncStatus('Данные автоматически получены из облака.','ok');
-        }else if(!lastSync){
-          // First run with data on both sides is ambiguous: do not pick a winner automatically.
+        }else if(!lastSync || !lastRevision){
+          // First run or legacy metadata without a revision baseline is ambiguous: do not pick a winner automatically.
           serviceSetAutoSyncStatus('Данные есть и локально, и в облаке, но устройство ещё не связано с облачной версией. Автоматическая перезапись остановлена ради сохранности данных.','conflict');
         }else if(remoteAt>lastSync || !lastRevision || remoteRevision>lastRevision){
           serviceApplyCloudSnapshot(remote);
