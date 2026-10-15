@@ -34,14 +34,17 @@ class SyncRevisionCasTests(unittest.TestCase):
     def cas_write(self, expected_revision, state_json, now):
         cursor = self.db.execute("""
             INSERT INTO account_state (account_id, state_json, schema_version, revision, updated_at)
-            SELECT ?, ?, ?, 1, ? WHERE ? = 0
+            SELECT ?, ?, ?, 1, ?
+            WHERE ? = 0 OR EXISTS (
+                SELECT 1 FROM account_state WHERE account_id = ? AND revision = ?
+            )
             ON CONFLICT(account_id) DO UPDATE SET
               state_json = excluded.state_json,
               schema_version = excluded.schema_version,
               revision = account_state.revision + 1,
               updated_at = excluded.updated_at
             WHERE account_state.revision = ?
-        """, ("tg:1", state_json, 4, now, expected_revision, expected_revision))
+        """, ("tg:1", state_json, 4, now, expected_revision, "tg:1", expected_revision, expected_revision))
         if cursor.rowcount != 1:
             raise RuntimeError("sync_revision_conflict")
         self.db.execute("UPDATE accounts SET updated_at = ? WHERE account_id = ?", (now, "tg:1"))
@@ -85,7 +88,7 @@ class SyncRevisionCasTests(unittest.TestCase):
 
     def test_worker_uses_atomic_cas_and_maps_conflict_to_http_409(self):
         self.assertIn("WHERE account_state.revision = ?", WORKER_SOURCE)
-        self.assertIn("WHERE ? = 0", WORKER_SOURCE)
+        self.assertIn("WHERE ? = 0 OR EXISTS", WORKER_SOURCE)
         self.assertIn("throw new Error('sync_revision_conflict')", WORKER_SOURCE)
         self.assertIn("|| code === 'sync_revision_conflict' ? 409", WORKER_SOURCE)
         save_start = WORKER_SOURCE.index("async function saveAccountState")
