@@ -4844,6 +4844,11 @@ document.addEventListener("DOMContentLoaded", () => {
           mergedFirstLink = true;
           setStatus('Первичная привязка: объединяю задачи, дедлайны, мероприятия и записи ЖБС из Telegram и VK. Обе исходные версии сохранены в резервной копии.');
         }
+        if (meta.dirtyProfile && meta.initialized
+            && (!Number(meta.lastServerRevision || 0) || remoteRevision > Number(meta.lastServerRevision || 0))) {
+          setStatus('Есть конфликт настроек профиля: в Telegram изменились общие данные после последней синхронизации. Локальные настройки VK сохранены; сначала получи облачную версию и сравни изменения.');
+          return;
+        }
         if (meta.dirtyService && cachedService && !mergedFirstLink) {
           if (!meta.lastServerRevision || remoteRevision > Number(meta.lastServerRevision || 0)) {
             snapshot.serviceData = cachedService;
