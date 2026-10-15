@@ -32,6 +32,17 @@ class StudentServiceCopyRegressionTest(unittest.TestCase):
         unlinked_guard = source.index("if (!linked)", link_state)
         self.assertLess(link_state, unlinked_guard)
 
+    def test_vk_sync_conflict_offers_backup_protected_merge(self):
+        source = (ROOT / "apps" / "vk" / "index.html").read_text(encoding="utf-8")
+        self.assertIn('id="shared-merge-both"', source)
+        self.assertIn("async function mergeBothVersions()", source)
+        self.assertIn("kgeu_vk_before_merge_both_v1", source)
+        self.assertIn("kgeu_vk_cloud_before_merge_both_v1", source)
+        self.assertIn("mergeServiceRecords(remote.serviceData || DEFAULT_SERVICE, localService)", source)
+        self.assertIn("payloadForSync(", source)
+        self.assertIn("sync_revision_conflict", source)
+        self.assertIn("Удаления записей автоматически не переносятся", source)
+
 
 if __name__ == "__main__":
     unittest.main()
