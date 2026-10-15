@@ -75,6 +75,10 @@ function normalizeIncoming(payload) {
   const personal = hasPersonalData ? payload.personalData : { version: 1, notes: {} };
   const hasProfileData = !!(payload.profileData && typeof payload.profileData === 'object' && !Array.isArray(payload.profileData));
   const profile = hasProfileData ? payload.profileData : {};
+  const hasExpectedRevision = Object.prototype.hasOwnProperty.call(payload, 'expectedRevision');
+  if (hasExpectedRevision && (!Number.isSafeInteger(payload.expectedRevision) || payload.expectedRevision < 0)) {
+    throw new Error('invalid_expected_revision');
+  }
   const envelope = { envelopeVersion: SYNC_ENVELOPE_VERSION, serviceData: data, personalData: personal, profileData: profile };
   if (new TextEncoder().encode(JSON.stringify(envelope)).byteLength > MAX_BODY_BYTES) {
     throw new Error('payload_too_large');
@@ -84,6 +88,8 @@ function normalizeIncoming(payload) {
     deviceId: String(payload.deviceId || '').slice(0, 120),
     hasPersonalData,
     hasProfileData,
+    hasExpectedRevision,
+    expectedRevision: hasExpectedRevision ? payload.expectedRevision : null,
     envelope,
   };
 }
@@ -332,7 +338,6 @@ function mergeAccountEnvelopes(source, target) {
 
 async function saveAccountState(env, identity, accountId, incoming) {
   const now = Date.now();
-  await env.DB.prepare('UPDATE accounts SET updated_at = ? WHERE account_id = ?').bind(now, accountId).run();
   if (!incoming.hasProfileData || !incoming.hasPersonalData) {
     const current = await env.DB.prepare('SELECT state_json FROM account_state WHERE account_id = ? LIMIT 1').bind(accountId).first();
     if (current) {
@@ -351,15 +356,43 @@ async function saveAccountState(env, identity, accountId, incoming) {
       }
     }
   }
-  await env.DB.prepare(
-    `INSERT INTO account_state (account_id, state_json, schema_version, revision, updated_at)
-     VALUES (?, ?, ?, 1, ?)
-     ON CONFLICT(account_id) DO UPDATE SET
-       state_json = excluded.state_json,
-       schema_version = excluded.schema_version,
-       revision = account_state.revision + 1,
-       updated_at = excluded.updated_at`
-  ).bind(accountId, JSON.stringify(incoming.envelope), incoming.schemaVersion, now).run();
+  let writeResult;
+  if (incoming.hasExpectedRevision) {
+    // Atomic compare-and-swap: only the revision observed by the client may be replaced.
+    // The SELECT guard permits a first insert only when the client observed revision 0.
+    writeResult = await env.DB.prepare(
+      `INSERT INTO account_state (account_id, state_json, schema_version, revision, updated_at)
+       SELECT ?, ?, ?, 1, ?
+       WHERE ? = 0 OR EXISTS (
+         SELECT 1 FROM account_state WHERE account_id = ? AND revision = ?
+       )
+       ON CONFLICT(account_id) DO UPDATE SET
+         state_json = excluded.state_json,
+         schema_version = excluded.schema_version,
+         revision = account_state.revision + 1,
+         updated_at = excluded.updated_at
+       WHERE account_state.revision = ?`
+    ).bind(
+      accountId, JSON.stringify(incoming.envelope), incoming.schemaVersion, now,
+      incoming.expectedRevision, accountId, incoming.expectedRevision, incoming.expectedRevision
+    ).run();
+    if (!writeResult.meta || Number(writeResult.meta.changes || 0) !== 1) {
+      throw new Error('sync_revision_conflict');
+    }
+  } else {
+    // Legacy clients and the account-link merge path may still use unconditional writes.
+    writeResult = await env.DB.prepare(
+      `INSERT INTO account_state (account_id, state_json, schema_version, revision, updated_at)
+       VALUES (?, ?, ?, 1, ?)
+       ON CONFLICT(account_id) DO UPDATE SET
+         state_json = excluded.state_json,
+         schema_version = excluded.schema_version,
+         revision = account_state.revision + 1,
+         updated_at = excluded.updated_at`
+    ).bind(accountId, JSON.stringify(incoming.envelope), incoming.schemaVersion, now).run();
+  }
+
+  await env.DB.prepare('UPDATE accounts SET updated_at = ? WHERE account_id = ?').bind(now, accountId).run();
 
   // Keep the legacy Telegram row current so old builds and rollback remain compatible.
   const telegramIdentity = await env.DB.prepare(
@@ -617,7 +650,7 @@ export default {
         : code.startsWith('telegram_') || code.startsWith('vk_auth') || code === 'auth_required' ? 401
         : code === 'payload_too_large' ? 413
         : code === 'link_rate_limited' ? 429
-        : code === 'target_account_has_data' || code === 'provider_already_linked' || code === 'link_requires_other_platform' ? 409
+        : code === 'target_account_has_data' || code === 'provider_already_linked' || code === 'link_requires_other_platform' || code === 'sync_revision_conflict' ? 409
         : 400;
       return json(request, { ok: false, error: code }, status);
     }

@@ -99,3 +99,24 @@ test('empty source still preserves target state and settings', () => {
   assert.equal(merged.profileData.activeGroup.id, 7);
   assert.equal(merged.profileData.settings.theme, 'light');
 });
+
+test('normalizeIncoming preserves and validates expected cloud revisions', () => {
+  const base = { serviceData: { schemaVersion: 4, tasks: [] } };
+  const legacy = sandbox.normalizeIncoming(base);
+  assert.equal(legacy.hasExpectedRevision, false);
+  assert.equal(legacy.expectedRevision, null);
+
+  const initial = sandbox.normalizeIncoming({ ...base, expectedRevision: 0 });
+  assert.equal(initial.hasExpectedRevision, true);
+  assert.equal(initial.expectedRevision, 0);
+
+  const later = sandbox.normalizeIncoming({ ...base, expectedRevision: 17 });
+  assert.equal(later.expectedRevision, 17);
+
+  for (const invalid of [-1, 1.5, '2', null, Number.MAX_SAFE_INTEGER + 1]) {
+    assert.throws(
+      () => sandbox.normalizeIncoming({ ...base, expectedRevision: invalid }),
+      /invalid_expected_revision/
+    );
+  }
+});
