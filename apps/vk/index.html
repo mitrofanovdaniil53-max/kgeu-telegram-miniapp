@@ -4759,7 +4759,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  function payloadForSync(personal, profile) {
+  function payloadForSync(personal, profile, expectedRevision) {
     const meta = readMeta();
     return {
       format: 'kgeu-student-service-sync',
@@ -4767,6 +4767,8 @@ document.addEventListener("DOMContentLoaded", () => {
       schemaVersion: 4,
       deviceId: getDeviceId(),
       exportedAt: new Date().toISOString(),
+      expectedRevision: Number.isSafeInteger(expectedRevision) && expectedRevision >= 0
+        ? expectedRevision : Number(meta.lastServerRevision || 0),
       serviceData: readCachedService() || snapshot.serviceData || DEFAULT_SERVICE,
       personalData: personal || localPersonal(),
       profileData: profile || readProfile()
@@ -4892,7 +4894,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       if (shouldPush) {
-        const result = await request('/api/sync', { method: 'POST', body: JSON.stringify(payloadForSync(personal, profile)) });
+        const result = await request('/api/sync', { method: 'POST', body: JSON.stringify(payloadForSync(personal, profile, Number(remote && remote.revision || 0))) });
         meta.lastServerRevision = Number(result.revision || meta.lastServerRevision || 0);
         meta.lastSyncAt = Date.now();
         meta.initialized = true;
@@ -4918,7 +4920,11 @@ document.addEventListener("DOMContentLoaded", () => {
         setStatus('Данные VK и Telegram синхронизированы.');
       }
     } catch (e) {
-      setStatus('Синхронизация пока недоступна', e.message);
+      if (String(e && e.message || '') === 'sync_revision_conflict') {
+        setStatus('Облако изменилось во время записи. Локальные изменения сохранены; обнови данные и выбери версию перед повторной записью.', e.message);
+      } else {
+        setStatus('Синхронизация пока недоступна', e.message);
+      }
     } finally {
       busy = false;
     }
@@ -5049,7 +5055,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const merged = mergeNotes(remote.personalData, local, allLocalNoteKeys);
       snapshot.serviceData = localSharedService();
       const profile = readProfile();
-      const result = await request('/api/sync', { method: 'POST', body: JSON.stringify(payloadForSync(merged.personalData, profile)) });
+      const result = await request('/api/sync', { method: 'POST', body: JSON.stringify(payloadForSync(merged.personalData, profile, Number(remote.revision || 0))) });
       meta.lastServerRevision = Number(result.revision || meta.lastServerRevision || 0);
       meta.lastSyncAt = Date.now();
       meta.initialized = true;
@@ -5065,7 +5071,11 @@ document.addEventListener("DOMContentLoaded", () => {
       renderSharedServiceView();
       setStatus('Локальная версия VK отправлена в облако. Предыдущая облачная копия сохранена локально.');
     } catch (error) {
-      setStatus('Не удалось отправить локальную версию', error.message);
+      if (String(error && error.message || '') === 'sync_revision_conflict') {
+        setStatus('Облако изменилось во время записи. Локальная версия и резервная копия сохранены; повтори действие после проверки облачных данных.', error.message);
+      } else {
+        setStatus('Не удалось отправить локальную версию', error.message);
+      }
     } finally {
       busy = false;
     }
