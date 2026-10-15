@@ -4486,7 +4486,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const label = document.querySelector('label[for="shared-link-code"]');
     const note = document.getElementById('shared-link-state');
     [input, button, label].forEach(node => {
-      if (node) node.hidden = !!linked;
+      if (node) {
+        node.hidden = !!linked;
+        node.style.display = linked ? 'none' : '';
+      }
     });
     if (note) {
       note.textContent = linked
