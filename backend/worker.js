@@ -362,7 +362,10 @@ async function saveAccountState(env, identity, accountId, incoming) {
     // The SELECT guard permits a first insert only when the client observed revision 0.
     writeResult = await env.DB.prepare(
       `INSERT INTO account_state (account_id, state_json, schema_version, revision, updated_at)
-       SELECT ?, ?, ?, 1, ? WHERE ? = 0
+       SELECT ?, ?, ?, 1, ?
+       WHERE ? = 0 OR EXISTS (
+         SELECT 1 FROM account_state WHERE account_id = ? AND revision = ?
+       )
        ON CONFLICT(account_id) DO UPDATE SET
          state_json = excluded.state_json,
          schema_version = excluded.schema_version,
@@ -371,7 +374,7 @@ async function saveAccountState(env, identity, accountId, incoming) {
        WHERE account_state.revision = ?`
     ).bind(
       accountId, JSON.stringify(incoming.envelope), incoming.schemaVersion, now,
-      incoming.expectedRevision, incoming.expectedRevision
+      incoming.expectedRevision, accountId, incoming.expectedRevision, incoming.expectedRevision
     ).run();
     if (!writeResult.meta || Number(writeResult.meta.changes || 0) !== 1) {
       throw new Error('sync_revision_conflict');
