@@ -3039,7 +3039,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
         const lastRevision=Number(meta.lastServerRevision||0);
         if(meta.dirty){
           // Never silently overwrite a newer cloud snapshot with unsynced local edits.
-          if(!lastSync || remoteAt>lastSync || (lastRevision>0 && remoteRevision>lastRevision)){
+          if(!lastSync || remoteAt>lastSync || !lastRevision || remoteRevision>lastRevision){
             serviceSetAutoSyncStatus('Есть несинхронизированные изменения на этом устройстве и более новая версия в облаке. Автоматическая запись приостановлена, чтобы не потерять данные. Открой «Синхронизация» для проверки.','conflict');
             return;
           }
@@ -3059,7 +3059,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
         }else if(!lastSync){
           // First run with data on both sides is ambiguous: do not pick a winner automatically.
           serviceSetAutoSyncStatus('Данные есть и локально, и в облаке, но устройство ещё не связано с облачной версией. Автоматическая перезапись остановлена ради сохранности данных.','conflict');
-        }else if(remoteAt>lastSync || (lastRevision>0 && remoteRevision>lastRevision)){
+        }else if(remoteAt>lastSync || !lastRevision || remoteRevision>lastRevision){
           serviceApplyCloudSnapshot(remote);
           serviceRefreshVisibleView();
           serviceSetAutoSyncStatus('Получены более свежие данные из облака.','ok');
@@ -3714,7 +3714,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
         try{
           const meta=serviceSyncMeta();
           const remote=await servicePullFromBackend();
-          if(remote&&remote.found&&((meta.lastServerSync&&Number(remote.updatedAt||0)>Number(meta.lastServerSync||0))||(Number(meta.lastServerRevision||0)>0&&Number(remote.revision||0)>Number(meta.lastServerRevision||0)))){
+          if(remote&&remote.found&&(!Number(meta.lastServerRevision||0)||(meta.lastServerSync&&Number(remote.updatedAt||0)>Number(meta.lastServerSync||0))||Number(remote.revision||0)>Number(meta.lastServerRevision||0))){
             throw new Error('cloud_is_newer_pull_first');
           }
           if(remote&&remote.found&&!meta.lastServerSync){
