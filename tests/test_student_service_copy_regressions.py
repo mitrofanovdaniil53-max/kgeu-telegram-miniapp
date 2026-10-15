@@ -22,6 +22,16 @@ class StudentServiceCopyRegressionTest(unittest.TestCase):
         home_renderer = source[start:end]
         self.assertEqual(home_renderer.count('data-service-action="analytics"'), 1)
 
+    def test_vk_link_code_is_hidden_after_persistent_account_link(self):
+        source = (ROOT / "apps" / "vk" / "index.html").read_text(encoding="utf-8")
+        self.assertIn("function setLinkUiState(linked)", source)
+        self.assertIn("setLinkUiState(linked);", source)
+        self.assertIn("Одноразовый код нужен только для первой привязки", source)
+        sync_start = source.index("async function syncNow(reason)")
+        link_state = source.index("setLinkUiState(linked);", sync_start)
+        unlinked_guard = source.index("if (!linked)", link_state)
+        self.assertLess(link_state, unlinked_guard)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1717,6 +1717,7 @@ html.vk-light .service-pill {
       <label class="field-label" for="shared-link-code">Код привязки из Telegram</label>
       <input class="field" id="shared-link-code" maxlength="8" autocomplete="one-time-code" autocapitalize="characters" placeholder="Например, 8F3KQ2WM">
       <button type="button" class="primary-btn" id="shared-link-submit">Привязать аккаунт</button>
+      <div class="mini-note" id="shared-link-state">Проверяю, связаны ли аккаунты…</div>
       <button type="button" class="system-theme-btn" id="shared-sync-now">Синхронизировать сейчас</button>
       <button type="button" class="system-theme-btn" id="shared-force-push">Оставить локальную версию VK</button>
       <button type="button" class="system-theme-btn" id="shared-force-pull">Заменить локальную версией из облака</button>
@@ -4479,6 +4480,23 @@ document.addEventListener("DOMContentLoaded", () => {
     const feedback = document.getElementById('shared-sync-feedback');
     if (feedback && error) feedback.textContent = error;
   }
+  function setLinkUiState(linked) {
+    const input = document.getElementById('shared-link-code');
+    const button = document.getElementById('shared-link-submit');
+    const label = document.querySelector('label[for="shared-link-code"]');
+    const note = document.getElementById('shared-link-state');
+    [input, button, label].forEach(node => {
+      if (node) {
+        node.hidden = !!linked;
+        node.style.display = linked ? 'none' : '';
+      }
+    });
+    if (note) {
+      note.textContent = linked
+        ? 'Аккаунт уже связан с Telegram. Одноразовый код нужен только для первой привязки — повторно вводить его не нужно.'
+        : 'Код из Telegram нужен только для первой привязки и действует ограниченное время.';
+    }
+  }
   async function request(path, options) {
     const raw = launchParams();
     if (!raw || !/(^|&)vk_user_id=/.test(raw) || !/(^|&)sign=/.test(raw)) throw new Error('Открой мини-приложение внутри VK, чтобы подтвердить аккаунт.');
@@ -4804,6 +4822,7 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const me = await request('/api/account/me', { method: 'GET' });
       const linked = Array.isArray(me.linkedProviders) && me.linkedProviders.indexOf('telegram') >= 0 && me.linkedProviders.indexOf('vk') >= 0;
+      setLinkUiState(linked);
       if (!linked) {
         setStatus('VK пока не связан с Telegram. Создай код в Telegram и введи его здесь.');
         return;
