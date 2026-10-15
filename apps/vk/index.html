@@ -1719,6 +1719,7 @@ html.vk-light .service-pill {
       <button type="button" class="primary-btn" id="shared-link-submit">Привязать аккаунт</button>
       <div class="mini-note" id="shared-link-state">Проверяю, связаны ли аккаунты…</div>
       <button type="button" class="system-theme-btn" id="shared-sync-now">Синхронизировать сейчас</button>
+      <button type="button" class="system-theme-btn" id="shared-merge-both">Объединить записи VK и Telegram</button>
       <button type="button" class="system-theme-btn" id="shared-force-push">Оставить локальную версию VK</button>
       <button type="button" class="system-theme-btn" id="shared-force-pull">Заменить локальную версией из облака</button>
       <div class="mini-note">Кнопки выбора версии нужны только при конфликте; перед заменой локальная или облачная копия будет сохранена.</div>
@@ -5065,6 +5066,70 @@ document.addEventListener("DOMContentLoaded", () => {
       if (changed) saveSharedServiceData(data);
     });
   }
+  async function mergeBothVersions() {
+    if (busy) return;
+    if (!window.confirm('Объединить записи VK и Telegram? Существующие записи с одинаковыми ID, но разным содержимым, будут сохранены обеими отдельными записями. Перед изменением будут сохранены резервные копии локальной и облачной версий. Удаления записей автоматически не переносятся.')) return;
+    busy = true;
+    try {
+      const meta = readMeta();
+      if (meta.dirtyProfile) {
+        throw new Error('Есть несохранённые изменения настроек профиля. Сначала разреши конфликт профиля отдельно.');
+      }
+      const remote = await request('/api/sync', { method: 'GET' });
+      if (!remote || !remote.found) throw new Error('В облаке пока нет версии, которую можно объединить.');
+      const localService = localSharedService();
+      const localPersonalData = localPersonal();
+      const localProfile = readProfile();
+      localStorage.setItem('kgeu_vk_before_merge_both_v1', JSON.stringify({
+        savedAt: Date.now(),
+        serviceData: localService,
+        personalData: localPersonalData,
+        profileData: localProfile
+      }));
+      localStorage.setItem('kgeu_vk_cloud_before_merge_both_v1', JSON.stringify(remote));
+
+      const mergedService = mergeServiceRecords(remote.serviceData || DEFAULT_SERVICE, localService);
+      const localNoteKeys = Array.isArray(meta.dirtyNotes) ? meta.dirtyNotes : [];
+      const mergedNotes = mergeNotes(remote.personalData, localPersonalData, localNoteKeys);
+      writeCachedService(mergedService);
+      const result = await request('/api/sync', {
+        method: 'POST',
+        body: JSON.stringify(payloadForSync(
+          mergedNotes.personalData,
+          remote.profileData || localProfile,
+          Number(remote.revision || 0)
+        ))
+      });
+
+      snapshot.serviceData = mergedService;
+      snapshot.personalData = mergedNotes.personalData;
+      snapshot.profileData = remote.profileData || localProfile;
+      applyPersonal(mergedNotes.personalData);
+      await applyProfile(snapshot.profileData);
+      meta.lastServerRevision = Number(result.revision || remote.revision || 0);
+      meta.lastSyncAt = Date.now();
+      meta.initialized = true;
+      meta.dirty = false;
+      meta.dirtyNotes = [];
+      meta.dirtyProfile = false;
+      meta.dirtyService = false;
+      writeMeta(meta);
+      writeCachedService(mergedService);
+      renderSharedServiceView();
+      setStatus(mergedNotes.conflicts
+        ? 'Записи VK и Telegram объединены. Конфликтующие заметки сохранены в резервной копии; открой её, если нужно сравнить тексты.'
+        : 'Записи VK и Telegram объединены. Обе исходные версии сохранены в резервных копиях.');
+    } catch (error) {
+      if (String(error && error.message || '') === 'sync_revision_conflict') {
+        setStatus('Облако изменилось во время объединения. Обе версии сохранены; повтори объединение после обновления данных.', error.message);
+      } else {
+        setStatus('Не удалось объединить версии', error.message);
+      }
+    } finally {
+      busy = false;
+    }
+  }
+
   async function forcePushLocalVersion() {
     if (busy) return;
     if (!window.confirm('Отправить текущую локальную версию VK в облако? Данные Student Service в облаке будут заменены, а перед этим сохранены в резервную копию.')) return;
@@ -5146,6 +5211,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if (link) link.addEventListener('click', linkAccount);
     const sync = document.getElementById('shared-sync-now');
     if (sync) sync.addEventListener('click', function () { syncNow('manual'); });
+    const merge = document.getElementById('shared-merge-both');
+    if (merge) merge.addEventListener('click', mergeBothVersions);
     const push = document.getElementById('shared-force-push');
     if (push) push.addEventListener('click', forcePushLocalVersion);
     const pull = document.getElementById('shared-force-pull');
