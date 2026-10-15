@@ -2885,8 +2885,11 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     const data=await serviceSyncRequest('/api/health',{method:'GET'});
     return data;
   }
-  async function servicePushToBackend(){
+  async function servicePushToBackend(expectedRevision){
     const payload=serviceSyncPackage();
+    const meta=serviceSyncMeta();
+    payload.expectedRevision=Number.isSafeInteger(expectedRevision)&&expectedRevision>=0
+      ? expectedRevision : Number(meta.lastServerRevision||0);
     return await serviceSyncRequest('/api/sync',{method:'POST',body:JSON.stringify(payload)});
   }
   async function servicePullFromBackend(){
@@ -2923,7 +2926,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       }catch(e){}
       if(typeof window.kgeuApplySharedProfile==='function')window.kgeuApplySharedProfile(snapshot.profileData).catch(function(){});
     }
-    const m=serviceSyncMeta();m.dirty=false;m.lastLocalSave=Number(serviceData.updatedAt||Date.now());m.lastServerSync=Number(snapshot.updatedAt||Date.now());
+    const m=serviceSyncMeta();m.dirty=false;m.lastLocalSave=Number(serviceData.updatedAt||Date.now());m.lastServerSync=Number(snapshot.updatedAt||Date.now());m.lastServerRevision=Number(snapshot.revision||0);
     localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(m));
   }
 
@@ -2982,9 +2985,9 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
   function serviceSyncMeta(){
     try{
       const x=JSON.parse(localStorage.getItem(STUDENT_SERVICE_SYNC_KEY)||'null');
-      if(x&&typeof x==='object') return Object.assign({deviceId:'',dirty:false,lastLocalSave:0,lastServerSync:0},x);
+      if(x&&typeof x==='object') return Object.assign({deviceId:'',dirty:false,lastLocalSave:0,lastServerSync:0,lastServerRevision:0},x);
     }catch(e){}
-    const meta={deviceId:'dev_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8),dirty:false,lastLocalSave:0,lastServerSync:0};
+    const meta={deviceId:'dev_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8),dirty:false,lastLocalSave:0,lastServerSync:0,lastServerRevision:0};
     try{localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(meta));}catch(e){}
     return meta;
   }
@@ -3032,16 +3035,19 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       if(remote&&remote.found){
         const remoteAt=Number(remote.updatedAt||0);
         const lastSync=Number(meta.lastServerSync||0);
+        const remoteRevision=Number(remote.revision||0);
+        const lastRevision=Number(meta.lastServerRevision||0);
         if(meta.dirty){
           // Never silently overwrite a newer cloud snapshot with unsynced local edits.
-          if(!lastSync || remoteAt>lastSync){
+          if(!lastSync || remoteAt>lastSync || (lastRevision>0 && remoteRevision>lastRevision)){
             serviceSetAutoSyncStatus('Есть несинхронизированные изменения на этом устройстве и более новая версия в облаке. Автоматическая запись приостановлена, чтобы не потерять данные. Открой «Синхронизация» для проверки.','conflict');
             return;
           }
           const revisionAtStart=serviceLocalRevision;
-          const result=await servicePushToBackend();
+          const result=await servicePushToBackend(remoteRevision);
           const current=serviceSyncMeta();
           current.lastServerSync=Number(result&&result.updatedAt||Date.now());
+          current.lastServerRevision=Number(result&&result.revision||remoteRevision);
           if(serviceLocalRevision===revisionAtStart){current.dirty=false;}
           else {current.dirty=true;serviceAutoSyncAgain=true;}
           try{localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(current));}catch(e){}
@@ -3065,9 +3071,10 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
         // group and display settings. Upload the normalized empty service envelope too;
         // the preceding GET has already checked for and hydrated any legacy Telegram row.
         const revisionAtStart=serviceLocalRevision;
-        const result=await servicePushToBackend();
+        const result=await servicePushToBackend(0);
         const current=serviceSyncMeta();
         current.lastServerSync=Number(result&&result.updatedAt||Date.now());
+        current.lastServerRevision=Number(result&&result.revision||1);
         if(serviceLocalRevision===revisionAtStart){current.dirty=false;}
         else {current.dirty=true;serviceAutoSyncAgain=true;}
         try{localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(current));}catch(e){}
@@ -3076,7 +3083,11 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
           : (localHasContent ? 'Данные автоматически отправлены в облако.' : 'Профиль и начальное состояние сохранены в облаке.'),'ok');
       }
     }catch(e){
-      serviceSetAutoSyncStatus('Автосинхронизация ждёт подключения: '+String(e&&e.message||'ошибка сети')+'. Изменения сохранены локально.','error');
+      if(String(e&&e.message||'')==='sync_revision_conflict'){
+        serviceSetAutoSyncStatus('Облако изменилось во время записи. Локальные изменения сохранены; открой «Синхронизация» и сравни версии перед повторной записью.','conflict');
+      }else{
+        serviceSetAutoSyncStatus('Автосинхронизация ждёт подключения: '+String(e&&e.message||'ошибка сети')+'. Изменения сохранены локально.','error');
+      }
     }finally{
       serviceAutoSyncRunning=false;
       if(serviceAutoSyncAgain){
