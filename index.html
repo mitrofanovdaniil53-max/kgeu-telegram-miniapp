@@ -3059,7 +3059,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
         }else if(!lastSync){
           // First run with data on both sides is ambiguous: do not pick a winner automatically.
           serviceSetAutoSyncStatus('Данные есть и локально, и в облаке, но устройство ещё не связано с облачной версией. Автоматическая перезапись остановлена ради сохранности данных.','conflict');
-        }else if(remoteAt>lastSync){
+        }else if(remoteAt>lastSync || (lastRevision>0 && remoteRevision>lastRevision)){
           serviceApplyCloudSnapshot(remote);
           serviceRefreshVisibleView();
           serviceSetAutoSyncStatus('Получены более свежие данные из облака.','ok');
@@ -3714,7 +3714,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
         try{
           const meta=serviceSyncMeta();
           const remote=await servicePullFromBackend();
-          if(remote&&remote.found&&meta.lastServerSync&&Number(remote.updatedAt||0)>Number(meta.lastServerSync||0)){
+          if(remote&&remote.found&&((meta.lastServerSync&&Number(remote.updatedAt||0)>Number(meta.lastServerSync||0))||(Number(meta.lastServerRevision||0)>0&&Number(remote.revision||0)>Number(meta.lastServerRevision||0)))){
             throw new Error('cloud_is_newer_pull_first');
           }
           if(remote&&remote.found&&!meta.lastServerSync){
@@ -3722,13 +3722,13 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
             const warning=localHasContent?'В облаке уже есть данные. Отправка заменит их текущими локальными данными. Продолжить?':'В облаке уже есть данные. Сначала лучше получить их, чтобы не затереть чужие данные. Всё равно перезаписать облако?';
             if(!window.confirm(warning)){if(feedback)feedback.textContent='Отправка отменена. Можно сначала получить данные из облака.';return;}
           }
-          const result=await servicePushToBackend();
-          const m=serviceSyncMeta();m.dirty=false;m.lastServerSync=Number(result&&result.updatedAt||Date.now());try{localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(m));}catch(e){}
+          const result=await servicePushToBackend(Number(remote&&remote.revision||0));
+          const m=serviceSyncMeta();m.dirty=false;m.lastServerSync=Number(result&&result.updatedAt||Date.now());m.lastServerRevision=Number(result&&result.revision||0);try{localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(m));}catch(e){}
           if(feedback)feedback.textContent='Отправка завершена: '+serviceEsc(result&&result.status?result.status:'OK');
           toast('Данные отправлены в облако');
           document.getElementById('app').innerHTML=serviceRenderSync();serviceBind();
         }catch(e){
-          const message=e.message==='cloud_is_newer_pull_first'?'В облаке есть более новая версия. Сначала нажми «Получить из облака».':(e.message||'неизвестная ошибка');
+          const message=e.message==='cloud_is_newer_pull_first'?'В облаке есть более новая версия. Сначала нажми «Получить из облака».':e.message==='sync_revision_conflict'?'Облако изменилось во время отправки. Локальные данные сохранены; сначала получи облачную версию и сравни изменения.':(e.message||'неизвестная ошибка');
           if(feedback)feedback.textContent='Ошибка отправки: '+serviceEsc(message);toast('Данные не отправлены');
         }
         return;
