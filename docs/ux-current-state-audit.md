@@ -1,0 +1,150 @@
+# UX/UI audit — current state and target journey
+
+Related tracking issue: #30
+
+## Purpose and audit status
+
+This document starts a source-based audit of the Telegram and VK Mini Apps. It is not a claim that the flows have already been usability-tested. Source inspection identifies existing capabilities and high-risk flows; final prioritization requires testing in the actual Telegram and VK shells with representative users.
+
+### Confirmed product surface
+
+The repository README and current frontend sources identify:
+- Two separate entry points: `index.html` (Telegram) and `apps/vk/index.html` (VK).
+- Timetable views for today, tomorrow, week and month, plus teacher search.
+- A Student Service area with tasks, deadlines, events, calendar, analytics, reminders, notes and hostel/ЖБС point tracking.
+- Settings for group and display preferences, including theme, text density/size and timetable display options.
+- Account linking and shared cloud synchronization.
+- Sync status, offline/error feedback and data backup/recovery controls.
+- Subject notes and personal data that must survive any interface redesign.
+
+## Manual verification evidence (owner-reported)
+
+On 2026-10-23, the product owner manually tested subject notes and tasks in both Telegram and VK and confirmed that changes synchronize in both directions. This is direct manual evidence for the basic cross-platform flow, not just source-level or CI evidence.
+
+**Covered:** create/update notes and tasks on one platform and observe them on the other, in both directions.
+
+**Still unverified:** fresh-account linking from start to finish, simultaneous edits, stale/offline recovery, repeated relaunch, other data types (deadlines, events, reminders, hostel/ЖБС records, profile settings), and behavior on a second device. Do not describe these as passed until tested.
+
+## Current user journeys to map
+
+### A. First launch → useful timetable
+1. Open the Mini App from Telegram or VK.
+2. Identify whether a group is already selected.
+3. Select or change the study group if needed.
+4. Wait for schedule data to load.
+5. Find today's next lesson and navigate to another day/week.
+6. Understand refresh, offline, empty and error states.
+
+**Questions to test:** Is the next action obvious on a fresh account? Does the app explain how to choose a group? Can the user recover from a failed load without guessing? How many taps until today's timetable is useful?
+
+### B. Everyday timetable use
+1. Open the app.
+2. See the relevant date and next lesson.
+3. Switch between today, tomorrow, week and month.
+4. Open lesson details and add/read a subject note.
+5. Refresh or return after losing connectivity.
+
+**Questions to test:** Is the active date/view unmistakable? Are lesson type, room, teacher and time easy to scan? Does the interface communicate stale or offline data honestly? Are controls comfortable on a small screen?
+
+### C. Student Service
+1. Open My Service.
+2. Find the relevant area: tasks, deadlines, events, calendar, analytics, reminders or hostel/ЖБС tracking.
+3. Add or update an entry.
+4. Confirm that the entry was saved and queued for synchronization.
+5. Find the same entry on the other linked platform.
+
+**Questions to test:** Are similar concepts clearly distinguished? Is the navigation hierarchy understandable? Does save feedback distinguish local save from cloud synchronization? Can users find an item later?
+
+### D. Telegram ↔ VK account linking
+1. Understand the benefit of linking accounts.
+2. Generate a one-time code in the source platform.
+3. Enter the code in the other platform.
+4. Understand success, invalid/expired code and retry behavior.
+5. Confirm which data is shared and which remains platform-specific.
+
+**Questions to test:** Does the user know which platform to open first? Is the code's expiry and one-time use explained? Is success clearly confirmed? Is the data-sharing boundary described in plain language?
+
+### E. Sync conflict and recovery
+The VK frontend currently exposes actions for manual sync, merging Telegram and VK records, sending the local VK version to the cloud, and replacing local data with the cloud version. Some operations use confirmation dialogs and save backups.
+
+**Risk:** These are consequential data operations. A technically correct action can still be a serious UX failure if users cannot predict which version will win or what will be overwritten.
+
+**Required design rule:** Before any destructive or conflict-resolution action, explain the affected copy, the expected result, and whether a backup will be made. Keep recovery actions visually separated from ordinary sync. Never remove backup behavior as part of a visual redesign.
+
+### F. Subscription journey — design only for now
+1. Understand the difference between free and paid access.
+2. See the monthly price and exact renewal/expiry terms.
+3. Decide whether to subscribe.
+4. Understand payment success/failure and expiry behavior.
+
+**Dependency:** Product rules must be agreed before paywall design or implementation: free/paid feature boundaries, renewal model, reminder schedule, cancellation/refund behavior and access after expiry. Do not imply that payment is already implemented.
+
+## Initial audit priorities
+
+| Priority | Area | Why it matters | Evidence needed |
+|---|---|---|---|
+| P0 | Data safety during sync and recovery | Basic bidirectional notes/tasks sync is owner-verified; conflict and recovery behavior remain unverified | Test conflicting edits, offline mode and recovery on two devices |
+| P1 | First launch and group selection | Core journey; owner currently confirms group selection works, so retain as a regression check rather than an active blocker | Fresh-account/relaunch check on Telegram and VK when convenient |
+| P1 | Navigation across timetable and Student Service | Many distinct features are exposed in one app | Screen inventory and task-based usability tests |
+| P1 | Sync status and error messages | Users need to distinguish local save from cloud sync | Test offline, delayed response, conflict and retry |
+| P2 | Visual consistency and accessibility | Affects scan speed and ease of use | Check typography, contrast, touch targets, themes and small screens |
+| P2 | Subscription entry points | Impacts conversion and trust | Validate only after product rules are agreed |
+
+These priorities are provisional. Frequency and severity must be confirmed with real users and observed behavior.
+
+## Proposed target experience principles
+
+1. **Show the next useful action.** On first launch, make group selection and schedule loading self-explanatory.
+2. **Keep the timetable primary.** Secondary tools should be discoverable without competing with the core schedule.
+3. **Use plain-language status.** Distinguish “saved on this device”, “syncing”, “synced” and “sync needs attention”.
+4. **Make recovery predictable.** Explain local vs cloud versions before merge/replace actions and preserve backups.
+5. **Design once, validate twice.** Keep a shared information architecture and design language, while respecting Telegram/VK platform constraints.
+6. **Avoid redesigning from assumptions.** Validate the current journey before removing or rearranging existing controls.
+7. **Measure usability.** Track task completion, time to completion, error/retry rate and points where users ask for help.
+
+## Test script for the first audit session
+
+Run each task in Telegram and VK, ideally with a fresh account and then with a linked account:
+1. Find today's next lesson.
+2. Switch to the weekly schedule and return to today.
+3. Find a subject and save a note.
+4. Add a task with a due date and then mark it complete.
+5. Find the sync status and explain what it means.
+6. Link the second platform and verify that a note appears there.
+7. Simulate or observe a failed sync and recover without losing edits.
+8. Find the backup/recovery controls and explain the consequences before confirming an action.
+
+For every task, record: success/failure, taps, time, confusion points, error messages, and whether the user needed assistance.
+
+
+### Additional source-based usability finding
+
+The VK Student Service sync screen exposes a configurable Worker API URL, technical backend wording, and separate “send to cloud” / “get from cloud” actions alongside diagnostics. These controls may be useful during development and recovery, but they are easy to misunderstand in ordinary use. Evaluate moving endpoint configuration into an advanced/debug area and present everyday users with a simple sync state plus clearly explained recovery actions. This is a source-based hypothesis, not a confirmed usability defect; validate it with screenshots and task-based testing before changing the UI.
+
+## Not yet established
+
+- No live usability session or screenshot-by-screenshot review has been completed in this audit.
+- Source code alone does not establish whether controls are visually prominent or understandable in Telegram/VK.
+- Final navigation, visual direction, subscription gating and success metrics remain decisions for the product owner after reviewing the audit evidence.
+- No production code, data, Worker deployment or Mini App launch URL is changed by this document.
+
+
+## Previously reported group-picker issue — current status (2026-10-24)
+
+A report on 2026-10-23 described group-directory errors and taps that appeared not to select a group in Telegram and VK. The report was tracked in issue #40 while the cause was unverified.
+
+**Current owner confirmation (2026-10-24):** group selection works, synchronization works, and the app is stable. Issue #40 has been closed based on this confirmation. There is no currently confirmed group-picker defect, and no speculative frontend or Worker change is justified.
+
+Keep the following as a lightweight regression checklist, not as evidence of a current failure:
+- Select a recent group and confirm the timetable changes.
+- Search for a normal group name and choose a result when the directory is available.
+- Reopen the Mini App and confirm the chosen group remains selected.
+- Confirm group switching does not break existing account linking or bidirectional notes/tasks sync.
+- If the problem recurs, record the platform (Telegram or VK), timestamp, exact UI message, and directory request status before changing code.
+
+### Screenshot-based UI observations (not a complete usability test)
+
+- Telegram settings place group selection, appearance and timetable preferences in one long settings surface.
+- The VK Student Service screen exposes the same broad functions: tasks, deadlines, events, calendar, study, analytics, reminders, notes/data and synchronization.
+- On the provided VK screenshot, the main Student Service action panel is prominent, but multiple rows of similarly styled outlined navigation buttons compete for attention. Consider grouping links by intent (Plan: calendar/study; Personal work: tasks/deadlines/events/notes; Account: data/sync) only after checking the full layout and avoiding removal of existing functions.
+- The screenshots show similar information architecture, but do not establish that every setting is functionally identical or that all data types synchronize correctly.
