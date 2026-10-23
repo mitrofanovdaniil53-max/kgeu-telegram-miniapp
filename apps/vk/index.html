@@ -99,7 +99,12 @@ function kgeuMigrateLegacyNotesForActiveGroup() {
       delete notes[key];
       kgeuPendingMigratedNoteKeys.push(scopedKey);
     });
-    if (!kgeuSavePersonalData(kgeuPersonalData)) return false;
+    if (!kgeuSavePersonalData(kgeuPersonalData)) {
+      try {
+        kgeuPersonalData = JSON.parse(localStorage.getItem("kgeu_vk_notes_migration_backup_v1") || "null") || kgeuPersonalData;
+      } catch (e) {}
+      return false;
+    }
     kgeuFlushMigratedNoteSync();
     return true;
   } catch (e) { return false; }
