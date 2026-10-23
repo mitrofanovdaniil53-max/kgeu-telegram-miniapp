@@ -53,7 +53,8 @@ class StudentServiceCopyRegressionTest(unittest.TestCase):
         post = merge.index("const result = await request('/api/sync'")
         cache_write = merge.index("writeCachedService(mergedService);")
         self.assertLess(post, cache_write)
-        self.assertIn("Number(remote.revision || 0),\\n          mergedService", merge)
+        self.assertIn("Number(remote.revision || 0),", merge)
+        self.assertIn("mergedService\\n        ))", merge)
         self.assertIn("function payloadForSync(personal, profile, expectedRevision, serviceData)", source)
 
     def test_vk_merge_algorithm_preserves_conflicts_and_unions_lists(self):
