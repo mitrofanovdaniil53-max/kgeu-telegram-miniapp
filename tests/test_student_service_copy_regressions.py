@@ -157,7 +157,9 @@ let kgeuPersonalData = { version: 1, notes: {
   'group:123::mathematics': 'existing scoped note',
   'group:456::mathematics': 'other group note'
 }};
+let shouldSavePersonalData = true;
 function kgeuSavePersonalData(data) {
+  if (!shouldSavePersonalData) return false;
   saved.kgeu_vk_personal_data_v1 = JSON.stringify(data);
   return true;
 }
@@ -175,6 +177,16 @@ assert.equal(kgeuPersonalData.notes['group:456::mathematics'], 'other group note
 assert.equal(Object.prototype.hasOwnProperty.call(kgeuPersonalData.notes, 'mathematics'), false);
 assert.deepEqual(dirty, [['note', 'group:123::mathematics']]);
 assert.equal(kgeuMigrateLegacyNotesForActiveGroup(), false, 'migration should be idempotent');
+
+// A failed local save must restore the legacy data and must not queue a dirty sync key.
+dirty.length = 0;
+kgeuPendingMigratedNoteKeys = [];
+kgeuPersonalData = { version: 1, notes: { 'legacy-subject': 'recover me' } };
+shouldSavePersonalData = false;
+assert.equal(kgeuMigrateLegacyNotesForActiveGroup(), false);
+assert.deepEqual(kgeuPersonalData.notes, { 'legacy-subject': 'recover me' });
+kgeuFlushMigratedNoteSync();
+assert.deepEqual(dirty, []);
 console.log('VK group-scoped note migration assertions passed');
 '''
         ])
