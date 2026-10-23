@@ -17,6 +17,14 @@ The repository README and current frontend sources identify:
 - Sync status, offline/error feedback and data backup/recovery controls.
 - Subject notes and personal data that must survive any interface redesign.
 
+## Manual verification evidence (owner-reported)
+
+On 2026-10-23, the product owner manually tested subject notes and tasks in both Telegram and VK and confirmed that changes synchronize in both directions. This is direct manual evidence for the basic cross-platform flow, not just source-level or CI evidence.
+
+**Covered:** create/update notes and tasks on one platform and observe them on the other, in both directions.
+
+**Still unverified:** fresh-account linking from start to finish, simultaneous edits, stale/offline recovery, repeated relaunch, other data types (deadlines, events, reminders, hostel/ЖБС records, profile settings), and behavior on a second device. Do not describe these as passed until tested.
+
 ## Current user journeys to map
 
 ### A. First launch → useful timetable
@@ -75,7 +83,7 @@ The VK frontend currently exposes actions for manual sync, merging Telegram and 
 
 | Priority | Area | Why it matters | Evidence needed |
 |---|---|---|---|
-| P0 | Data safety during sync and recovery | User data can be overwritten or conflict | Test conflicting edits, offline mode and recovery on two devices |
+| P0 | Data safety during sync and recovery | Basic bidirectional notes/tasks sync is owner-verified; conflict and recovery behavior remain unverified | Test conflicting edits, offline mode and recovery on two devices |
 | P1 | First launch and group selection | Blocks access to the core value | Fresh-account test on Telegram and VK |
 | P1 | Navigation across timetable and Student Service | Many distinct features are exposed in one app | Screen inventory and task-based usability tests |
 | P1 | Sync status and error messages | Users need to distinguish local save from cloud sync | Test offline, delayed response, conflict and retry |
@@ -107,6 +115,11 @@ Run each task in Telegram and VK, ideally with a fresh account and then with a l
 8. Find the backup/recovery controls and explain the consequences before confirming an action.
 
 For every task, record: success/failure, taps, time, confusion points, error messages, and whether the user needed assistance.
+
+
+### Additional source-based usability finding
+
+The VK Student Service sync screen exposes a configurable Worker API URL, technical backend wording, and separate “send to cloud” / “get from cloud” actions alongside diagnostics. These controls may be useful during development and recovery, but they are easy to misunderstand in ordinary use. Evaluate moving endpoint configuration into an advanced/debug area and present everyday users with a simple sync state plus clearly explained recovery actions. This is a source-based hypothesis, not a confirmed usability defect; validate it with screenshots and task-based testing before changing the UI.
 
 ## Not yet established
 
