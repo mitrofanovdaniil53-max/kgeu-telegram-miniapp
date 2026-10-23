@@ -34,7 +34,7 @@ jobs:
 
           for (const file of ['index.html', 'apps/vk/index.html']) {
             const html = fs.readFileSync(file, 'utf8');
-            const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)]
+            const scripts = [...html.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/gi)]
               .map(match => match[1])
               .filter(code => code.trim());
 
@@ -50,7 +50,7 @@ jobs:
           }
 
           const worker = fs.readFileSync('backend/worker.js', 'utf8')
-            .replace(/\bexport default\s*\{/, 'const workerModule = {');
+            .replace(/\\bexport default\\s*\\{/, 'const workerModule = {');
           try {
             new Function(worker);
           } catch (error) {
@@ -63,5 +63,5 @@ jobs:
           python-version: "3.12"
       - name: Test additive D1 migration
         run: python -m unittest discover -s tests -v
-      - name: Test shared account-state merge behavior
-        run: node --test tests/worker_shared_state.test.cjs
+      - name: Test shared account-state merge and legacy field preservation
+        run: node --test tests/worker_shared_state.test.cjs tests/worker_legacy_field_preservation.test.cjs
