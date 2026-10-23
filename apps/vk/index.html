@@ -62,12 +62,37 @@ function kgeuSubjectKey(subject) {
   return String(subject || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+function kgeuGroupNoteKey(subject, groupId) {
+  const group = Number(groupId || (typeof activeGroupId !== "undefined" ? activeGroupId : 0));
+  const key = kgeuSubjectKey(subject);
+  return group > 0 && key ? "group:" + group + "::" + key : key;
+}
+
+function kgeuMigrateLegacyNotesForActiveGroup() {
+  try {
+    const notes = kgeuPersonalData && kgeuPersonalData.notes;
+    const group = Number(typeof activeGroupId !== "undefined" ? activeGroupId : 0);
+    if (!notes || typeof notes !== "object" || !group) return;
+    const prefix = "group:" + group + "::";
+    let changed = false;
+    Object.keys(notes).forEach(function(key) {
+      if (key.indexOf("group:") === 0) return;
+      const scopedKey = prefix + key;
+      if (!Object.prototype.hasOwnProperty.call(notes, scopedKey)) notes[scopedKey] = notes[key];
+      delete notes[key];
+      changed = true;
+    });
+    if (changed) kgeuSavePersonalData(kgeuPersonalData);
+  } catch (e) {}
+}
+
 function kgeuGetNote(subject) {
-  return String(kgeuPersonalData.notes[kgeuSubjectKey(subject)] || "");
+  const key = kgeuGroupNoteKey(subject);
+  return String(kgeuPersonalData.notes[key] || "");
 }
 
 function kgeuSetNote(subject, value) {
-  const key = kgeuSubjectKey(subject);
+  const key = kgeuGroupNoteKey(subject);
   if (!key) return;
   const note = String(value || "").trim();
   if (note) kgeuPersonalData.notes[key] = note;
@@ -1773,6 +1798,7 @@ html.vk-light .service-pill {
   const SETTINGS_KEY = 'kgeu_vk_settings_v1';
   const CACHE_TTL = 30 * 60 * 1000;
 
+  const hasExplicitGroupFromLaunch = Boolean(Number(params.get('groupId')) || Number(hashParams.get('groupId')));
   let activeGroupId = Number(params.get('groupId')) || Number(hashParams.get('groupId')) || 0;
   let GROUP_NAME = params.get('groupName') || hashParams.get('groupName') || '';
   let INSTITUTE_NAME = params.get('institute') || hashParams.get('institute') || '';
@@ -1856,6 +1882,7 @@ html.vk-light .service-pill {
   updateGroupLabel();
   saveActiveGroup();
   rememberGroup(activeGroupId, GROUP_NAME);
+  kgeuMigrateLegacyNotesForActiveGroup();
 
   function updateGroupLabel() {
     const sub = document.getElementById('group-sub');
@@ -2914,7 +2941,7 @@ html.vk-light .service-pill {
         render();
       }
       const group = profile.activeGroup;
-      if (group && Number(group.id) && (Number(group.id) !== Number(activeGroupId) || String(group.name || '') !== String(GROUP_NAME || '') || String(group.institute || '') !== String(INSTITUTE_NAME || ''))) {
+      if (!hasExplicitGroupFromLaunch && group && Number(group.id) && (Number(group.id) !== Number(activeGroupId) || String(group.name || '') !== String(GROUP_NAME || '') || String(group.institute || '') !== String(INSTITUTE_NAME || ''))) {
         await switchGroup(Number(group.id), String(group.name || ''), { name: String(group.name || ''), institute: String(group.institute || '') });
       }
     } finally {
@@ -3144,12 +3171,13 @@ html.vk-light .service-pill {
       const pd=snapshot.personalData;
       kgeuPersonalData={version:1,notes:(pd.notes&&typeof pd.notes==='object')?pd.notes:{},updatedAt:Date.now()};
       if(typeof kgeuSavePersonalData==='function')kgeuSavePersonalData(kgeuPersonalData);
+      if(typeof kgeuMigrateLegacyNotesForActiveGroup==='function')kgeuMigrateLegacyNotesForActiveGroup();
     }
     let profileChanged=false;
     const profile=snapshot.profileData&&typeof snapshot.profileData==='object'?snapshot.profileData:{};
     try{
       window.__kgeuApplyingSharedProfile=true;
-      if(profile.activeGroup&&Number(profile.activeGroup.id)){
+      if(!hasExplicitGroupFromLaunch&&profile.activeGroup&&Number(profile.activeGroup.id)){
         const next={id:Number(profile.activeGroup.id),name:String(profile.activeGroup.name||''),institute:String(profile.activeGroup.institute||'')};
         const previous=JSON.parse(localStorage.getItem(ACTIVE_GROUP_KEY)||'null');
         if(!previous||Number(previous.id)!==next.id||String(previous.name||'')!==next.name||String(previous.institute||'')!==next.institute){
