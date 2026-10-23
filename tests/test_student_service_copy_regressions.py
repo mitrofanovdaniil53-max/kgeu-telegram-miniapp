@@ -130,5 +130,58 @@ console.log('VK merge behavior assertions passed');
         self.assertIn("VK merge behavior assertions passed", result.stdout)
 
 
+    def test_vk_group_scoped_notes_migration_preserves_backup_and_syncs_scoped_keys(self):
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("Node.js is required to execute the note migration helper")
+
+        source = (ROOT / "apps" / "vk" / "index.html").read_text(encoding="utf-8")
+        self.assertIn('const hasExplicitGroupFromLaunch = Boolean(Number(params.get(\'groupId\')) || Number(hashParams.get(\'groupId\')));', source)
+        self.assertIn("if(!hasExplicitGroupFromLaunch&&profile.activeGroup&&Number(profile.activeGroup.id))", source)
+        self.assertIn("if (!hasExplicitGroupFromLaunch && group && Number(group.id)", source)
+        start = source.index("function kgeuSubjectKey(subject)")
+        end = source.index("function kgeuGetNote(subject)", start)
+        helpers = source[start:end]
+        assertions = r'''
+const assert = require('node:assert/strict');
+const saved = {};
+const dirty = [];
+global.window = { kgeuSharedSyncMarkDirty: (kind, key) => dirty.push([kind, key]) };
+global.localStorage = {
+  getItem: key => Object.prototype.hasOwnProperty.call(saved, key) ? saved[key] : null,
+  setItem: (key, value) => { saved[key] = String(value); }
+};
+let activeGroupId = 123;
+let kgeuPersonalData = { version: 1, notes: {
+  'mathematics': 'legacy note',
+  'group:123::mathematics': 'existing scoped note',
+  'group:456::mathematics': 'other group note'
+}};
+function kgeuSavePersonalData(data) {
+  saved.kgeu_vk_personal_data_v1 = JSON.stringify(data);
+  return true;
+}
+''';
+        script = "\\n".join([
+            assertions,
+            helpers,
+            r'''
+const original = JSON.parse(JSON.stringify(kgeuPersonalData));
+assert.equal(kgeuMigrateLegacyNotesForActiveGroup(), true);
+assert.equal(JSON.parse(saved.kgeu_vk_notes_migration_backup_v1).notes.mathematics, original.notes.mathematics);
+assert.equal(kgeuPersonalData.notes['group:123::mathematics'], 'existing scoped note');
+assert.equal(kgeuPersonalData.notes['group:456::mathematics'], 'other group note');
+assert.equal(Object.prototype.hasOwnProperty.call(kgeuPersonalData.notes, 'mathematics'), false);
+assert.deepEqual(dirty, [['note', 'group:123::mathematics']]);
+assert.equal(kgeuMigrateLegacyNotesForActiveGroup(), false, 'migration should be idempotent');
+console.log('VK group-scoped note migration assertions passed');
+'''
+        ])
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        self.assertIn("VK group-scoped note migration assertions passed", result.stdout)
+
+
+
 if __name__ == "__main__":
     unittest.main()
