@@ -24,6 +24,15 @@ class GroupPickerRegressionTest(unittest.TestCase):
         self.assertIn("group_directory_invalid_response", source)
         self.assertIn("group_directory_unavailable", source)
 
+    def test_group_search_selection_waits_for_explicit_save(self):
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                self.assertIn("let selectedDirectoryGroup = null;", source)
+                self.assertIn("await switchGroup(id, name, meta);", source)
+                self.assertIn("Открываем группу…", source)
+                self.assertNotIn("switchGroup(g.id,g.name,g).catch(function(){});", source)
+
     def test_empty_schedule_on_probe_date_does_not_reject_group(self):
         for relative in ("index.html", "apps/vk/index.html"):
             source = (ROOT / relative).read_text(encoding="utf-8")
