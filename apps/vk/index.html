@@ -62,12 +62,64 @@ function kgeuSubjectKey(subject) {
   return String(subject || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+function kgeuGroupNoteKey(subject, groupId) {
+  const group = Number(groupId || (typeof activeGroupId !== "undefined" ? activeGroupId : 0));
+  const key = kgeuSubjectKey(subject);
+  return group > 0 && key ? "group:" + group + "::" + key : key;
+}
+
+let kgeuPendingMigratedNoteKeys = [];
+
+function kgeuFlushMigratedNoteSync() {
+  try {
+    if (typeof window.kgeuSharedSyncMarkDirty !== "function" || !kgeuPendingMigratedNoteKeys.length) return;
+    const keys = Array.from(new Set(kgeuPendingMigratedNoteKeys));
+    kgeuPendingMigratedNoteKeys = [];
+    keys.forEach(function(key) { window.kgeuSharedSyncMarkDirty("note", key); });
+  } catch (e) {}
+}
+
+function kgeuMigrateLegacyNotesForActiveGroup() {
+  try {
+    const notes = kgeuPersonalData && kgeuPersonalData.notes;
+    const group = Number(typeof activeGroupId !== "undefined" ? activeGroupId : 0);
+    if (!notes || typeof notes !== "object" || !group) return false;
+    const legacyKeys = Object.keys(notes).filter(function(key) { return key.indexOf("group:") !== 0; });
+    if (!legacyKeys.length) return false;
+    // Preserve a recoverable copy before changing any user data. If backup fails, leave notes untouched.
+    try {
+      localStorage.setItem("kgeu_vk_notes_migration_backup_v1", JSON.stringify(kgeuPersonalData));
+    } catch (e) {
+      return false;
+    }
+    const prefix = "group:" + group + "::";
+    const pendingStart = kgeuPendingMigratedNoteKeys.length;
+    legacyKeys.forEach(function(key) {
+      const scopedKey = prefix + key;
+      if (!Object.prototype.hasOwnProperty.call(notes, scopedKey)) notes[scopedKey] = notes[key];
+      delete notes[key];
+      kgeuPendingMigratedNoteKeys.push(scopedKey);
+    });
+    if (!kgeuSavePersonalData(kgeuPersonalData)) {
+      // Roll back both the in-memory data and any queued sync work from this failed migration.
+      kgeuPendingMigratedNoteKeys.splice(pendingStart);
+      try {
+        kgeuPersonalData = JSON.parse(localStorage.getItem("kgeu_vk_notes_migration_backup_v1") || "null") || kgeuPersonalData;
+      } catch (e) {}
+      return false;
+    }
+    // Flush after sync setup or after cloud-restore metadata has been finalized.
+    return true;
+  } catch (e) { return false; }
+}
+
 function kgeuGetNote(subject) {
-  return String(kgeuPersonalData.notes[kgeuSubjectKey(subject)] || "");
+  const key = kgeuGroupNoteKey(subject);
+  return String(kgeuPersonalData.notes[key] || "");
 }
 
 function kgeuSetNote(subject, value) {
-  const key = kgeuSubjectKey(subject);
+  const key = kgeuGroupNoteKey(subject);
   if (!key) return;
   const note = String(value || "").trim();
   if (note) kgeuPersonalData.notes[key] = note;
@@ -1773,6 +1825,7 @@ html.vk-light .service-pill {
   const SETTINGS_KEY = 'kgeu_vk_settings_v1';
   const CACHE_TTL = 30 * 60 * 1000;
 
+  const hasExplicitGroupFromLaunch = Boolean(Number(params.get('groupId')) || Number(hashParams.get('groupId')));
   let activeGroupId = Number(params.get('groupId')) || Number(hashParams.get('groupId')) || 0;
   let GROUP_NAME = params.get('groupName') || hashParams.get('groupName') || '';
   let INSTITUTE_NAME = params.get('institute') || hashParams.get('institute') || '';
@@ -1856,6 +1909,7 @@ html.vk-light .service-pill {
   updateGroupLabel();
   saveActiveGroup();
   rememberGroup(activeGroupId, GROUP_NAME);
+  kgeuMigrateLegacyNotesForActiveGroup();
 
   function updateGroupLabel() {
     const sub = document.getElementById('group-sub');
@@ -2914,7 +2968,7 @@ html.vk-light .service-pill {
         render();
       }
       const group = profile.activeGroup;
-      if (group && Number(group.id) && (Number(group.id) !== Number(activeGroupId) || String(group.name || '') !== String(GROUP_NAME || '') || String(group.institute || '') !== String(INSTITUTE_NAME || ''))) {
+      if (!hasExplicitGroupFromLaunch && group && Number(group.id) && (Number(group.id) !== Number(activeGroupId) || String(group.name || '') !== String(GROUP_NAME || '') || String(group.institute || '') !== String(INSTITUTE_NAME || ''))) {
         await switchGroup(Number(group.id), String(group.name || ''), { name: String(group.name || ''), institute: String(group.institute || '') });
       }
     } finally {
@@ -3144,12 +3198,13 @@ html.vk-light .service-pill {
       const pd=snapshot.personalData;
       kgeuPersonalData={version:1,notes:(pd.notes&&typeof pd.notes==='object')?pd.notes:{},updatedAt:Date.now()};
       if(typeof kgeuSavePersonalData==='function')kgeuSavePersonalData(kgeuPersonalData);
+      if(typeof kgeuMigrateLegacyNotesForActiveGroup==='function')kgeuMigrateLegacyNotesForActiveGroup();
     }
     let profileChanged=false;
     const profile=snapshot.profileData&&typeof snapshot.profileData==='object'?snapshot.profileData:{};
     try{
       window.__kgeuApplyingSharedProfile=true;
-      if(profile.activeGroup&&Number(profile.activeGroup.id)){
+      if(!hasExplicitGroupFromLaunch&&profile.activeGroup&&Number(profile.activeGroup.id)){
         const next={id:Number(profile.activeGroup.id),name:String(profile.activeGroup.name||''),institute:String(profile.activeGroup.institute||'')};
         const previous=JSON.parse(localStorage.getItem(ACTIVE_GROUP_KEY)||'null');
         if(!previous||Number(previous.id)!==next.id||String(previous.name||'')!==next.name||String(previous.institute||'')!==next.institute){
@@ -3173,6 +3228,8 @@ html.vk-light .service-pill {
     }catch(e){}finally{window.__kgeuApplyingSharedProfile=false;}
     const m=serviceSyncMeta();m.dirty=false;m.lastLocalSave=Number(serviceData.updatedAt||Date.now());m.lastServerSync=Number(snapshot.updatedAt||Date.now());
     localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(m));
+    // Cloud restore resets dirty metadata above; queue migrated scoped notes only after that reset.
+    if(typeof kgeuFlushMigratedNoteSync==='function')kgeuFlushMigratedNoteSync();
     if(profileChanged&&!window.__kgeuSharedProfileReloading){
       window.__kgeuSharedProfileReloading=true;
       window.location.reload();
@@ -4871,6 +4928,7 @@ document.addEventListener("DOMContentLoaded", () => {
     writeMeta(meta);
     scheduleSync();
   };
+  kgeuFlushMigratedNoteSync();
   window.kgeuSharedSyncMarkClean = function(result) {
     const meta = readMeta();
     meta.lastServerRevision = Number(result && result.revision || meta.lastServerRevision || 0);
