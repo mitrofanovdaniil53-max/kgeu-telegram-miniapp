@@ -1,4 +1,6 @@
 from pathlib import Path
+import shutil
+import subprocess
 import unittest
 
 
@@ -42,6 +44,90 @@ class StudentServiceCopyRegressionTest(unittest.TestCase):
         self.assertIn("payloadForSync(", source)
         self.assertIn("sync_revision_conflict", source)
         self.assertIn("Удаления записей автоматически не переносятся", source)
+
+    def test_vk_merge_keeps_local_cache_unchanged_until_cas_write_succeeds(self):
+        source = (ROOT / "apps" / "vk" / "index.html").read_text(encoding="utf-8")
+        start = source.index("async function mergeBothVersions()")
+        end = source.index("async function forcePushLocalVersion()", start)
+        merge = source[start:end]
+        post = merge.index("const result = await request('/api/sync'")
+        cache_write = merge.index("writeCachedService(mergedService);")
+        self.assertLess(post, cache_write)
+        revision_arg = merge.index("Number(remote.revision || 0),")
+        merged_service_arg = merge.index("mergedService", revision_arg)
+        self.assertLess(post, revision_arg)
+        self.assertLess(revision_arg, merged_service_arg)
+        self.assertLess(merged_service_arg, cache_write)
+        self.assertIn("function payloadForSync(personal, profile, expectedRevision, serviceData)", source)
+
+    def test_vk_merge_algorithm_preserves_conflicts_and_unions_lists(self):
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("Node.js is required to execute the real frontend merge function")
+
+        source = (ROOT / "apps" / "vk" / "index.html").read_text(encoding="utf-8")
+        stable_start = source.index("  function stableServiceValue(value) {")
+        same_start = source.index("  function sameServiceContent(left, right) {", stable_start)
+        merge_comment = source.index("  // Merge pre-existing VK-local records", same_start)
+        merge_start = source.index("  function mergeServiceRecords(cloudValue, localValue) {", merge_comment)
+        merge_end = source.index("  function sharedServiceEscape(value) {", merge_start)
+
+        stable_function = source[stable_start:same_start]
+        same_function = source[same_start:merge_comment]
+        merge_function = source[merge_start:merge_end]
+        assertions = r'''
+const assert = require('node:assert/strict');
+const cloud = {
+  schemaVersion: 4,
+  tasks: [
+    { id: 'same', title: 'Telegram copy' },
+    { id: 'cloud-only', title: 'Cloud only' },
+    { id: 'same-vk-tasks', title: 'Pre-existing ID collision' }
+  ],
+  deadlines: [{ id: 'deadline-1', title: 'Exam', updatedAt: 1, version: 1 }],
+  events: [{ id: 'event-cloud', title: 'Cloud event' }],
+  hostel: {
+    totalGoal: 250,
+    work: [{ id: 'work-cloud', title: 'Cloud work' }],
+    social: [{ id: 'social-cloud', title: 'Cloud event', points: 5 }]
+  }
+};
+const local = {
+  schemaVersion: 4,
+  tasks: [
+    { id: 'same', title: 'VK copy' },
+    { id: 'local-only', title: 'Local only' }
+  ],
+  deadlines: [{ id: 'deadline-1', title: 'Exam', updatedAt: 99, version: 2 }],
+  events: [{ id: 'event-local', title: 'Local event' }],
+  hostel: {
+    totalGoal: 300,
+    work: [{ id: 'work-local', title: 'Local work' }],
+    social: [{ id: 'social-local', title: 'Local event', points: 3 }]
+  }
+};
+const merged = mergeServiceRecords(cloud, local);
+assert.equal(merged.tasks.find(x => x.id === 'same').title, 'Telegram copy');
+assert.equal(merged.tasks.find(x => x.id === 'same-vk-tasks-2').title, 'VK copy');
+assert.ok(merged.tasks.some(x => x.id === 'cloud-only'));
+assert.ok(merged.tasks.some(x => x.id === 'local-only'));
+assert.equal(merged.deadlines.length, 1, 'same logical record should not duplicate for metadata-only changes');
+assert.equal(merged.events.length, 2, 'unique events from both accounts should survive');
+assert.deepEqual(merged.hostel.work.map(x => x.id).sort(), ['work-cloud', 'work-local']);
+assert.deepEqual(merged.hostel.social.map(x => x.id).sort(), ['social-cloud', 'social-local']);
+assert.equal(merged.hostel.totalGoal, 300, 'non-list scalar fields follow the explicit local-wins rule');
+console.log('VK merge behavior assertions passed');
+''';
+        script = "\n".join([
+            "const DEFAULT_SERVICE = {};",
+            stable_function,
+            same_function,
+            merge_function,
+            assertions,
+        ])
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        self.assertIn("VK merge behavior assertions passed", result.stdout)
 
 
 if __name__ == "__main__":
