@@ -2504,14 +2504,18 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
   let groupDirectory = null;
   let groupDirectoryPromise = null;
 
-  async function loadGroupDirectory() {
-    if (groupDirectory) return groupDirectory;
+  async function loadGroupDirectory(forceRefresh) {
+    if (groupDirectory && !forceRefresh) return groupDirectory;
 
+    let staleCache = null;
     try {
       const cached = JSON.parse(localStorage.getItem(GROUP_DIRECTORY_CACHE_KEY) || 'null');
-      if (cached && Array.isArray(cached.items) && cached.savedAt && Date.now() - cached.savedAt < GROUP_DIRECTORY_TTL) {
-        groupDirectory = cached.items;
-        return groupDirectory;
+      if (cached && Array.isArray(cached.items) && cached.items.length) {
+        staleCache = cached.items;
+        if (!forceRefresh && cached.savedAt && Date.now() - cached.savedAt < GROUP_DIRECTORY_TTL) {
+          groupDirectory = cached.items;
+          return groupDirectory;
+        }
       }
     } catch(e) {}
 
@@ -2524,7 +2528,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       })
       .then(function(data) {
         const list = Array.isArray(data && data.data) ? data.data : [];
-        groupDirectory = list.map(function(g) {
+        const normalized = list.map(function(g) {
           return {
             id: Number(g.id),
             name: String(g.name || '').trim(),
@@ -2533,6 +2537,8 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
             facultyId: g.facultyID || null
           };
         }).filter(function(g) { return g.id && g.name; });
+        if (!normalized.length) throw new Error('empty group directory');
+        groupDirectory = normalized;
 
         try {
           localStorage.setItem(GROUP_DIRECTORY_CACHE_KEY, JSON.stringify({
@@ -2542,6 +2548,14 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
         } catch(e) {}
 
         return groupDirectory;
+      })
+      .catch(function(error) {
+        // Preserve access to the last known group list during temporary upstream outages.
+        if (staleCache && staleCache.length) {
+          groupDirectory = staleCache;
+          return groupDirectory;
+        }
+        throw error;
       })
       .finally(function() {
         groupDirectoryPromise = null;
@@ -2564,7 +2578,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       box.innerHTML = '<div class="group-directory-loading">Ищем группу…</div>';
       loadGroupDirectory().then(function(){ renderGroupDirectoryResults(query); })
         .catch(function(){
-          box.innerHTML = '<div class="mini-note">Не удалось загрузить справочник групп. Можно использовать расширенный ввод ID.</div>';
+          box.innerHTML = '<div class="mini-note">Не удалось загрузить справочник групп.</div><button type="button" class="secondary-btn" data-retry-group-directory>Повторить загрузку</button><div class="mini-note">Если проблема сохраняется, попробуйте позже. ID группы вводить не обязательно.</div>';
         });
       return;
     }
@@ -2722,6 +2736,15 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     const close=document.getElementById('group-close'); if(close) close.addEventListener('click',closeGroupModal);
     const modal=document.getElementById('group-modal'); if(modal) modal.addEventListener('click',function(e){
       const target=e.target;
+      const retryDirectory = target.closest && target.closest('[data-retry-group-directory]');
+      if (retryDirectory) {
+        const input = document.getElementById('group-name-input');
+        const results = document.getElementById('group-directory-results');
+        if (results) results.innerHTML = '<div class="group-directory-loading">Повторно загружаем справочник…</div>';
+        loadGroupDirectory(true).then(function(){ renderGroupDirectoryResults(input ? input.value : ''); })
+          .catch(function(){ renderGroupDirectoryResults(input ? input.value : ''); });
+        return;
+      }
       if(target.getAttribute && target.getAttribute('data-close-modal')) closeGroupModal();
       const del=target.getAttribute && target.getAttribute('data-delid');
       if(del){ saveGroups(getSavedGroups().filter(function(g){return Number(g.id)!==Number(del);})); openGroupModal(); return; }
