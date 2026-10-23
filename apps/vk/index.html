@@ -93,6 +93,7 @@ function kgeuMigrateLegacyNotesForActiveGroup() {
       return false;
     }
     const prefix = "group:" + group + "::";
+    const pendingStart = kgeuPendingMigratedNoteKeys.length;
     legacyKeys.forEach(function(key) {
       const scopedKey = prefix + key;
       if (!Object.prototype.hasOwnProperty.call(notes, scopedKey)) notes[scopedKey] = notes[key];
@@ -100,6 +101,8 @@ function kgeuMigrateLegacyNotesForActiveGroup() {
       kgeuPendingMigratedNoteKeys.push(scopedKey);
     });
     if (!kgeuSavePersonalData(kgeuPersonalData)) {
+      // Roll back both the in-memory data and any queued sync work from this failed migration.
+      kgeuPendingMigratedNoteKeys.splice(pendingStart);
       try {
         kgeuPersonalData = JSON.parse(localStorage.getItem("kgeu_vk_notes_migration_backup_v1") || "null") || kgeuPersonalData;
       } catch (e) {}
