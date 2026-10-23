@@ -130,5 +130,48 @@ console.log('VK merge behavior assertions passed');
         self.assertIn("VK merge behavior assertions passed", result.stdout)
 
 
+class GroupPickerRegressionTest(unittest.TestCase):
+    def test_both_frontends_use_shared_group_directory_contract(self):
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                self.assertIn("https://kgeu-telegram-miniapp.2vkv544dmd.workers.dev/api/groups?year=2026-2027", source)
+                self.assertIn("Array.isArray(data && data.data) ? data.data : []", source)
+                self.assertIn("data-group-directory-id", source)
+                self.assertIn("data-retry-group-directory", source)
+                self.assertIn("loadGroupDirectory(true)", source)
+                self.assertIn("function getSavedGroups()", source)
+                self.assertIn("data-sgid", source)
+                self.assertIn("switchGroup(g.id,g.name)", source)
+
+    def test_group_directory_failure_preserves_stale_cache(self):
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                start = source.index("async function loadGroupDirectory(forceRefresh)")
+                end = source.index("function renderGroupDirectoryResults(query)", start)
+                loader = source[start:end]
+                self.assertIn("staleCache = cached.items", loader)
+                self.assertIn("if (staleCache && staleCache.length)", loader)
+                self.assertIn("groupDirectory = staleCache", loader)
+
+    def test_worker_exposes_read_only_group_directory_proxy(self):
+        source = (ROOT / "backend" / "worker.js").read_text(encoding="utf-8")
+        start = source.index("if (url.pathname === '/api/groups' && request.method === 'GET')")
+        end = source.index("const syncPath =", start)
+        route = source[start:end]
+        self.assertIn("raspGrouplist?year=", route)
+        self.assertIn("Array.isArray(payload.data)", route)
+        self.assertIn("group_directory_invalid_response", route)
+        self.assertIn("group_directory_unavailable", route)
+        self.assertIn("invalid_year", route)
+
+    def test_worker_cors_allows_canonical_github_pages_origin(self):
+        source = (ROOT / "backend" / "worker.js").read_text(encoding="utf-8")
+        self.assertIn("origin === 'https://mitrofanovdaniil53-max.github.io'", source)
+        self.assertIn("Access-Control-Allow-Origin", source)
+        self.assertIn("Vary': 'Origin'", source)
+
+
 if __name__ == "__main__":
     unittest.main()
