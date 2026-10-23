@@ -196,5 +196,126 @@ console.log('VK group-scoped note migration assertions passed');
 
 
 
+
+    def test_telegram_group_note_migration_is_backup_safe_and_queues_sync(self):
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("Node.js is required to execute the note migration helper")
+
+        source = (ROOT / "index.html").read_text(encoding="utf-8")
+        start = source.index("function kgeuSubjectKey(subject)")
+        end = source.index("function kgeuGetNote(subject)", start)
+        helpers = source[start:end]
+        script = r"""
+const assert = require('node:assert/strict');
+const saved = {};
+const dirty = [];
+let activeGroupId = 123;
+let kgeuPersonalData = { version: 1, notes: {
+  mathematics: 'legacy note',
+  'group:123::mathematics': 'scoped note wins',
+  'group:456::mathematics': 'other group note'
+}};
+let shouldSavePersonalData = true;
+let failBackup = false;
+global.window = { kgeuMarkStudentServiceDirty: () => dirty.push('dirty') };
+global.localStorage = {
+  getItem: key => Object.prototype.hasOwnProperty.call(saved, key) ? saved[key] : null,
+  setItem: (key, value) => {
+    if (failBackup && key === 'kgeu_tg_notes_migration_backup_v1') throw new Error('backup failed');
+    saved[key] = String(value);
+  }
+};
+function kgeuSavePersonalData(data) {
+  if (!shouldSavePersonalData) return false;
+  saved.kgeu_tg_personal_data_v1 = JSON.stringify(data);
+  return true;
+}
+"""
+        script = "\n".join([
+            script,
+            helpers,
+            r"""
+const original = JSON.parse(JSON.stringify(kgeuPersonalData));
+assert.equal(kgeuMigrateLegacyNotesForActiveGroup(), true);
+assert.equal(kgeuPersonalData.notes['group:123::mathematics'], 'scoped note wins');
+assert.equal(kgeuPersonalData.notes['group:456::mathematics'], 'other group note');
+assert.equal(Object.prototype.hasOwnProperty.call(kgeuPersonalData.notes, 'mathematics'), false);
+assert.deepEqual(JSON.parse(saved.kgeu_tg_notes_migration_backup_v1), original);
+assert.deepEqual(dirty, ['dirty']);
+assert.equal(kgeuMigrateLegacyNotesForActiveGroup(), false, 'migration is idempotent');
+
+// A failed save must restore the original in-memory data and must not queue sync.
+dirty.length = 0;
+kgeuPersonalData = { version: 1, notes: { 'legacy-subject': 'recover me' } };
+shouldSavePersonalData = false;
+assert.equal(kgeuMigrateLegacyNotesForActiveGroup(), false);
+assert.equal(JSON.stringify(kgeuPersonalData), JSON.stringify({ version: 1, notes: { 'legacy-subject': 'recover me' } }));
+assert.deepEqual(dirty, []);
+
+// A failed backup must abort before any mutation.
+kgeuPersonalData = { version: 1, notes: { 'keep-this': 'safe' } };
+shouldSavePersonalData = true;
+failBackup = true;
+assert.equal(kgeuMigrateLegacyNotesForActiveGroup(), false);
+assert.equal(JSON.stringify(kgeuPersonalData), JSON.stringify({ version: 1, notes: { 'keep-this': 'safe' } }));
+assert.deepEqual(dirty, []);
+
+// Cloud restore defers dirty marking until the caller has finalized sync metadata.
+failBackup = false;
+kgeuPersonalData = { version: 1, notes: { 'cloud-legacy': 'cloud note' } };
+assert.equal(kgeuMigrateLegacyNotesForActiveGroup({ deferSync: true }), true);
+assert.deepEqual(dirty, []);
+assert.equal(kgeuFlushLegacyNoteMigrationSync(), true);
+assert.deepEqual(dirty, ['dirty']);
+console.log('Telegram backup-safe note migration assertions passed');
+"""
+        ])
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        self.assertIn("Telegram backup-safe note migration assertions passed", result.stdout)
+
+class GroupPickerRegressionTest(unittest.TestCase):
+    def test_both_frontends_use_shared_group_directory_contract(self):
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                self.assertIn("https://kgeu-telegram-miniapp.2vkv544dmd.workers.dev/api/groups?year=2026-2027", source)
+                self.assertIn("Array.isArray(data && data.data) ? data.data : []", source)
+                self.assertIn("data-group-directory-id", source)
+                self.assertIn("data-retry-group-directory", source)
+                self.assertIn("loadGroupDirectory(true)", source)
+                self.assertIn("function getSavedGroups()", source)
+                self.assertIn("data-sgid", source)
+                self.assertIn("switchGroup(g.id,g.name)", source)
+
+    def test_group_directory_failure_preserves_stale_cache(self):
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                start = source.index("async function loadGroupDirectory(forceRefresh)")
+                end = source.index("function renderGroupDirectoryResults(query)", start)
+                loader = source[start:end]
+                self.assertIn("staleCache = cached.items", loader)
+                self.assertIn("if (staleCache && staleCache.length)", loader)
+                self.assertIn("groupDirectory = staleCache", loader)
+
+    def test_worker_exposes_read_only_group_directory_proxy(self):
+        source = (ROOT / "backend" / "worker.js").read_text(encoding="utf-8")
+        start = source.index("if (url.pathname === '/api/groups' && request.method === 'GET')")
+        end = source.index("const syncPath =", start)
+        route = source[start:end]
+        self.assertIn("raspGrouplist?year=", route)
+        self.assertIn("Array.isArray(payload.data)", route)
+        self.assertIn("group_directory_invalid_response", route)
+        self.assertIn("group_directory_unavailable", route)
+        self.assertIn("invalid_year", route)
+
+    def test_worker_cors_allows_canonical_github_pages_origin(self):
+        source = (ROOT / "backend" / "worker.js").read_text(encoding="utf-8")
+        self.assertIn("origin === 'https://mitrofanovdaniil53-max.github.io'", source)
+        self.assertIn("Access-Control-Allow-Origin", source)
+        self.assertIn("Vary': 'Origin'", source)
+
 if __name__ == "__main__":
     unittest.main()
