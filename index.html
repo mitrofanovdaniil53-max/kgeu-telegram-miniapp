@@ -72,12 +72,37 @@ function kgeuSubjectKey(subject) {
   return String(subject || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+function kgeuGroupNoteKey(subject, groupId) {
+  const group = Number(groupId || (typeof activeGroupId !== "undefined" ? activeGroupId : 0));
+  const key = kgeuSubjectKey(subject);
+  return group > 0 && key ? "group:" + group + "::" + key : key;
+}
+
+function kgeuMigrateLegacyNotesForActiveGroup() {
+  try {
+    const notes = kgeuPersonalData && kgeuPersonalData.notes;
+    const group = Number(typeof activeGroupId !== "undefined" ? activeGroupId : 0);
+    if (!notes || typeof notes !== "object" || !group) return;
+    const prefix = "group:" + group + "::";
+    let changed = false;
+    Object.keys(notes).forEach(function(key) {
+      if (key.indexOf("group:") === 0) return;
+      const scopedKey = prefix + key;
+      if (!Object.prototype.hasOwnProperty.call(notes, scopedKey)) notes[scopedKey] = notes[key];
+      delete notes[key];
+      changed = true;
+    });
+    if (changed) kgeuSavePersonalData(kgeuPersonalData);
+  } catch (e) {}
+}
+
 function kgeuGetNote(subject) {
-  return String(kgeuPersonalData.notes[kgeuSubjectKey(subject)] || "");
+  const key = kgeuGroupNoteKey(subject);
+  return String(kgeuPersonalData.notes[key] || "");
 }
 
 function kgeuSetNote(subject, value) {
-  const key = kgeuSubjectKey(subject);
+  const key = kgeuGroupNoteKey(subject);
   if (!key) return;
   const note = String(value || "").trim();
   if (note) kgeuPersonalData.notes[key] = note;
@@ -1544,6 +1569,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     if (/^\d+$/.test(startParam)) startParamGroupId = Number(startParam);
   } catch (e) {}
 
+  const hasExplicitGroupFromLaunch = Boolean(Number(params.get('groupId')) || Number(hashParams.get('groupId')) || startParamGroupId);
   let activeGroupId = Number(params.get('groupId')) || Number(hashParams.get('groupId')) || startParamGroupId || 0;
   // Every value below is normal decoded text — URLSearchParams already decodes
   // query/hash params once. decodeRepeated() is only a defensive safety net in
@@ -1663,6 +1689,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
   updateGroupLabel();
   saveActiveGroup();
   rememberGroup(activeGroupId, GROUP_NAME);
+  kgeuMigrateLegacyNotesForActiveGroup();
 
   function headerInstituteLabel() {
     // Always plain decoded text — never re-run encodeURIComponent on this value.
@@ -2768,7 +2795,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
         render();
       }
       const group = profile.activeGroup;
-      if (group && Number(group.id) && (Number(group.id) !== Number(activeGroupId) || String(group.name || '') !== String(GROUP_NAME || '') || String(group.institute || '') !== String(INSTITUTE_NAME || ''))) {
+      if (!hasExplicitGroupFromLaunch && group && Number(group.id) && (Number(group.id) !== Number(activeGroupId) || String(group.name || '') !== String(GROUP_NAME || '') || String(group.institute || '') !== String(INSTITUTE_NAME || ''))) {
         await switchGroup(Number(group.id), String(group.name || ''), { name: String(group.name || ''), institute: String(group.institute || '') });
       }
     } finally {
@@ -2999,11 +3026,12 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       const pd=snapshot.personalData;
       kgeuPersonalData={version:1,notes:(pd.notes&&typeof pd.notes==='object')?pd.notes:{},updatedAt:Date.now()};
       if(typeof kgeuSavePersonalData==='function')kgeuSavePersonalData(kgeuPersonalData);
+      kgeuMigrateLegacyNotesForActiveGroup();
     }
     if(snapshot.profileData&&typeof snapshot.profileData==='object'){
       try{
         const group=snapshot.profileData.activeGroup;
-        if(group&&Number(group.id))localStorage.setItem('kgeu_tg_active_group_v1',JSON.stringify({id:Number(group.id),name:String(group.name||''),institute:String(group.institute||'')}));
+        if(group&&Number(group.id)&&!hasExplicitGroupFromLaunch)localStorage.setItem('kgeu_tg_active_group_v1',JSON.stringify({id:Number(group.id),name:String(group.name||''),institute:String(group.institute||'')}));
         const settings=snapshot.profileData.settings;
         if(settings&&typeof settings==='object'){
           let current={};try{current=JSON.parse(localStorage.getItem('kgeu_tg_settings_v1')||'{}');}catch(e){}
