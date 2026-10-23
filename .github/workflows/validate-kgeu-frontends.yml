@@ -65,3 +65,5 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Test shared account-state merge behavior
         run: node --test tests/worker_shared_state.test.cjs
+      - name: Test VK launch signature validation
+        run: node --test tests/worker_vk_launch_auth.test.cjs
