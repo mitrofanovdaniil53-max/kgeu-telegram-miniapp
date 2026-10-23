@@ -572,8 +572,8 @@ export default {
     if (url.pathname === '/api/rasp' && request.method === 'GET') {
       const groupId = url.searchParams.get('idGroup') || '';
       const sdate = url.searchParams.get('sdate') || '';
-      if (!/^\\d{1,10}$/.test(groupId) || Number(groupId) <= 0 ||
-          !/^\\d{4}-\\d{2}-\\d{2}$/.test(sdate)) {
+      if (!/^\d{1,10}$/.test(groupId) || Number(groupId) <= 0 ||
+          !/^\d{4}-\d{2}-\d{2}$/.test(sdate)) {
         return json(request, { ok: false, error: 'invalid_schedule_query' }, 400);
       }
       try {
