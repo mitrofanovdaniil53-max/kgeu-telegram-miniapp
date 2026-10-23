@@ -120,3 +120,204 @@ test('normalizeIncoming preserves and validates expected cloud revisions', () =>
     );
   }
 });
+
+
+function createLinkCodeDb() {
+  const codes = [];
+  const attempts = new Map();
+  const identities = new Map();
+  const db = {
+    codes,
+    attempts,
+    identities,
+    prepare(sql) {
+      const statement = sql.replace(/\\s+/g, ' ').trim();
+      let params = [];
+      return {
+        bind(...values) {
+          params = values;
+          return this;
+        },
+        async run() {
+          if (statement.startsWith('UPDATE account_link_codes SET consumed_at = ? WHERE source_account_id = ?')) {
+            let changes = 0;
+            for (const row of codes) {
+              if (row.sourceAccountId === String(params[1]) && row.consumedAt == null) {
+                row.consumedAt = Number(params[0]);
+                changes++;
+              }
+            }
+            return { meta: { changes } };
+          }
+          if (statement.startsWith('INSERT INTO account_link_codes')) {
+            codes.push({
+              codeHash: String(params[0]),
+              sourceAccountId: String(params[1]),
+              sourceProvider: String(params[2]),
+              expiresAt: Number(params[3]),
+              consumedAt: null,
+              createdAt: Number(params[4])
+            });
+            return { meta: { changes: 1 } };
+          }
+          if (statement.startsWith('INSERT INTO account_link_attempts')) {
+            const key = String(params[0]) + ':' + String(params[1]);
+            const now = Number(params[2]);
+            const resetBefore = Number(params[3]);
+            const existing = attempts.get(key);
+            if (!existing || existing.windowStartedAt <= resetBefore) {
+              attempts.set(key, { windowStartedAt: now, attempts: 1 });
+            } else {
+              existing.attempts++;
+            }
+            return { meta: { changes: 1 } };
+          }
+          if (statement.startsWith('UPDATE account_link_codes SET consumed_at = ? WHERE code_hash = ? AND consumed_at IS NULL')) {
+            let changes = 0;
+            for (const row of codes) {
+              if (row.codeHash === String(params[1]) && row.consumedAt == null) {
+                row.consumedAt = Number(params[0]);
+                changes++;
+              }
+            }
+            return { meta: { changes } };
+          }
+          throw new Error('Unexpected fake D1 run query: ' + statement);
+        },
+        async first() {
+          if (statement.startsWith('SELECT attempts FROM account_link_attempts')) {
+            const key = String(params[0]) + ':' + String(params[1]);
+            const row = attempts.get(key);
+            return row ? { attempts: row.attempts } : null;
+          }
+          if (statement.startsWith('SELECT source_account_id, source_provider FROM account_link_codes')) {
+            const row = codes.find(item => item.codeHash === String(params[0])
+              && item.consumedAt == null && item.expiresAt > Number(params[1]));
+            return row ? {
+              source_account_id: row.sourceAccountId,
+              source_provider: row.sourceProvider
+            } : null;
+          }
+          if (statement.startsWith('SELECT account_id FROM account_identities')) {
+            const accountId = identities.get(String(params[0]) + ':' + String(params[1]));
+            return accountId ? { account_id: accountId } : null;
+          }
+          throw new Error('Unexpected fake D1 first query: ' + statement);
+        }
+      };
+    }
+  };
+  return db;
+}
+
+test('account-link codes are hashed, expire after ten minutes, and replace previous active codes', async () => {
+  const DB = createLinkCodeDb();
+  const env = { DB };
+  const identity = { provider: 'telegram', userId: '123' };
+  const before = Date.now();
+  const first = await sandbox.createAccountLinkCode(env, identity, 'tg:123');
+  assert.match(first.code, /^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{8}$/);
+  assert.notEqual(DB.codes[0].codeHash, first.code);
+  assert.equal(DB.codes[0].codeHash, await sandbox.hashLinkCode(first.code));
+  assert.ok(first.expiresAt >= before + 9 * 60 * 1000);
+  assert.ok(first.expiresAt <= Date.now() + 10 * 60 * 1000);
+
+  const second = await sandbox.createAccountLinkCode(env, identity, 'tg:123');
+  assert.notEqual(first.code, second.code);
+  assert.notEqual(DB.codes[0].consumedAt, null, 'generating a replacement invalidates the previous code');
+  assert.equal(DB.codes[1].consumedAt, null);
+});
+
+test('account-link code consumption rejects malformed, expired, reused, and same-platform codes', async (t) => {
+  const identity = { provider: 'vk', userId: '456' };
+  await t.test('malformed code', async () => {
+    await assert.rejects(
+      sandbox.consumeAccountLinkCode({ DB: createLinkCodeDb() }, identity, 'bad'),
+      /link_code_invalid/
+    );
+  });
+
+  await t.test('expired code', async () => {
+    const DB = createLinkCodeDb();
+    const code = 'ABCDEFGH';
+    DB.codes.push({
+      codeHash: await sandbox.hashLinkCode(code),
+      sourceAccountId: 'tg:123',
+      sourceProvider: 'telegram',
+      expiresAt: Date.now() - 1,
+      consumedAt: null
+    });
+    await assert.rejects(
+      sandbox.consumeAccountLinkCode({ DB }, identity, code),
+      /link_code_expired_or_invalid/
+    );
+  });
+
+  await t.test('already consumed code', async () => {
+    const DB = createLinkCodeDb();
+    const code = 'ABCDEFGH';
+    DB.codes.push({
+      codeHash: await sandbox.hashLinkCode(code),
+      sourceAccountId: 'tg:123',
+      sourceProvider: 'telegram',
+      expiresAt: Date.now() + 60_000,
+      consumedAt: Date.now()
+    });
+    await assert.rejects(
+      sandbox.consumeAccountLinkCode({ DB }, identity, code),
+      /link_code_expired_or_invalid/
+    );
+  });
+
+  await t.test('same platform', async () => {
+    const DB = createLinkCodeDb();
+    const code = 'ABCDEFGH';
+    DB.codes.push({
+      codeHash: await sandbox.hashLinkCode(code),
+      sourceAccountId: 'vk:123',
+      sourceProvider: 'vk',
+      expiresAt: Date.now() + 60_000,
+      consumedAt: null
+    });
+    await assert.rejects(
+      sandbox.consumeAccountLinkCode({ DB }, identity, code),
+      /link_requires_other_platform/
+    );
+  });
+});
+
+test('account-link code is consumed after linking and cannot be reused', async () => {
+  const DB = createLinkCodeDb();
+  const env = { DB };
+  const telegramIdentity = { provider: 'telegram', userId: '123' };
+  const vkIdentity = { provider: 'vk', userId: '456' };
+  const generated = await sandbox.createAccountLinkCode(env, telegramIdentity, 'tg:123');
+  DB.identities.set('vk:456', 'tg:123');
+
+  const result = await sandbox.consumeAccountLinkCode(env, vkIdentity, generated.code);
+  assert.deepEqual(JSON.parse(JSON.stringify(result)), {
+    linked: true,
+    alreadyLinked: true,
+    accountId: 'tg:123'
+  });
+  assert.notEqual(DB.codes[0].consumedAt, null);
+  await assert.rejects(
+    sandbox.consumeAccountLinkCode(env, vkIdentity, generated.code),
+    /link_code_expired_or_invalid/
+  );
+});
+
+test('account-link code attempts are rate-limited after ten attempts in the window', async () => {
+  const env = { DB: createLinkCodeDb() };
+  const identity = { provider: 'vk', userId: '456' };
+  for (let i = 0; i < 10; i++) {
+    await assert.rejects(
+      sandbox.consumeAccountLinkCode(env, identity, 'bad'),
+      /link_code_invalid/
+    );
+  }
+  await assert.rejects(
+    sandbox.consumeAccountLinkCode(env, identity, 'bad'),
+    /link_rate_limited/
+  );
+});
