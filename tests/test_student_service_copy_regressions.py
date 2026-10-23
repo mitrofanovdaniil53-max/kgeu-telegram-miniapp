@@ -168,6 +168,7 @@ function kgeuSavePersonalData(data) {
             r'''
 const original = JSON.parse(JSON.stringify(kgeuPersonalData));
 assert.equal(kgeuMigrateLegacyNotesForActiveGroup(), true);
+kgeuFlushMigratedNoteSync(); // sync is available only after frontend initialization
 assert.equal(JSON.parse(saved.kgeu_vk_notes_migration_backup_v1).notes.mathematics, original.notes.mathematics);
 assert.equal(kgeuPersonalData.notes['group:123::mathematics'], 'existing scoped note');
 assert.equal(kgeuPersonalData.notes['group:456::mathematics'], 'other group note');
