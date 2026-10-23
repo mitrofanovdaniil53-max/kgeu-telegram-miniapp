@@ -127,3 +127,47 @@ The VK Student Service sync screen exposes a configurable Worker API URL, techni
 - Source code alone does not establish whether controls are visually prominent or understandable in Telegram/VK.
 - Final navigation, visual direction, subscription gating and success metrics remain decisions for the product owner after reviewing the audit evidence.
 - No production code, data, Worker deployment or Mini App launch URL is changed by this document.
+
+
+## Owner-reported defect: study group picker (2026-10-23)
+
+The owner supplied screenshots from Telegram settings, Telegram Student Service, and the VK Student Service screen, and reported the same group-selection failure in both platforms:
+
+- Tapping an item under recent groups does nothing.
+- Searching by a group name (example given: “РСО-2-24”) fails.
+- The UI reports: “Не удалось загрузить справочник групп”.
+- It then suggests advanced ID entry, but the owner does not know the group ID.
+
+This is now a concrete, owner-reported blocker, not only a usability hypothesis. Treat it as **P1 / core journey blocked** until reproduced and fixed in both shells. The screenshots also show that Telegram and VK already have a similar settings structure and a similar Student Service dashboard, supporting a shared interaction model where practical.
+
+### Expected behavior
+
+1. Selecting a recent group selects it immediately, persists the selection, and refreshes the timetable.
+2. Typing a group name queries the current group directory and displays selectable matches.
+3. The selected group is visibly confirmed after saving/reopening settings.
+4. If the directory request fails, show a retry action and a useful diagnostic state; do not make an unknown numeric ID the normal user's only fallback.
+5. Keep advanced ID entry as an optional fallback for support/debug scenarios.
+
+### Investigation checklist (before changing implementation)
+
+- Reproduce on Telegram and VK separately; record the exact error and whether the Worker/API request is sent.
+- Inspect the group-directory endpoint, response schema, HTTP status, CORS/auth requirements, and upstream schedule API availability.
+- Inspect recent-group item click handlers, event propagation/disabled states, and persistence callbacks.
+- Verify whether both frontends share the same directory endpoint or contain duplicated implementations.
+- Add automated coverage for: directory success, empty results, HTTP/network failure, selecting a recent group, selecting a search result, and persistence after reload.
+- Test a known group and a group with punctuation/spacing variations, then verify the timetable changes.
+
+### Acceptance criteria
+
+- In both Telegram and VK, a user can select a recent group with one tap.
+- Search by a normal group name returns selectable results when the directory is available.
+- Failure states explain what failed and offer retry; they do not imply that users should know an internal ID.
+- The chosen group remains selected after closing/reopening the app.
+- Existing account linking and cross-platform notes/tasks synchronization remain unaffected.
+
+### Screenshot-based UI observations (not a complete usability test)
+
+- Telegram settings place group selection, appearance and timetable preferences in one long settings surface.
+- The VK Student Service screen exposes the same broad functions: tasks, deadlines, events, calendar, study, analytics, reminders, notes/data and synchronization.
+- On the provided VK screenshot, the main Student Service action panel is prominent, but multiple rows of similarly styled outlined navigation buttons compete for attention. Consider grouping links by intent (Plan: calendar/study; Personal work: tasks/deadlines/events/notes; Account: data/sync) only after checking the full layout and avoiding removal of existing functions.
+- The screenshots show similar information architecture, but do not establish that every setting is functionally identical or that all data types synchronize correctly.
