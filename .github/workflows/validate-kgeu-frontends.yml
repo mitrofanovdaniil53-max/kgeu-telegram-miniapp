@@ -63,5 +63,9 @@ jobs:
           python-version: "3.12"
       - name: Test additive D1 migration
         run: python -m unittest discover -s tests -v
-      - name: Test shared account-state merge behavior
+      - name: Test shared account-state merge and revision behavior
         run: node --test tests/worker_shared_state.test.cjs
+      - name: Test legacy shared-state field preservation
+        run: node --test tests/worker_legacy_field_preservation.test.cjs
+      - name: Test VK launch signature validation
+        run: node --test tests/worker_vk_launch_auth.test.cjs
