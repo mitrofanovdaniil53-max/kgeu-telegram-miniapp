@@ -45,6 +45,17 @@ class StudentServiceCopyRegressionTest(unittest.TestCase):
         self.assertIn("sync_revision_conflict", source)
         self.assertIn("Удаления записей автоматически не переносятся", source)
 
+    def test_vk_merge_keeps_local_cache_unchanged_until_cas_write_succeeds(self):
+        source = (ROOT / "apps" / "vk" / "index.html").read_text(encoding="utf-8")
+        start = source.index("async function mergeBothVersions()")
+        end = source.index("async function forcePushLocalVersion()", start)
+        merge = source[start:end]
+        post = merge.index("const result = await request('/api/sync'")
+        cache_write = merge.index("writeCachedService(mergedService);")
+        self.assertLess(post, cache_write)
+        self.assertIn("Number(remote.revision || 0),\\n          mergedService", merge)
+        self.assertIn("function payloadForSync(personal, profile, expectedRevision, serviceData)", source)
+
     def test_vk_merge_algorithm_preserves_conflicts_and_unions_lists(self):
         node = shutil.which("node")
         if not node:
