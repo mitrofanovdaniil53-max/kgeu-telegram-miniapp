@@ -321,3 +321,102 @@ test('account-link code attempts are rate-limited after ten attempts in the wind
     /link_rate_limited/
   );
 });
+
+
+function createRevisionDb(initialEnvelope, initialRevision) {
+  let stateJson = initialEnvelope == null ? null : JSON.stringify(initialEnvelope);
+  let revision = initialRevision;
+  const db = {
+    get stateJson() { return stateJson; },
+    get revision() { return revision; },
+    prepare(sql) {
+      const statement = sql.replace(/\\s+/g, ' ').trim();
+      let params = [];
+      return {
+        bind(...values) { params = values; return this; },
+        async first() {
+          if (statement.startsWith('SELECT state_json FROM account_state')) {
+            return stateJson == null ? null : { state_json: stateJson };
+          }
+          if (statement.startsWith('SELECT revision FROM account_state')) {
+            return stateJson == null ? null : { revision };
+          }
+          if (statement.startsWith('SELECT provider_user_id FROM account_identities')) return null;
+          throw new Error('Unexpected fake D1 first query: ' + statement);
+        },
+        async run() {
+          if (statement.startsWith('INSERT INTO account_state') && statement.includes('SELECT ?, ?, ?, 1, ?')) {
+            const expectedRevision = Number(params[4]);
+            const canInsert = stateJson == null && expectedRevision === 0;
+            const canUpdate = stateJson != null && revision === expectedRevision;
+            if (!canInsert && !canUpdate) return { meta: { changes: 0 } };
+            stateJson = String(params[1]);
+            revision = canInsert ? 1 : revision + 1;
+            return { meta: { changes: 1 } };
+          }
+          if (statement.startsWith('UPDATE accounts SET updated_at')) return { meta: { changes: 1 } };
+          throw new Error('Unexpected fake D1 run query: ' + statement);
+        }
+      };
+    }
+  };
+  return db;
+}
+
+test('saveAccountState rejects a stale expected revision without overwriting cloud state', async () => {
+  const existing = {
+    envelopeVersion: 1,
+    serviceData: { schemaVersion: 4, tasks: [{ id: 'newer-cloud-task' }] },
+    personalData: { version: 1, notes: { Math: 'cloud note' } },
+    profileData: { activeGroup: { id: 7 }, settings: { theme: 'dark' } }
+  };
+  const DB = createRevisionDb(existing, 5);
+  const incoming = sandbox.normalizeIncoming({
+    serviceData: { schemaVersion: 4, tasks: [{ id: 'stale-device-task' }] },
+    expectedRevision: 4
+  });
+
+  await assert.rejects(
+    sandbox.saveAccountState({ DB }, { provider: 'vk', userId: '42' }, 'tg:42', incoming),
+    /sync_revision_conflict/
+  );
+  assert.equal(DB.revision, 5);
+  assert.deepEqual(JSON.parse(DB.stateJson), existing);
+});
+
+test('saveAccountState advances the revision when the client revision matches', async () => {
+  const existing = {
+    envelopeVersion: 1,
+    serviceData: { schemaVersion: 4, tasks: [{ id: 'old-task' }] },
+    personalData: { version: 1, notes: { Math: 'keep this note' } },
+    profileData: { activeGroup: { id: 7 }, settings: { theme: 'dark' } }
+  };
+  const DB = createRevisionDb(existing, 5);
+  const incoming = sandbox.normalizeIncoming({
+    serviceData: { schemaVersion: 4, tasks: [{ id: 'updated-task' }] },
+    expectedRevision: 5
+  });
+
+  const result = await sandbox.saveAccountState({ DB }, { provider: 'vk', userId: '42' }, 'tg:42', incoming);
+  const saved = JSON.parse(DB.stateJson);
+  assert.equal(result.revision, 6);
+  assert.equal(DB.revision, 6);
+  assert.equal(saved.serviceData.tasks[0].id, 'updated-task');
+  assert.deepEqual(saved.personalData, existing.personalData);
+  assert.deepEqual(saved.profileData, existing.profileData);
+});
+
+test('saveAccountState allows a first write only when the expected revision is zero', async () => {
+  const DB = createRevisionDb(null, 0);
+  const incoming = sandbox.normalizeIncoming({
+    serviceData: { schemaVersion: 4, tasks: [{ id: 'first-task' }] },
+    personalData: { version: 1, notes: {} },
+    profileData: {},
+    expectedRevision: 0
+  });
+
+  const result = await sandbox.saveAccountState({ DB }, { provider: 'vk', userId: '42' }, 'vk:42', incoming);
+  assert.equal(result.revision, 1);
+  assert.equal(DB.revision, 1);
+  assert.equal(JSON.parse(DB.stateJson).serviceData.tasks[0].id, 'first-task');
+});
