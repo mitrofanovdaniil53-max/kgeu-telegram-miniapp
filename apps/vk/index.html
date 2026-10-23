@@ -1205,6 +1205,13 @@ height:8px;background:var(--bg2);border-radius:99px;overflow:hidden;margin:11px 
 .service-progress>span {
 display:block;height:100%;background:var(--accent);border-radius:99px;max-width:100%
 }
+.service-action-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+.service-create-row { margin-top:0; }
+.service-main-nav { padding-top:2px; }
+.service-more-nav { margin-top:6px; }
+.service-more-nav > summary { display:inline-flex; align-items:center; min-height:40px; padding:7px 12px; border:1px solid var(--border); border-radius:12px; color:var(--muted); font-size:13px; font-weight:650; cursor:pointer; }
+.service-more-nav[open] > summary { margin-bottom:4px; color:var(--text); }
+.service-action-row .service-btn { min-height:40px; }
 .service-actions {
 display:flex;flex-wrap:wrap;gap:8px;margin-top:12px
 }
@@ -3451,9 +3458,25 @@ html.vk-light .service-pill {
         '<h1 class="service-title">Мой сервис</h1>'+
         '<div class="service-sub">'+serviceEsc(GROUP_NAME)+' · всё важное в одном месте</div>'+
         '<div class="service-actions">'+
-          '<button class="service-btn primary" data-service-action="task">+ Задача</button>'+
-          '<button class="service-btn" data-service-action="deadline">+ Дедлайн</button>'+
-          '<button class="service-btn" data-service-action="event">+ Мероприятие</button><button class="service-btn" data-service-action="calendar">Календарь</button><button class="service-btn" data-service-action="study">Учёба</button><button class="service-btn" data-service-action="analytics">Аналитика</button><button class="service-btn" data-service-action="reminders">Напоминания</button><button class="service-btn" data-service-action="notes">Заметки</button><button class="service-btn" data-service-action="data">Данные</button><button class="service-btn" data-service-action="sync">Синхронизация</button>'+
+          '<div class="service-action-row service-create-row">'+
+            '<button class="service-btn primary" data-service-action="task">+ Задача</button>'+
+            '<button class="service-btn" data-service-action="deadline">+ Дедлайн</button>'+
+            '<button class="service-btn" data-service-action="event">+ Мероприятие</button>'+
+          '</div>'+
+          '<div class="service-action-row service-main-nav">'+
+            '<button class="service-btn" data-service-action="calendar">Календарь</button>'+
+            '<button class="service-btn" data-service-action="study">Учёба</button>'+
+            '<button class="service-btn" data-service-action="reminders">Напоминания</button>'+
+            '<button class="service-btn" data-service-action="notes">Заметки</button>'+
+          '</div>'+
+          '<details class="service-more-nav">'+
+            '<summary>Ещё разделы</summary>'+
+            '<div class="service-action-row">'+
+              '<button class="service-btn" data-service-action="analytics">Аналитика</button>'+
+              '<button class="service-btn" data-service-action="data">Данные и резервная копия</button>'+
+              '<button class="service-btn" data-service-action="sync">Синхронизация</button>'+
+            '</div>'+
+          '</details>'+
         '</div>'+
       '</section>'+
       '<div class="service-grid">'+
