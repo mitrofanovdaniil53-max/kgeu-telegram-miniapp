@@ -3762,8 +3762,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     let rows='';
     h.work.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))).forEach(x=>rows+='<tr><td>'+serviceEsc(x.date)+'</td><td>Административные</td><td>'+serviceEsc(x.title||'Работа')+'</td><td>'+Number(x.minutes||0)+'</td><td>'+Number(x.points||0)+'</td><td></td></tr>');
     h.social.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))).forEach(x=>rows+='<tr><td>'+serviceEsc(x.date)+'</td><td>Социальные</td><td>'+serviceEsc(x.title)+'</td><td></td><td>'+Number(x.points||0)+'</td><td>'+serviceEsc(x.fileName||'')+'</td></tr>');
-    const doc='<!doctype html><html><head><meta charset="utf-8"><title>Отчёт по баллам</title><style>body{font-family:Arial,sans-serif;font-size:11pt}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:6px}h1{font-size:18pt}
-</style></head><body>'+
+    const doc='<!doctype html><html><head><meta charset="utf-8"><title>Отчёт по баллам</title><style>body{font-family:Arial,sans-serif;font-size:11pt}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:6px}h1{font-size:18pt}</style></head><body>'+
       '<h1>Отчёт по баллам общежития</h1><p>Группа: '+serviceEsc(GROUP_NAME)+'</p><p>Всего: <b>'+total+'</b> / '+Number(h.totalGoal||250)+' · Административные: <b>'+admin+'</b> · Социальные: <b>'+social+'</b></p>'+
       '<table><tr><th>Дата</th><th>Тип</th><th>Событие / работа</th><th>Минуты</th><th>Баллы</th><th>Подтверждение</th></tr>'+rows+'</table>'+
       '<p>Документ сформирован в KGEU Student Service. Перед официальной подачей проверьте соответствие требованиям общежития.</p></body></html>';
