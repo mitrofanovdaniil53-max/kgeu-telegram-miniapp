@@ -4778,7 +4778,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  function payloadForSync(personal, profile, expectedRevision) {
+  function payloadForSync(personal, profile, expectedRevision, serviceData) {
     const meta = readMeta();
     return {
       format: 'kgeu-student-service-sync',
@@ -4788,7 +4788,7 @@ document.addEventListener("DOMContentLoaded", () => {
       exportedAt: new Date().toISOString(),
       expectedRevision: Number.isSafeInteger(expectedRevision) && expectedRevision >= 0
         ? expectedRevision : Number(meta.lastServerRevision || 0),
-      serviceData: readCachedService() || snapshot.serviceData || DEFAULT_SERVICE,
+      serviceData: serviceData || readCachedService() || snapshot.serviceData || DEFAULT_SERVICE,
       personalData: personal || localPersonal(),
       profileData: profile || readProfile()
     };
@@ -5091,13 +5091,13 @@ document.addEventListener("DOMContentLoaded", () => {
       const mergedService = mergeServiceRecords(remote.serviceData || DEFAULT_SERVICE, localService);
       const localNoteKeys = Array.isArray(meta.dirtyNotes) ? meta.dirtyNotes : [];
       const mergedNotes = mergeNotes(remote.personalData, localPersonalData, localNoteKeys);
-      writeCachedService(mergedService);
       const result = await request('/api/sync', {
         method: 'POST',
         body: JSON.stringify(payloadForSync(
           mergedNotes.personalData,
           remote.profileData || localProfile,
-          Number(remote.revision || 0)
+          Number(remote.revision || 0),
+          mergedService
         ))
       });
 
