@@ -2693,6 +2693,7 @@ html.vk-light .service-pill {
 
   let groupDirectory = null;
   let groupDirectoryPromise = null;
+  let selectedDirectoryGroup = null;
 
   async function loadGroupDirectory(forceRefresh) {
     if (groupDirectory && !forceRefresh) return groupDirectory;
@@ -2806,6 +2807,7 @@ html.vk-light .service-pill {
 
   function openGroupModal() {
     const modal=document.getElementById('group-modal'); if(!modal) return;
+    selectedDirectoryGroup = null;
     document.getElementById('group-id-input').value=activeGroupId;
     document.getElementById('group-name-input').value='';
     syncAppearanceControls();
@@ -2942,9 +2944,10 @@ html.vk-light .service-pill {
         const gid=Number(dir.getAttribute('data-group-directory-id'));
         const g=(groupDirectory || []).find(function(x){return Number(x.id)===gid;});
         if(g){
+          selectedDirectoryGroup = g;
           document.getElementById('group-id-input').value=g.id;
           document.getElementById('group-name-input').value=g.name;
-          switchGroup(g.id,g.name,g).catch(function(){});
+          dir.setAttribute('aria-pressed', 'true');
         }
         return;
       }
@@ -2957,6 +2960,7 @@ html.vk-light .service-pill {
     });
     const groupSearch=document.getElementById('group-name-input');
     if(groupSearch) groupSearch.addEventListener('input',function(){
+      if (selectedDirectoryGroup && groupSearch.value !== selectedDirectoryGroup.name) selectedDirectoryGroup = null;
       renderGroupDirectoryResults(groupSearch.value);
     });
     const themeToggle=document.getElementById('theme-toggle'); if(themeToggle) themeToggle.addEventListener('change',function(){
@@ -2975,11 +2979,27 @@ html.vk-light .service-pill {
     const sb=document.getElementById('show-breaks-setting'); if(sb) sb.addEventListener('change',function(){ settings.showBreaks=sb.checked; saveSettings(); render(); });
     const ar=document.getElementById('auto-refresh-setting'); if(ar) ar.addEventListener('change',function(){ settings.autoRefresh=ar.checked; saveSettings(); });
     const save=document.getElementById('group-save');
-    if(save) save.addEventListener('click',function(){
-      switchGroup(
-        document.getElementById('group-id-input').value,
-        document.getElementById('group-name-input').value
-      ).catch(function(){});
+    if(save) save.addEventListener('click',async function(){
+      if (save.disabled) return;
+      const idInput = document.getElementById('group-id-input');
+      const nameInput = document.getElementById('group-name-input');
+      const id = Number(idInput && idInput.value);
+      const name = String(nameInput && nameInput.value || '').trim();
+      const meta = selectedDirectoryGroup && Number(selectedDirectoryGroup.id) === id ? selectedDirectoryGroup : null;
+      if (!id) { toast('Сначала выберите группу из результатов поиска или введите ID'); return; }
+      const originalLabel = save.textContent;
+      save.disabled = true;
+      save.textContent = 'Открываем группу…';
+      save.setAttribute('aria-busy', 'true');
+      try {
+        await switchGroup(id, name, meta);
+      } catch (error) {
+        // switchGroup shows the user-facing error and restores the previous group.
+      } finally {
+        save.disabled = false;
+        save.textContent = originalLabel;
+        save.removeAttribute('aria-busy');
+      }
     });
   }
   bindGroupModal();
