@@ -3726,6 +3726,40 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
   .service-hero { padding: 12px !important; }
 }
 
+
+/* Dashboard hierarchy: put today's agenda before secondary student-service widgets. */
+@media (max-width: 640px) {
+  .service-page {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  .service-page > .service-hero { order: 0; }
+  .service-page > .service-grid { order: 1; }
+  .service-page > section:nth-of-type(3) { order: 2; }
+  .service-page > section:nth-of-type(2) { order: 3; }
+  .service-page > section:nth-of-type(n+4) { order: 4; }
+  .service-page .service-reminder-grid { gap: 6px !important; }
+  .service-page .service-reminder-box {
+    padding: 10px 9px !important;
+    border-radius: 12px !important;
+  }
+  .service-page .service-reminder-box strong { font-size: 20px !important; }
+  .service-page .service-reminder-box span { font-size: 11px !important; }
+  .service-page .service-section-title {
+    gap: 8px !important;
+    align-items: center !important;
+  }
+  .service-page .service-section-title .service-btn {
+    min-height: 34px !important;
+    padding: 7px 10px !important;
+    font-size: 12px !important;
+  }
+  .service-page .service-empty,
+  .service-page .service-calendar-empty {
+    padding: 14px 10px !important;
+  }
+}
+
 </style></head><body>'+
       '<h1>Отчёт по баллам общежития</h1><p>Группа: '+serviceEsc(GROUP_NAME)+'</p><p>Всего: <b>'+total+'</b> / '+Number(h.totalGoal||250)+' · Административные: <b>'+admin+'</b> · Социальные: <b>'+social+'</b></p>'+
       '<table><tr><th>Дата</th><th>Тип</th><th>Событие / работа</th><th>Минуты</th><th>Баллы</th><th>Подтверждение</th></tr>'+rows+'</table>'+
