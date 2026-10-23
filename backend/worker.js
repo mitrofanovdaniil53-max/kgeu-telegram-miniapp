@@ -567,6 +567,29 @@ export default {
       return json(request, { ok: true, service: 'kgeu-student-service', version: 'v23-shared', database: !!env.DB, vkAuthConfigured: !!env.VK_APP_SECRET });
     }
 
+    // Public, read-only proxy for the KGEU group directory. Fetching it from
+    // Mini Apps directly can fail when the upstream does not permit browser CORS.
+    if (url.pathname === '/api/groups' && request.method === 'GET') {
+      const year = url.searchParams.get('year') || '2026-2027';
+      if (!/^\d{4}-\d{4}$/.test(year)) {
+        return json(request, { ok: false, error: 'invalid_year' }, 400);
+      }
+      try {
+        const upstream = await fetch(
+          'https://kabinet.kgeu.ru/api/raspGrouplist?year=' + encodeURIComponent(year),
+          { cf: { cacheTtl: 21600, cacheEverything: true } }
+        );
+        if (!upstream.ok) return json(request, { ok: false, error: 'group_directory_upstream', status: upstream.status }, 502);
+        const payload = await upstream.json();
+        if (!payload || !Array.isArray(payload.data) || !payload.data.length) {
+          return json(request, { ok: false, error: 'group_directory_invalid_response' }, 502);
+        }
+        return json(request, payload);
+      } catch (error) {
+        return json(request, { ok: false, error: 'group_directory_unavailable' }, 502);
+      }
+    }
+
     const syncPath = url.pathname === '/api/sync';
     const mePath = url.pathname === '/api/account/me';
     const linkCodePath = url.pathname === '/api/account/link-code';

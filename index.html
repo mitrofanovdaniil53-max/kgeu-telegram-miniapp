@@ -1035,6 +1035,13 @@ function kgeuSetNote(subject, value) {
 .service-stat{font-size:27px;font-weight:800;line-height:1.05;margin:8px 0 2px}
 .service-progress{height:8px;background:var(--bg2);border-radius:99px;overflow:hidden;margin:11px 0 7px}
 .service-progress>span{display:block;height:100%;background:var(--accent);border-radius:99px;max-width:100%}
+.service-action-row{display:flex;flex:1 1 100%;width:100%;flex-wrap:wrap;gap:8px;margin-top:8px}
+.service-create-row{margin-top:0}
+.service-main-nav{padding-top:2px}
+.service-more-nav{flex:1 1 100%;margin-top:6px}
+.service-more-nav>summary{display:inline-flex;align-items:center;min-height:40px;padding:7px 12px;border:1px solid var(--border);border-radius:12px;color:var(--muted);font-size:13px;font-weight:650;cursor:pointer}
+.service-more-nav[open]>summary{margin-bottom:4px;color:var(--text)}
+.service-action-row .service-btn{min-height:40px}
 .service-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 .service-btn{border:1px solid var(--border);background:var(--bg2);color:var(--text);border-radius:13px;padding:10px 12px;font-weight:700;cursor:pointer;font:inherit}
 .service-btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
@@ -1515,7 +1522,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     String(window.location.hash || '').replace(/^#/, '')
   );
   const API = 'https://kabinet.kgeu.ru/api/Rasp';
-  const GROUP_DIRECTORY_API = 'https://kabinet.kgeu.ru/api/raspGrouplist?year=2026-2027';
+  const GROUP_DIRECTORY_API = 'https://kgeu-telegram-miniapp.2vkv544dmd.workers.dev/api/groups?year=2026-2027';
   const GROUP_DIRECTORY_CACHE_KEY = 'kgeu_tg_group_directory_2026_2027';
   const GROUP_DIRECTORY_TTL = 6 * 60 * 60 * 1000;
   const FIRST_STUDY = new Date('2026-09-02T00:00:00');
@@ -1834,12 +1841,32 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
   }
 
   // ——— API ———
+  async function fetchWithTimeout(url, options, timeoutMs) {
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const requestOptions = Object.assign({}, options || {});
+    if (controller) requestOptions.signal = controller.signal;
+    let timeoutId = null;
+    try {
+      return await Promise.race([
+        fetch(url, requestOptions),
+        new Promise(function(_, reject) {
+          timeoutId = setTimeout(function() {
+            if (controller) controller.abort();
+            reject(new Error('request_timeout'));
+          }, timeoutMs || 12000);
+        })
+      ]);
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
+  }
+
   async function fetchRasp(params, options) {
     options = options || {};
     const qs = Object.keys(params).map(function (k) {
       return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
     }).join('&');
-    const res = await fetch(API + '?' + qs);
+    const res = await fetchWithTimeout(API + '?' + qs, null, 12000);
     if (!res.ok) throw new Error('API ' + res.status);
     const data = await res.json();
     const groupInfo = data && data.data && data.data.info && data.data.info.group
@@ -2504,27 +2531,31 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
   let groupDirectory = null;
   let groupDirectoryPromise = null;
 
-  async function loadGroupDirectory() {
-    if (groupDirectory) return groupDirectory;
+  async function loadGroupDirectory(forceRefresh) {
+    if (groupDirectory && !forceRefresh) return groupDirectory;
 
+    let staleCache = null;
     try {
       const cached = JSON.parse(localStorage.getItem(GROUP_DIRECTORY_CACHE_KEY) || 'null');
-      if (cached && Array.isArray(cached.items) && cached.savedAt && Date.now() - cached.savedAt < GROUP_DIRECTORY_TTL) {
-        groupDirectory = cached.items;
-        return groupDirectory;
+      if (cached && Array.isArray(cached.items) && cached.items.length) {
+        staleCache = cached.items;
+        if (!forceRefresh && cached.savedAt && Date.now() - cached.savedAt < GROUP_DIRECTORY_TTL) {
+          groupDirectory = cached.items;
+          return groupDirectory;
+        }
       }
     } catch(e) {}
 
     if (groupDirectoryPromise) return groupDirectoryPromise;
 
-    groupDirectoryPromise = fetch(GROUP_DIRECTORY_API)
+    groupDirectoryPromise = fetchWithTimeout(GROUP_DIRECTORY_API, null, 12000)
       .then(function(res) {
         if (!res.ok) throw new Error('groups API ' + res.status);
         return res.json();
       })
       .then(function(data) {
         const list = Array.isArray(data && data.data) ? data.data : [];
-        groupDirectory = list.map(function(g) {
+        const normalized = list.map(function(g) {
           return {
             id: Number(g.id),
             name: String(g.name || '').trim(),
@@ -2533,6 +2564,8 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
             facultyId: g.facultyID || null
           };
         }).filter(function(g) { return g.id && g.name; });
+        if (!normalized.length) throw new Error('empty group directory');
+        groupDirectory = normalized;
 
         try {
           localStorage.setItem(GROUP_DIRECTORY_CACHE_KEY, JSON.stringify({
@@ -2542,6 +2575,14 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
         } catch(e) {}
 
         return groupDirectory;
+      })
+      .catch(function(error) {
+        // Preserve access to the last known group list during temporary upstream outages.
+        if (staleCache && staleCache.length) {
+          groupDirectory = staleCache;
+          return groupDirectory;
+        }
+        throw error;
       })
       .finally(function() {
         groupDirectoryPromise = null;
@@ -2564,7 +2605,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       box.innerHTML = '<div class="group-directory-loading">Ищем группу…</div>';
       loadGroupDirectory().then(function(){ renderGroupDirectoryResults(query); })
         .catch(function(){
-          box.innerHTML = '<div class="mini-note">Не удалось загрузить справочник групп. Можно использовать расширенный ввод ID.</div>';
+          box.innerHTML = '<div class="mini-note">Не удалось загрузить справочник групп.</div><button type="button" class="secondary-btn" data-retry-group-directory>Повторить загрузку</button><div class="mini-note">Если проблема сохраняется, попробуйте позже. ID группы вводить не обязательно.</div>';
         });
       return;
     }
@@ -2653,9 +2694,8 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
         { updateMeta: false, returnMeta: true }
       );
 
-      if (!probe.groupInfo && !probe.lessons.length) {
-        throw new Error('group not found');
-      }
+      // An empty schedule for one date does not mean the group is invalid.
+      // Accept a successful API response; the normal refresh will load the selected period.
 
       const resolvedName = (meta && meta.name) || (probe.groupInfo && probe.groupInfo.name) || name || ('Группа ' + id);
       const resolvedInstitute =
@@ -2722,6 +2762,15 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     const close=document.getElementById('group-close'); if(close) close.addEventListener('click',closeGroupModal);
     const modal=document.getElementById('group-modal'); if(modal) modal.addEventListener('click',function(e){
       const target=e.target;
+      const retryDirectory = target.closest && target.closest('[data-retry-group-directory]');
+      if (retryDirectory) {
+        const input = document.getElementById('group-name-input');
+        const results = document.getElementById('group-directory-results');
+        if (results) results.innerHTML = '<div class="group-directory-loading">Повторно загружаем справочник…</div>';
+        loadGroupDirectory(true).then(function(){ renderGroupDirectoryResults(input ? input.value : ''); })
+          .catch(function(){ renderGroupDirectoryResults(input ? input.value : ''); });
+        return;
+      }
       if(target.getAttribute && target.getAttribute('data-close-modal')) closeGroupModal();
       const del=target.getAttribute && target.getAttribute('data-delid');
       if(del){ saveGroups(getSavedGroups().filter(function(g){return Number(g.id)!==Number(del);})); openGroupModal(); return; }
@@ -3224,9 +3273,24 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
         '<h1 class="service-title">Мой сервис</h1>'+
         '<div class="service-sub">'+serviceEsc(GROUP_NAME)+' · всё важное в одном месте</div>'+
         '<div class="service-actions">'+
-          '<button class="service-btn primary" data-service-action="task">+ Задача</button>'+
-          '<button class="service-btn" data-service-action="deadline">+ Дедлайн</button>'+
-          '<button class="service-btn" data-service-action="event">+ Мероприятие</button><button class="service-btn" data-service-action="calendar">Календарь</button><button class="service-btn" data-service-action="study">Учёба</button><button class="service-btn" data-service-action="analytics">Аналитика</button><button class="service-btn" data-service-action="reminders">Напоминания</button><button class="service-btn" data-service-action="data">Данные</button><button class="service-btn" data-service-action="sync">Синхронизация</button>'+
+          '<div class="service-action-row service-create-row">'+
+            '<button class="service-btn primary" data-service-action="task">+ Задача</button>'+
+            '<button class="service-btn" data-service-action="deadline">+ Дедлайн</button>'+
+            '<button class="service-btn" data-service-action="event">+ Мероприятие</button>'+
+          '</div>'+
+          '<div class="service-action-row service-main-nav">'+
+            '<button class="service-btn" data-service-action="calendar">Календарь</button>'+
+            '<button class="service-btn" data-service-action="study">Учёба</button>'+
+            '<button class="service-btn" data-service-action="reminders">Напоминания</button>'+
+          '</div>'+
+          '<details class="service-more-nav">'+
+            '<summary>Ещё разделы</summary>'+
+            '<div class="service-action-row">'+
+              '<button class="service-btn" data-service-action="analytics">Аналитика</button>'+
+              '<button class="service-btn" data-service-action="data">Данные и резервная копия</button>'+
+              '<button class="service-btn" data-service-action="sync">Синхронизация</button>'+
+            '</div>'+
+          '</details>'+
         '</div>'+
       '</section>'+
       '<div class="service-grid">'+
