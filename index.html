@@ -78,22 +78,59 @@ function kgeuGroupNoteKey(subject, groupId) {
   return group > 0 && key ? "group:" + group + "::" + key : key;
 }
 
-function kgeuMigrateLegacyNotesForActiveGroup() {
+let kgeuPendingLegacyNoteMigrationSync = false;
+
+function kgeuFlushLegacyNoteMigrationSync() {
+  try {
+    if (!kgeuPendingLegacyNoteMigrationSync || typeof window === "undefined" ||
+        typeof window.kgeuMarkStudentServiceDirty !== "function") return false;
+    window.kgeuMarkStudentServiceDirty();
+    kgeuPendingLegacyNoteMigrationSync = false;
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function kgeuMigrateLegacyNotesForActiveGroup(options) {
   try {
     const notes = kgeuPersonalData && kgeuPersonalData.notes;
     const group = Number(typeof activeGroupId !== "undefined" ? activeGroupId : 0);
-    if (!notes || typeof notes !== "object" || !group) return;
+    if (!notes || typeof notes !== "object" || !group) return false;
+    const legacyKeys = Object.keys(notes).filter(function(key) {
+      return key.indexOf("group:") !== 0;
+    });
+    if (!legacyKeys.length) return false;
+
+    // Back up the complete personal-data object before changing any note keys.
+    const backupKey = "kgeu_tg_notes_migration_backup_v1";
+    let backupJson;
+    try {
+      backupJson = JSON.stringify(kgeuPersonalData);
+      localStorage.setItem(backupKey, backupJson);
+      backupJson = localStorage.getItem(backupKey);
+      if (!backupJson) return false;
+    } catch (e) {
+      return false;
+    }
+
     const prefix = "group:" + group + "::";
-    let changed = false;
-    Object.keys(notes).forEach(function(key) {
-      if (key.indexOf("group:") === 0) return;
+    legacyKeys.forEach(function(key) {
       const scopedKey = prefix + key;
       if (!Object.prototype.hasOwnProperty.call(notes, scopedKey)) notes[scopedKey] = notes[key];
       delete notes[key];
-      changed = true;
     });
-    if (changed) kgeuSavePersonalData(kgeuPersonalData);
-  } catch (e) {}
+
+    if (!kgeuSavePersonalData(kgeuPersonalData)) {
+      try { kgeuPersonalData = JSON.parse(backupJson); } catch (e) {}
+      return false;
+    }
+    kgeuPendingLegacyNoteMigrationSync = true;
+    if (!(options && options.deferSync)) kgeuFlushLegacyNoteMigrationSync();
+    return true;
+  } catch (e) {
+    return false;
+  }
 }
 
 function kgeuGetNote(subject) {
@@ -3026,7 +3063,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       const pd=snapshot.personalData;
       kgeuPersonalData={version:1,notes:(pd.notes&&typeof pd.notes==='object')?pd.notes:{},updatedAt:Date.now()};
       if(typeof kgeuSavePersonalData==='function')kgeuSavePersonalData(kgeuPersonalData);
-      kgeuMigrateLegacyNotesForActiveGroup();
+      kgeuMigrateLegacyNotesForActiveGroup({deferSync:true});
     }
     if(snapshot.profileData&&typeof snapshot.profileData==='object'){
       try{
@@ -3042,6 +3079,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     }
     const m=serviceSyncMeta();m.dirty=false;m.lastLocalSave=Number(serviceData.updatedAt||Date.now());m.lastServerSync=Number(snapshot.updatedAt||Date.now());m.lastServerRevision=Number(snapshot.revision||0);
     localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(m));
+    kgeuFlushLegacyNoteMigrationSync();
   }
 
   // Refresh only the visible Student Service screen after a remote update.
@@ -3133,6 +3171,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
   }
   // Used by the separate subject-notes script without coupling the two modules.
   try{window.kgeuMarkStudentServiceDirty=serviceMarkDirty;}catch(e){}
+  kgeuFlushLegacyNoteMigrationSync();
 
   async function serviceAutoSync(reason){
     if(serviceAutoSyncRunning){serviceAutoSyncAgain=true;return;}
