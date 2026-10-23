@@ -567,6 +567,35 @@ export default {
       return json(request, { ok: true, service: 'kgeu-student-service', version: 'v23-shared', database: !!env.DB, vkAuthConfigured: !!env.VK_APP_SECRET });
     }
 
+    // Public read-only proxy for the KGEU timetable API. Mini App WebViews can be
+    // blocked by upstream browser CORS even when the API is reachable server-side.
+    if (url.pathname === '/api/rasp' && request.method === 'GET') {
+      const groupId = url.searchParams.get('idGroup') || '';
+      const sdate = url.searchParams.get('sdate') || '';
+      if (!/^\d{1,10}$/.test(groupId) || Number(groupId) <= 0 ||
+          !/^\d{4}-\d{2}-\d{2}$/.test(sdate)) {
+        return json(request, { ok: false, error: 'invalid_schedule_query' }, 400);
+      }
+      try {
+        const upstreamUrl = new URL('https://kabinet.kgeu.ru/api/Rasp');
+        upstreamUrl.searchParams.set('idGroup', groupId);
+        upstreamUrl.searchParams.set('sdate', sdate);
+        const upstream = await fetch(upstreamUrl.toString(), {
+          cf: { cacheTtl: 60, cacheEverything: true },
+        });
+        if (!upstream.ok) {
+          return json(request, { ok: false, error: 'schedule_upstream', status: upstream.status }, 502);
+        }
+        const payload = await upstream.json();
+        if (!payload || typeof payload !== 'object' || !payload.data || typeof payload.data !== 'object') {
+          return json(request, { ok: false, error: 'schedule_invalid_response' }, 502);
+        }
+        return json(request, payload);
+      } catch (error) {
+        return json(request, { ok: false, error: 'schedule_unavailable' }, 502);
+      }
+    }
+
     // Public, read-only proxy for the KGEU group directory. Fetching it from
     // Mini Apps directly can fail when the upstream does not permit browser CORS.
     if (url.pathname === '/api/groups' && request.method === 'GET') {

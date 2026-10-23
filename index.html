@@ -1521,7 +1521,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
   const hashParams = new URLSearchParams(
     String(window.location.hash || '').replace(/^#/, '')
   );
-  const API = 'https://kabinet.kgeu.ru/api/Rasp';
+  const API = 'https://kgeu-telegram-miniapp.2vkv544dmd.workers.dev/api/rasp';
   const GROUP_DIRECTORY_API = 'https://kgeu-telegram-miniapp.2vkv544dmd.workers.dev/api/groups?year=2026-2027';
   const GROUP_DIRECTORY_CACHE_KEY = 'kgeu_tg_group_directory_2026_2027';
   const GROUP_DIRECTORY_TTL = 6 * 60 * 60 * 1000;
@@ -1992,6 +1992,23 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
   }
 
   async function loadInitialNetwork() {
+    // Telegram deep links currently carry only the numeric group ID. Resolve
+    // the readable group name from the shared directory so the header does
+    // not remain "Группа <id>" when the schedule API metadata is unavailable.
+    if (!GROUP_NAME && activeGroupId) {
+      try {
+        const knownGroup = (await loadGroupDirectory()).find(function (g) {
+          return Number(g.id) === Number(activeGroupId);
+        });
+        if (knownGroup) {
+          GROUP_NAME = knownGroup.name;
+          INSTITUTE_NAME = knownGroup.institute || INSTITUTE_NAME || '';
+          updateGroupLabel();
+          saveActiveGroup();
+          rememberGroup(activeGroupId, GROUP_NAME);
+        }
+      } catch (e) {}
+    }
     const today = new Date();
     const requestDate = today < FIRST_STUDY ? FIRST_STUDY : today;
     const anchors = relativeAnchors(requestDate, 3);
