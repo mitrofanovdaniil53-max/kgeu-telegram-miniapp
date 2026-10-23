@@ -2694,9 +2694,8 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
         { updateMeta: false, returnMeta: true }
       );
 
-      if (!probe.groupInfo && !probe.lessons.length) {
-        throw new Error('group not found');
-      }
+      // An empty schedule for one date does not mean the group is invalid.
+      // Accept a successful API response; the normal refresh will load the selected period.
 
       const resolvedName = (meta && meta.name) || (probe.groupInfo && probe.groupInfo.name) || name || ('Группа ' + id);
       const resolvedInstitute =
