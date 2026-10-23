@@ -131,7 +131,7 @@ function createLinkCodeDb() {
     attempts,
     identities,
     prepare(sql) {
-      const statement = sql.replace(/\\s+/g, ' ').trim();
+      const statement = sql.replace(/\s+/g, ' ').trim();
       let params = [];
       return {
         bind(...values) {
