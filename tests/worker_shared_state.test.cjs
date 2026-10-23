@@ -330,7 +330,7 @@ function createRevisionDb(initialEnvelope, initialRevision) {
     get stateJson() { return stateJson; },
     get revision() { return revision; },
     prepare(sql) {
-      const statement = sql.replace(/\\s+/g, ' ').trim();
+      const statement = sql.replace(/\s+/g, ' ').trim();
       let params = [];
       return {
         bind(...values) { params = values; return this; },
