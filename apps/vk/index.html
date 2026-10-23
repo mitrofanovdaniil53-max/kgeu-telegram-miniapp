@@ -105,7 +105,7 @@ function kgeuMigrateLegacyNotesForActiveGroup() {
       } catch (e) {}
       return false;
     }
-    kgeuFlushMigratedNoteSync();
+    // Flush after sync setup or after cloud-restore metadata has been finalized.
     return true;
   } catch (e) { return false; }
 }
