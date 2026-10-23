@@ -60,7 +60,7 @@ class StudentServiceCopyRegressionTest(unittest.TestCase):
         stable_function = source[stable_start:same_start]
         same_function = source[same_start:merge_comment]
         merge_function = source[merge_start:merge_end]
-        assertions = r\'''
+        assertions = r'''
 const assert = require('node:assert/strict');
 const cloud = {
   schemaVersion: 4,
@@ -102,8 +102,8 @@ assert.deepEqual(merged.hostel.work.map(x => x.id).sort(), ['work-cloud', 'work-
 assert.deepEqual(merged.hostel.social.map(x => x.id).sort(), ['social-cloud', 'social-local']);
 assert.equal(merged.hostel.totalGoal, 300, 'non-list scalar fields follow the explicit local-wins rule');
 console.log('VK merge behavior assertions passed');
-\''';
-        script = "\\n".join([
+''';
+        script = "\n".join([
             "const DEFAULT_SERVICE = {};",
             stable_function,
             same_function,
