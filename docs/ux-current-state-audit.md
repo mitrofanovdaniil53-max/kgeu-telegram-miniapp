@@ -84,7 +84,7 @@ The VK frontend currently exposes actions for manual sync, merging Telegram and 
 | Priority | Area | Why it matters | Evidence needed |
 |---|---|---|---|
 | P0 | Data safety during sync and recovery | Basic bidirectional notes/tasks sync is owner-verified; conflict and recovery behavior remain unverified | Test conflicting edits, offline mode and recovery on two devices |
-| P1 | First launch and group selection | Blocks access to the core value | Fresh-account test on Telegram and VK |
+| P1 | First launch and group selection | Core journey; owner currently confirms group selection works, so retain as a regression check rather than an active blocker | Fresh-account/relaunch check on Telegram and VK when convenient |
 | P1 | Navigation across timetable and Student Service | Many distinct features are exposed in one app | Screen inventory and task-based usability tests |
 | P1 | Sync status and error messages | Users need to distinguish local save from cloud sync | Test offline, delayed response, conflict and retry |
 | P2 | Visual consistency and accessibility | Affects scan speed and ease of use | Check typography, contrast, touch targets, themes and small screens |
@@ -129,41 +129,18 @@ The VK Student Service sync screen exposes a configurable Worker API URL, techni
 - No production code, data, Worker deployment or Mini App launch URL is changed by this document.
 
 
-## Owner-reported defect: study group picker (2026-10-23)
+## Previously reported group-picker issue — current status (2026-10-24)
 
-The owner supplied screenshots from Telegram settings, Telegram Student Service, and the VK Student Service screen, and reported the same group-selection failure in both platforms:
+A report on 2026-10-23 described group-directory errors and taps that appeared not to select a group in Telegram and VK. The report was tracked in issue #40 while the cause was unverified.
 
-- Tapping an item under recent groups does nothing.
-- Searching by a group name (example given: “РСО-2-24”) fails.
-- The UI reports: “Не удалось загрузить справочник групп”.
-- It then suggests advanced ID entry, but the owner does not know the group ID.
+**Current owner confirmation (2026-10-24):** group selection works, synchronization works, and the app is stable. Issue #40 has been closed based on this confirmation. There is no currently confirmed group-picker defect, and no speculative frontend or Worker change is justified.
 
-This is now a concrete, owner-reported blocker, not only a usability hypothesis. Treat it as **P1 / core journey blocked** until reproduced and fixed in both shells. The screenshots also show that Telegram and VK already have a similar settings structure and a similar Student Service dashboard, supporting a shared interaction model where practical.
-
-### Expected behavior
-
-1. Selecting a recent group selects it immediately, persists the selection, and refreshes the timetable.
-2. Typing a group name queries the current group directory and displays selectable matches.
-3. The selected group is visibly confirmed after saving/reopening settings.
-4. If the directory request fails, show a retry action and a useful diagnostic state; do not make an unknown numeric ID the normal user's only fallback.
-5. Keep advanced ID entry as an optional fallback for support/debug scenarios.
-
-### Investigation checklist (before changing implementation)
-
-- Reproduce on Telegram and VK separately; record the exact error and whether the Worker/API request is sent.
-- Inspect the group-directory endpoint, response schema, HTTP status, CORS/auth requirements, and upstream schedule API availability.
-- Inspect recent-group item click handlers, event propagation/disabled states, and persistence callbacks.
-- Verify whether both frontends share the same directory endpoint or contain duplicated implementations.
-- Add automated coverage for: directory success, empty results, HTTP/network failure, selecting a recent group, selecting a search result, and persistence after reload.
-- Test a known group and a group with punctuation/spacing variations, then verify the timetable changes.
-
-### Acceptance criteria
-
-- In both Telegram and VK, a user can select a recent group with one tap.
-- Search by a normal group name returns selectable results when the directory is available.
-- Failure states explain what failed and offer retry; they do not imply that users should know an internal ID.
-- The chosen group remains selected after closing/reopening the app.
-- Existing account linking and cross-platform notes/tasks synchronization remain unaffected.
+Keep the following as a lightweight regression checklist, not as evidence of a current failure:
+- Select a recent group and confirm the timetable changes.
+- Search for a normal group name and choose a result when the directory is available.
+- Reopen the Mini App and confirm the chosen group remains selected.
+- Confirm group switching does not break existing account linking or bidirectional notes/tasks sync.
+- If the problem recurs, record the platform (Telegram or VK), timestamp, exact UI message, and directory request status before changing code.
 
 ### Screenshot-based UI observations (not a complete usability test)
 
