@@ -162,7 +162,7 @@ function kgeuSavePersonalData(data) {
   return true;
 }
 ''';
-        script = "\\n".join([
+        script = "\n".join([
             assertions,
             helpers,
             r'''
