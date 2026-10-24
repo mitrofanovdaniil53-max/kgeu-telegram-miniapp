@@ -3610,24 +3610,29 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
   }
   function serviceRenderHostel(){
     const h=serviceData.hostel, total=serviceTotalPoints(), social=serviceSumSocial(), admin=serviceSumWork();
-    return '<div class="service-page">'+
-      '<section class="service-hero"><div class="service-kicker">Общежитие</div><h1 class="service-title">Учёт баллов</h1>'+
+    return '<div class="service-page service-hostel-module">'+
+      '<nav class="hostel-module-nav" aria-label="Разделы общежития">'+
+        '<button type="button" class="service-btn" data-hostel-view="overview">Обзор</button>'+
+        '<button type="button" class="service-btn" data-hostel-view="admin">Административные</button>'+
+        '<button type="button" class="service-btn" data-hostel-view="social">Социальные</button>'+
+      '</nav>'+
+      '<section class="service-hero" data-hostel-panel="overview"><div class="service-kicker">Общежитие</div><h1 class="service-title">Учёт баллов</h1>'+
       '<div class="service-sub">Цели можно изменить под правила твоего года.</div>'+
       '<div class="service-form-row service-form"><div><label>Цель социальных баллов</label><input id="hostel-social-goal" type="number" min="0" value="'+Number(h.socialGoal||Math.max(0,Number(h.totalGoal||250)-Number(h.adminGoal||100)))+'"></div><div><label>Цель административных баллов</label><input id="hostel-admin-goal" type="number" min="0" value="'+Number(h.adminGoal||100)+'"></div></div>'+
       '<div class="service-actions"><button class="service-btn primary" data-service-action="save-hostel-goals">Сохранить цели</button><button class="service-btn" data-service-action="service-home">← Мой сервис</button></div></section>'+
-      '<section class="service-card"><h3>Прогресс</h3><div class="hostel-summary">'+
+      '<section class="service-card" data-hostel-panel="overview"><h3>Прогресс</h3><div class="hostel-summary">'+
         '<div class="hostel-box"><strong>'+total+'</strong><span>всего / '+Number(h.totalGoal||250)+'</span></div>'+
         '<div class="hostel-box"><strong>'+admin+'</strong><span>административные</span></div>'+
         '<div class="hostel-box"><strong>'+social+'</strong><span>социальные</span></div>'+
         '<div class="hostel-box"><strong>'+Math.max(0,Number(h.totalGoal||250)-total)+'</strong><span>осталось</span></div>'+
       '</div><div class="service-progress"><span style="width:'+Math.min(100,total/Math.max(1,Number(h.totalGoal||250))*100)+'%"></span></div></section>'+
-      '<section class="service-card"><h3>⏱ Административные / GBS</h3><p>За каждые 10 минут — 1 балл. Вводи фактически отработанные минуты, приложение посчитает баллы.</p>'+
+      '<section class="service-card" data-hostel-panel="admin"><h3>⏱ Административные / GBS</h3><p>За каждые 10 минут — 1 балл. Вводи фактически отработанные минуты, приложение посчитает баллы.</p>'+
       '<div class="service-form"><div class="service-form-row"><div><label>Дата</label><input id="work-date" type="date" value="'+isoDate(new Date())+'"></div><div><label>Минуты</label><input id="work-minutes" type="number" min="0" step="1" placeholder="20"></div></div><div><label>Что делал</label><input id="work-title" placeholder="GBS / дежурство / работа"></div>'+
       '<button class="service-btn primary" data-service-action="add-work">Добавить работу</button></div>'+
       '<div class="service-list" style="margin-top:10px">'+(h.work.slice().reverse().slice(0,12).map(x=>
         '<div class="service-row"><div class="service-row-main"><div class="service-row-title">'+serviceDate(x.date)+' · '+Number(x.minutes)+' мин</div><div class="service-row-meta">'+serviceEsc(x.title||'Работа')+'</div></div><span class="service-pill">+'+Number(x.points)+' б.</span><button class="service-btn danger" data-service-del-work="'+serviceEsc(x.id)+'">×</button></div>'
       ).join('')||'<div class="service-empty">Записей пока нет.</div>')+'</div></section>'+
-      '<section class="service-card"><h3>🎓 Социальные баллы</h3><p>Фиксируй мероприятие, дату, количество баллов и подтверждение участия. Подтверждение сохраняется в записи и синхронизируется вместе с общим аккаунтом. Для крупных файлов может потребоваться уменьшить размер вложения.</p>'+
+      '<section class="service-card" data-hostel-panel="social"><h3>🎓 Социальные баллы</h3><p>Фиксируй мероприятие, дату, количество баллов и подтверждение участия. Подтверждение сохраняется в записи и синхронизируется вместе с общим аккаунтом. Для крупных файлов может потребоваться уменьшить размер вложения.</p>'+
       '<div class="service-form"><div class="service-form-row"><div><label>Дата</label><input id="social-date" type="date" value="'+isoDate(new Date())+'"></div><div><label>Баллы</label><input id="social-points" type="number" min="0" step="1" placeholder="10"></div></div><div><label>Мероприятие</label><input id="social-title" placeholder="Название мероприятия"></div><div><label>Комментарий</label><textarea id="social-note" placeholder="Организатор, роль, что подтверждает участие…"></textarea></div><div><label>Подтверждение</label><input id="social-file" class="service-file" type="file" accept="image/*,.pdf,.doc,.docx"></div>'+
       '<button class="service-btn primary" data-service-action="add-social">Добавить мероприятие</button></div>'+
       '<div class="service-list" style="margin-top:10px">'+(h.social.slice().reverse().slice(0,12).map(x=>
