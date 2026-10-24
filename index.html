@@ -1280,6 +1280,12 @@ html.tg-light .service-launch-btn{background:#fff;color:#101828;border-color:#e4
 .setting-navigation-row span:last-child{font-size:24px;color:var(--muted)}
 .service-main-nav .service-btn:active,.setting-navigation-row:active{transform:scale(.985)}
 @media(prefers-reduced-motion:no-preference){.service-main-nav .service-btn,.setting-navigation-row{transition:transform .16s ease,background .16s ease,box-shadow .16s ease}}
+
+/* Hostel module: compact segmented navigation with Liquid Glass surface. */
+.hostel-module-nav{display:flex;gap:7px;overflow-x:auto;padding:7px;margin:0 0 12px;border:1px solid color-mix(in srgb,var(--border) 65%,transparent);border-radius:17px;background:color-mix(in srgb,var(--bg2) 76%,transparent);-webkit-backdrop-filter:blur(18px) saturate(1.35);backdrop-filter:blur(18px) saturate(1.35)}
+.hostel-module-nav .service-btn{flex:1;white-space:nowrap;min-width:max-content;border:1px solid transparent;background:transparent}
+.hostel-module-nav .service-btn.is-active{background:var(--accent,#155eef);color:#fff;border-color:rgba(255,255,255,.38);box-shadow:0 4px 12px rgba(21,94,239,.2)}
+.service-hostel-module [hidden]{display:none!important}
 </style>
 
 <script>
@@ -3589,6 +3595,19 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
         '</div></section>'+
       '</div>';
   }
+  let serviceHostelView='overview';
+  function serviceHostelApplyView(){
+    const root=document.querySelector('.service-hostel-module');
+    if(!root)return;
+    root.querySelectorAll('[data-hostel-panel]').forEach(function(panel){
+      panel.hidden=panel.getAttribute('data-hostel-panel')!==serviceHostelView;
+    });
+    root.querySelectorAll('[data-hostel-view]').forEach(function(button){
+      const active=button.getAttribute('data-hostel-view')===serviceHostelView;
+      button.classList.toggle('is-active',active);
+      button.setAttribute('aria-pressed',active?'true':'false');
+    });
+  }
   function serviceRenderHostel(){
     const h=serviceData.hostel, total=serviceTotalPoints(), social=serviceSumSocial(), admin=serviceSumWork();
     return '<div class="service-page">'+
@@ -3980,6 +3999,17 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
   });
 
   function serviceBind(){
+    if(document.querySelector('.service-hostel-module')){
+      serviceHostelApplyView();
+      document.querySelectorAll('[data-hostel-view]').forEach(function(button){
+        button.addEventListener('click',function(){
+          serviceHostelView=button.getAttribute('data-hostel-view')||'overview';
+          document.getElementById('app').innerHTML=serviceRenderHostel();
+          serviceBind();
+          window.scrollTo({top:0,behavior:'smooth'});
+        });
+      });
+    }
     document.querySelectorAll('[data-calendar-date]').forEach(function(b){b.addEventListener('click',function(){serviceCalendarSelected=b.getAttribute('data-calendar-date')||serviceCalendarSelected;serviceCalendarDate=new Date(serviceCalendarSelected+'T00:00:00');document.getElementById('app').innerHTML=serviceRenderCalendar();serviceBind();});});
     const calPrev=document.querySelector('[data-calendar-prev]');
     if(calPrev)calPrev.addEventListener('click',function(){serviceCalendarDate=new Date(serviceCalendarDate.getFullYear(),serviceCalendarDate.getMonth()-1,1);serviceCalendarSelected=serviceCalendarMonthKey(serviceCalendarDate)+'-01';document.getElementById('app').innerHTML=serviceRenderCalendar();serviceBind();});
