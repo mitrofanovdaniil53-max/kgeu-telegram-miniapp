@@ -4355,7 +4355,7 @@ html.vk-light .service-pill {
         if('Notification' in window){try{const p=await Notification.requestPermission();toast(p==='granted'?'Уведомления разрешены':'Разрешение не выдано');}catch(e){toast('Не удалось запросить разрешение');}}else toast('Этот WebView не поддерживает системные уведомления');
         return;
       }
-      if(a==='hostel'){document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();return;}
+      if(a==='hostel'){serviceHostelView='overview';document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();return;}
       if(a==='study'){document.getElementById('app').innerHTML=serviceRenderStudy();serviceBind();return;}
       if(a==='schedule'||a==='today'){switchTab('today');return;}
       if(a==='service-home'){document.getElementById('app').innerHTML=serviceRenderToday();serviceBind();return;}
