@@ -1630,6 +1630,135 @@ html.vk-light .service-pill {
  background:#eef2f7 !important; color:#667085 !important; 
 }
 </style>
+<style>
+/* UI refinement 2026-10: compact, flatter mobile layout.
+   Presentation-only overrides; preserve app behavior and data flows. */
+.top-shell {
+  padding: 12px 14px 10px !important;
+  border-radius: 0 0 22px 22px !important;
+  background: var(--card) !important;
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+  box-shadow: 0 4px 14px rgba(16,24,40,.05) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+.top-shell::before { display: none !important; }
+.top-shell .brand h1 { color: var(--text) !important; }
+.top-shell .brand .sub { color: var(--muted) !important; }
+.top-actions { gap: 6px !important; }
+.top-shell .icon-btn {
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 12px !important;
+  color: var(--text) !important;
+  background: var(--bg2) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+.status-line { margin-top: 5px !important; margin-bottom: 8px !important; }
+.tabs {
+  display: flex !important;
+  gap: 4px !important;
+  padding: 4px !important;
+  margin-top: 8px !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  border-radius: 14px !important;
+  background: var(--bg2) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  scroll-snap-type: x proximity;
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tabs .tab {
+  flex: 0 0 auto !important;
+  min-height: 38px !important;
+  padding: 8px 13px !important;
+  border-radius: 11px !important;
+  white-space: nowrap !important;
+  scroll-snap-align: start;
+  box-shadow: none !important;
+}
+.tabs .tab.active {
+  color: var(--accent) !important;
+  background: var(--card) !important;
+  border-color: var(--border) !important;
+  box-shadow: 0 1px 3px rgba(16,24,40,.06) !important;
+}
+.service-page { gap: 10px !important; }
+.service-hero {
+  padding: 14px !important;
+  border-radius: 18px !important;
+  box-shadow: none !important;
+}
+.service-title { font-size: 22px !important; margin-bottom: 4px !important; }
+.service-grid { gap: 8px !important; }
+.service-card {
+  padding: 12px !important;
+  border-radius: 16px !important;
+  box-shadow: none !important;
+}
+.service-stat { font-size: 24px !important; margin-top: 7px !important; }
+.service-action-row, .service-actions { gap: 6px !important; }
+.service-btn { border-radius: 11px !important; }
+.service-section-title h2 { font-size: 17px !important; }
+.service-list { gap: 6px !important; }
+.service-row { border-radius: 13px !important; padding: 10px 11px !important; }
+@media (max-width: 380px) {
+  .top-shell { padding: 10px 11px 9px !important; }
+  .brand h1 { font-size: 18px !important; }
+  .brand .sub { font-size: 12px !important; }
+  .top-actions { gap: 4px !important; }
+  .top-shell .icon-btn { width: 36px !important; height: 36px !important; }
+  .tabs .tab { padding: 8px 11px !important; font-size: 13px !important; }
+  .service-hero { padding: 12px !important; }
+}
+
+
+/* Dashboard hierarchy: put today's agenda before secondary student-service widgets. */
+@media (max-width: 640px) {
+  .service-page {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  .service-page > .service-hero { order: 0; }
+  .service-page > .service-agenda-section { order: 1; }
+  .service-page > .service-grid { order: 2; }
+  .service-page > .service-hostel-section { order: 3; }
+  .service-page > .service-reminder-section { order: 4; }
+  .service-page > .service-deadlines-section { order: 5; }
+  .service-page > .service-events-section { order: 6; }
+  .service-page .service-reminder-grid { gap: 6px !important; }
+  .service-page .service-reminder-box {
+    padding: 10px 9px !important;
+    border-radius: 12px !important;
+  }
+  .service-page .service-reminder-box strong { font-size: 20px !important; }
+  .service-page .service-reminder-box span { font-size: 11px !important; }
+  .service-page .service-section-title {
+    gap: 8px !important;
+    align-items: center !important;
+  }
+  .service-page .service-section-title .service-btn {
+    min-height: 34px !important;
+    padding: 7px 10px !important;
+    font-size: 12px !important;
+  }
+  .service-page .service-empty,
+  .service-page .service-calendar-empty {
+    padding: 14px 10px !important;
+  }
+}
+
+
+</style>
 </head>
 <body>
 <div class="wrap">
@@ -3561,7 +3690,7 @@ html.vk-light .service-pill {
         '</section>'+
         '<section class="service-card"><h3>Мои дела</h3><div class="service-stat">'+taskOpen+'</div><p>активных задач'+(taskOverdue?' · '+taskOverdue+' просрочено':'')+'</p><p>'+dlOpen+' дедлайнов'+(dlOverdue?' · '+dlOverdue+' просрочено':'')+'</p></section>'+
       '</div>'+
-      '<section class="service-card"><h3>🏠 Баллы общежития</h3>'+
+      '<section class="service-card service-hostel-section"><h3>🏠 Баллы общежития</h3>'+
         '<div class="hostel-summary">'+
           '<div class="hostel-box"><strong>'+serviceTotalPoints()+'</strong><span>всего</span></div>'+
           '<div class="hostel-box"><strong>'+serviceSumSocial()+'</strong><span>социальные</span></div>'+
@@ -3570,7 +3699,7 @@ html.vk-light .service-pill {
         '<p>'+serviceTotalPoints()+' / '+Number(serviceData.hostel.totalGoal||250)+' баллов</p>'+
         '<div class="service-actions"><button class="service-btn primary" data-service-action="hostel">🏠 Учёт баллов общежития</button></div>'+
       '</section>'+
-      '<section><div class="service-section-title"><h2>Сегодня</h2><button class="service-btn" data-service-action="calendar">Открыть календарь</button></div>'+
+      '<section class="service-agenda-section"><div class="service-section-title"><h2>Сегодня</h2><button class="service-btn" data-service-action="calendar">Открыть календарь</button></div>'+
         '<div class="service-list">'+
         (function(){
           const todayKey=isoDate(new Date());
@@ -3582,19 +3711,19 @@ html.vk-light .service-pill {
           return rows.join('')||'<div class="service-calendar-empty">На сегодня ничего дополнительного нет.</div>';
         })()+
         '</div></section>'+
-      '<section><div class="service-section-title"><h2>На ближайшие 7 дней</h2><button class="service-btn" data-service-action="reminders">Напоминания</button></div>'+
+      '<section class="service-reminder-section"><div class="service-section-title"><h2>На ближайшие 7 дней</h2><button class="service-btn" data-service-action="reminders">Напоминания</button></div>'+
         '<div class="service-reminder-grid">'+
           '<div class="service-reminder-box"><strong>'+serviceData.tasks.filter(function(x){return !x.done&&serviceDateKey(x.dueDate)&&x.dueDate>=isoDate(new Date())&&x.dueDate<=isoDate(new Date(Date.now()+6*86400000));}).length+'</strong><span>задач</span></div>'+
           '<div class="service-reminder-box"><strong>'+serviceData.deadlines.filter(function(x){return !x.done&&serviceDateKey(x.date)&&x.date>=isoDate(new Date())&&x.date<=isoDate(new Date(Date.now()+6*86400000));}).length+'</strong><span>дедлайнов</span></div>'+
           '<div class="service-reminder-box"><strong>'+serviceData.events.filter(function(x){return serviceDateKey(x.date)&&x.date>=isoDate(new Date())&&x.date<=isoDate(new Date(Date.now()+6*86400000));}).length+'</strong><span>мероприятий</span></div>'+
         '</div></section>'+
-      '<section><div class="service-section-title"><h2>Ближайшие дедлайны</h2></div>'+
+      '<section class="service-deadlines-section"><div class="service-section-title"><h2>Ближайшие дедлайны</h2></div>'+
         '<div class="service-list">'+
         (serviceData.deadlines.filter(x=>!x.done).sort((a,b)=>String(a.date).localeCompare(String(b.date))).slice(0,4).map(x=>
           '<div class="service-row"><div class="service-row-main"><div class="service-row-title">'+serviceEsc(x.title)+'</div><div class="service-row-meta">'+serviceDate(x.date)+'</div></div><span class="service-pill">дедлайн</span></div>'
         ).join('') || '<div class="service-empty">Дедлайнов пока нет.</div>')+
         '</div></section>'+
-      '<section><div class="service-section-title"><h2>Ближайшие мероприятия</h2><button class="service-btn" data-service-action="event">+ Добавить</button></div>'+
+      '<section class="service-events-section"><div class="service-section-title"><h2>Ближайшие мероприятия</h2><button class="service-btn" data-service-action="event">+ Добавить</button></div>'+
         '<div class="service-list">'+
         (serviceData.events.slice().sort((a,b)=>String(a.date||'9999-12-31').localeCompare(String(b.date||'9999-12-31'))).filter(x=>String(x.date||'9999-12-31')>=isoDate(new Date())).slice(0,3).map(x=>
           '<div class="service-row"><div class="service-row-main"><div class="service-row-title">'+serviceEsc(x.title)+'</div><div class="service-row-meta">'+serviceDate(x.date)+' · '+Number(x.points||0)+' б.</div></div><span class="service-pill">мероприятие</span></div>'
