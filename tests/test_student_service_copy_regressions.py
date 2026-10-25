@@ -25,6 +25,20 @@ class StudentServiceCopyRegressionTest(unittest.TestCase):
         self.assertNotIn('data-service-action="analytics"', home_renderer)
         self.assertIn("function serviceRenderAnalytics(", source)
 
+    def test_dashboard_navigation_is_compact_and_redundant_week_summary_is_removed(self):
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                home_start = source.index("function serviceRenderToday()")
+                home_end = source.index("function serviceRenderHostel()", home_start)
+                home = source[home_start:home_end]
+                self.assertIn('class="service-btn service-hostel-entry" data-service-action="hostel"', home)
+                self.assertNotIn('class="service-reminder-section"', home)
+                self.assertNotIn("На ближайшие 7 дней", home)
+                self.assertIn('data-service-action="calendar"', home)
+                self.assertIn('data-service-action="study"', home)
+                self.assertIn('data-service-action="reminders"', home)
+
     def test_hostel_is_a_standalone_module_in_both_frontends(self):
         for relative in ("index.html", "apps/vk/index.html"):
             source = (ROOT / relative).read_text(encoding="utf-8")
