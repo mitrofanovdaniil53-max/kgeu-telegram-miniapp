@@ -8,6 +8,7 @@ on:
       - "backend/**"
       - "tests/**"
       - "docs/**"
+      - "prototypes/**"
       - ".github/workflows/validate-kgeu-frontends.yml"
   push:
     branches: ["main"]
@@ -17,6 +18,7 @@ on:
       - "backend/**"
       - "tests/**"
       - "docs/**"
+      - "prototypes/**"
       - ".github/workflows/validate-kgeu-frontends.yml"
 
 jobs:
@@ -32,7 +34,7 @@ jobs:
           node <<'NODE'
           const fs = require('node:fs');
 
-          for (const file of ['index.html', 'apps/vk/index.html']) {
+          for (const file of ['index.html', 'apps/vk/index.html', 'prototypes/student-service-dashboard.html']) {
             const html = fs.readFileSync(file, 'utf8');
             const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)]
               .map(match => match[1])

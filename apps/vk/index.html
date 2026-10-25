@@ -1100,6 +1100,41 @@ function kgeuSetNote(subject, value) {
 /* Keep the standalone Hostel destination easy to spot without adding another dashboard row. */
 .service-hostel-entry{border-color:var(--accent);box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
 @media (hover:hover){.service-hostel-entry:hover{filter:brightness(.98)}}
+/* Student Service design system v1: hierarchy, spacing, and readable surfaces. */
+.service-page > .service-hero { order: 0; }
+.service-page > .service-agenda-section { order: 1; }
+.service-page > .service-tasks-section { order: 7; }
+.service-page > .service-grid { order: 2; }
+.service-page > .service-hostel-section { order: 3; }
+.service-page > .service-reminder-section { order: 4; }
+.service-page > .service-deadlines-section { order: 5; }
+.service-page > .service-events-section { order: 6; }
+.service-page .service-hero, .service-page .service-card, .service-page .service-agenda-section,
+.service-page .service-deadlines-section, .service-page .service-events-section { min-width: 0; }
+.service-page .service-grid { align-items: stretch; }
+.service-page .service-grid > .service-card { min-height: 112px; }
+.service-page .service-card h3 { line-height: 1.3; letter-spacing: -.015em; }
+.service-page .service-card p { line-height: 1.45; overflow-wrap: anywhere; }
+.service-page .service-agenda-row, .service-page .service-agenda-row .service-row-main { min-width: 0; }
+.service-page .service-agenda-row .service-row-title { overflow-wrap: anywhere; }
+.service-page .service-section-title h2 { min-width: 0; line-height: 1.25; }
+.service-page .service-section-title .service-btn { flex-shrink: 0; }
+.service-page .service-action-row .service-btn { min-height: 44px; }
+.service-page .service-actions .service-btn, .service-page .service-section-title .service-btn { min-height: 44px; }
+@media (min-width: 641px) { .service-page > .service-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) {
+ .service-page > .service-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+ .service-page .service-grid > .service-card { padding: 12px; min-height: 108px; }
+ .service-page .service-card h3 { font-size: 14px; }
+ .service-page .service-stat { overflow-wrap: anywhere; }
+}
+@media (max-width: 360px) {
+ .service-page > .service-grid { grid-template-columns: minmax(0, 1fr); }
+ .service-page .service-section-title { align-items: flex-start; }
+ .service-page .service-section-title .service-btn { white-space: normal; max-width: 48%; }
+}
+@media (prefers-reduced-motion: reduce) { .service-page .service-card, .service-page .service-btn { transition: none !important; } }
+
 </style>
 
 <script>
@@ -3609,6 +3644,7 @@ html.vk-light .service-pill {
     if(r.note!=null) r.note=String(r.note);
     return r;
   }
+  function serviceNonNegativeNumber(value,fallback){if(value==null||(typeof value!=='number'&&typeof value!=='string')||(typeof value==='string'&&value.trim()===''))return fallback;const n=Number(value);return Number.isFinite(n)?Math.max(0,n):fallback;}
   function serviceEmptyData(){return {version:STUDENT_SERVICE_SCHEMA,schemaVersion:STUDENT_SERVICE_SCHEMA,updatedAt:Date.now(),tasks:[],deadlines:[],events:[],hostel:{totalGoal:250,adminGoal:100,socialGoal:150,work:[],social:[]},reminders:{enabled:false,taskDays:1,deadlineDays:1,eventDays:1}};}
   function serviceNormalizeData(x){
     const src=(x&&typeof x==='object')?x:{};
@@ -3616,10 +3652,10 @@ html.vk-light .service-pill {
     const tasks=serviceRecordArray(src.tasks).map(function(r){const x=serviceNormalizeRecord(r,'t');return {id:x.id,title:String(x.title||'').trim(),dueDate:serviceDateKey(x.dueDate)?x.dueDate:'',subject:String(x.subject||''),note:String(x.note||''),done:!!x.done,createdAt:Number(x.createdAt||Date.now()),updatedAt:Number(x.updatedAt||x.createdAt||Date.now())};}).filter(function(x){return x.title;});
     const deadlines=serviceRecordArray(src.deadlines).map(function(r){const x=serviceNormalizeRecord(r,'d');return {id:x.id,title:String(x.title||'').trim(),date:serviceDateKey(x.date)?x.date:'',subject:String(x.subject||''),note:String(x.note||''),done:!!x.done,createdAt:Number(x.createdAt||Date.now()),updatedAt:Number(x.updatedAt||x.createdAt||Date.now())};}).filter(function(x){return x.title;});
     const events=serviceRecordArray(src.events).map(function(r){const x=serviceNormalizeRecord(r,'e');return {id:x.id,title:String(x.title||'').trim(),date:serviceDateKey(x.date)?x.date:'',points:Number(x.points||0),createdAt:Number(x.createdAt||Date.now()),updatedAt:Number(x.updatedAt||x.createdAt||Date.now())};}).filter(function(x){return x.title;});
-    const work=serviceRecordArray(h.work).map(function(r){const x=serviceNormalizeRecord(r,'w');return {id:x.id,date:serviceDateKey(x.date)?x.date:'',minutes:Math.max(0,Number(x.minutes||0)),points:Math.max(0,Number(x.points||0)),title:String(x.title||'Работа'),createdAt:Number(x.createdAt||Date.now()),updatedAt:Number(x.updatedAt||x.createdAt||Date.now())};});
-    const social=serviceRecordArray(h.social).map(function(r){const x=serviceNormalizeRecord(r,'s');return {id:x.id,date:serviceDateKey(x.date)?x.date:'',points:Math.max(0,Number(x.points||0)),title:String(x.title||'Мероприятие'),note:String(x.note||''),fileName:String(x.fileName||''),fileData:String(x.fileData||''),createdAt:Number(x.createdAt||Date.now()),updatedAt:Number(x.updatedAt||x.createdAt||Date.now())};});
+    const work=serviceRecordArray(h.work).map(function(r){const x=serviceNormalizeRecord(r,'w');return {id:x.id,date:serviceDateKey(x.date)?x.date:'',minutes:serviceNonNegativeNumber(x.minutes,0),points:serviceNonNegativeNumber(x.points,0),title:String(x.title||'Работа'),createdAt:Number(x.createdAt||Date.now()),updatedAt:Number(x.updatedAt||x.createdAt||Date.now())};});
+    const social=serviceRecordArray(h.social).map(function(r){const x=serviceNormalizeRecord(r,'s');return {id:x.id,date:serviceDateKey(x.date)?x.date:'',points:serviceNonNegativeNumber(x.points,0),title:String(x.title||'Мероприятие'),note:String(x.note||''),fileName:String(x.fileName||''),fileData:String(x.fileData||''),createdAt:Number(x.createdAt||Date.now()),updatedAt:Number(x.updatedAt||x.createdAt||Date.now())};});
     const rem=src.reminders&&typeof src.reminders==='object'?src.reminders:{};
-    return {version:STUDENT_SERVICE_SCHEMA,schemaVersion:STUDENT_SERVICE_SCHEMA,updatedAt:Number(src.updatedAt||Date.now()),tasks:tasks,deadlines:deadlines,events:events,reminders:{enabled:!!rem.enabled,taskDays:Math.max(0,Math.min(7,Number(rem.taskDays!=null?rem.taskDays:1))),deadlineDays:Math.max(0,Math.min(7,Number(rem.deadlineDays!=null?rem.deadlineDays:1))),eventDays:Math.max(0,Math.min(7,Number(rem.eventDays!=null?rem.eventDays:1)))},hostel:{totalGoal:Math.max(0,Number(h.totalGoal||250)),adminGoal:Math.max(0,Number(h.adminGoal||100)),socialGoal:Math.max(0,Number(h.socialGoal||150)),work:work,social:social}};
+    return {version:STUDENT_SERVICE_SCHEMA,schemaVersion:STUDENT_SERVICE_SCHEMA,updatedAt:Number(src.updatedAt||Date.now()),tasks:tasks,deadlines:deadlines,events:events,reminders:{enabled:!!rem.enabled,taskDays:Math.max(0,Math.min(7,Number(rem.taskDays!=null?rem.taskDays:1))),deadlineDays:Math.max(0,Math.min(7,Number(rem.deadlineDays!=null?rem.deadlineDays:1))),eventDays:Math.max(0,Math.min(7,Number(rem.eventDays!=null?rem.eventDays:1)))},hostel:{totalGoal:serviceNonNegativeNumber(h.totalGoal!=null?h.totalGoal:250,250),adminGoal:serviceNonNegativeNumber(h.adminGoal!=null?h.adminGoal:100,100),socialGoal:serviceNonNegativeNumber(h.socialGoal!=null?h.socialGoal:150,150),work:work,social:social}};
   }
   function serviceLoad(){
     const fallback=serviceEmptyData();
@@ -3755,7 +3791,7 @@ html.vk-light .service-pill {
           '<div class="service-row"><div class="service-row-main"><div class="service-row-title">'+serviceEsc(x.title)+'</div><div class="service-row-meta">'+serviceDate(x.date)+' · '+Number(x.points||0)+' б.</div></div><span class="service-pill">мероприятие</span></div>'
         ).join('') || '<div class="service-empty">Ближайших мероприятий нет.</div>')+
         '</div></section>'+
-      '<section><div class="service-section-title"><h2>Последние задачи</h2></div>'+
+      '<section class="service-tasks-section"><div class="service-section-title"><h2>Последние задачи</h2></div>'+
         '<div class="service-list">'+
         (serviceSortTasks(serviceData.tasks).slice(0,4).map(function(x){const st=serviceTaskStatus(x);return '<div class="service-row '+(x.done?'is-done':'')+'"><button class="service-btn" data-service-toggle-task="'+serviceEsc(x.id)+'">'+(x.done?'✓':'○')+'</button><div class="service-row-main"><div class="service-row-title">'+serviceEsc(x.title)+serviceSubjectText(x.subject)+'</div><div class="service-row-meta">'+(x.dueDate?serviceDate(x.dueDate):'Без срока')+(x.note?' · '+serviceEsc(x.note):'')+'</div></div><span class="service-status '+st.cls+'">'+serviceEsc(st.label)+'</span></div>';}).join('') || '<div class="service-empty">Добавь первую задачу.</div>')+
         '</div></section>'+
@@ -3776,6 +3812,7 @@ html.vk-light .service-pill {
   }
   function serviceRenderHostel(){
     const h=serviceData.hostel, total=serviceTotalPoints(), social=serviceSumSocial(), admin=serviceSumWork();
+    const historyRows=h.work.map(function(x){return Object.assign({kind:'work'},x);}).concat(h.social.map(function(x){return Object.assign({kind:'social'},x);})).sort(function(a,b){if(!a.date&&b.date)return 1;if(a.date&&!b.date)return -1;return String(b.date||'').localeCompare(String(a.date||''))||String(b.id||'').localeCompare(String(a.id||''));});
     return '<div class="service-page service-hostel-module">'+
       '<div class="hostel-navigation-header">'+
       '<div class="service-actions hostel-home-action"><button class="service-btn" data-service-action="service-home">← Мой сервис</button></div>'+
@@ -3788,14 +3825,14 @@ html.vk-light .service-pill {
       '</div>'+
       '<section class="service-hero" data-hostel-panel="overview"><div class="service-kicker">Общежитие</div><h1 class="service-title">Учёт баллов</h1>'+
       '<div class="service-sub">Цели можно изменить под правила твоего года.</div>'+
-      '<div class="service-form-row service-form"><div><label>Цель социальных баллов</label><input id="hostel-social-goal" type="number" min="0" value="'+Number(h.socialGoal||Math.max(0,Number(h.totalGoal||250)-Number(h.adminGoal||100)))+'"></div><div><label>Цель административных баллов</label><input id="hostel-admin-goal" type="number" min="0" value="'+Number(h.adminGoal||100)+'"></div></div>'+
+      '<div class="service-form-row service-form"><div><label>Цель социальных баллов</label><input id="hostel-social-goal" type="number" min="0" value="'+Number(h.socialGoal!=null?h.socialGoal:Math.max(0,Number(h.totalGoal!=null?h.totalGoal:250)-Number(h.adminGoal!=null?h.adminGoal:100)))+'"></div><div><label>Цель административных баллов</label><input id="hostel-admin-goal" type="number" min="0" value="'+Number(h.adminGoal!=null?h.adminGoal:100)+'"></div></div>'+
       '<div class="service-actions"><button class="service-btn primary" data-service-action="save-hostel-goals">Сохранить цели</button></div></section>'+
       '<section class="service-card" data-hostel-panel="overview"><h3>Прогресс</h3><div class="hostel-summary">'+
-        '<div class="hostel-box"><strong>'+total+'</strong><span>всего / '+Number(h.totalGoal||250)+'</span></div>'+
+        '<div class="hostel-box"><strong>'+total+'</strong><span>всего / '+Number(h.totalGoal!=null?h.totalGoal:250)+'</span></div>'+
         '<div class="hostel-box"><strong>'+admin+'</strong><span>административные</span></div>'+
         '<div class="hostel-box"><strong>'+social+'</strong><span>социальные</span></div>'+
-        '<div class="hostel-box"><strong>'+Math.max(0,Number(h.totalGoal||250)-total)+'</strong><span>осталось</span></div>'+
-      '</div><div class="service-progress"><span style="width:'+Math.min(100,total/Math.max(1,Number(h.totalGoal||250))*100)+'%"></span></div></section>'+
+        '<div class="hostel-box"><strong>'+Math.max(0,Number(h.totalGoal!=null?h.totalGoal:250)-total)+'</strong><span>осталось</span></div>'+
+      '</div><div class="service-progress"><span style="width:'+Math.min(100,total/Math.max(1,Number(h.totalGoal!=null?h.totalGoal:250))*100)+'%"></span></div></section>'+
       '<section class="service-card" data-hostel-panel="admin"><h3>⏱ Административные / ЖБС</h3><p>За каждые 10 минут — 1 балл. Вводи фактически отработанные минуты, приложение посчитает баллы.</p>'+
       '<div class="service-form"><div class="service-form-row"><div><label>Дата</label><input id="work-date" type="date" value="'+isoDate(new Date())+'"></div><div><label>Минуты</label><input id="work-minutes" type="number" min="0" step="1" placeholder="20"></div></div><div><label>Что делал</label><input id="work-title" placeholder="ЖБС / дежурство / работа"></div>'+
       '<button class="service-btn primary" data-service-action="add-work">Добавить работу</button></div>'+
@@ -3805,11 +3842,8 @@ html.vk-light .service-pill {
       '<button class="service-btn primary" data-service-action="add-social">Добавить мероприятие</button></div>'+
       '</section>'+
       '<section class="service-card" data-hostel-panel="history"><h3>История начислений</h3>'+
-        '<p>Все записи по ЖБС и ССО собраны здесь. Удаление записи обновляет общий баланс.</p>'+
-        '<h4 class="hostel-history-heading">ЖБС · Административные баллы</h4>'+
-        '<div class="service-list">'+(h.work.slice().sort(function(a,b){return String(b.date||"").localeCompare(String(a.date||""));}).map(function(x){return `<div class="service-row"><div class="service-row-main"><div class="service-row-title">${serviceDate(x.date)} · ${Number(x.minutes)} мин</div><div class="service-row-meta">${serviceEsc(x.title||"Работа")}</div></div><span class="service-pill">+${Number(x.points)} б.</span><button class="service-btn danger" data-service-del-work="${serviceEsc(x.id)}" aria-label="Удалить запись ЖБС">×</button></div>`;}).join("")||'<div class="service-empty">Записей ЖБС пока нет.</div>')+'</div>'+
-        '<h4 class="hostel-history-heading">ССО · Социальные баллы</h4>'+
-        '<div class="service-list">'+(h.social.slice().sort(function(a,b){return String(b.date||"").localeCompare(String(a.date||""));}).map(function(x){return `<div class="service-row"><div class="service-row-main"><div class="service-row-title">${serviceDate(x.date)} · ${serviceEsc(x.title)}</div><div class="service-row-meta">${Number(x.points)} б. · ${serviceEsc(x.note||"")}${x.fileName?" · "+serviceEsc(x.fileName):""}</div></div><button class="service-btn danger" data-service-del-social="${serviceEsc(x.id)}" aria-label="Удалить запись ССО">×</button></div>`;}).join("")||'<div class="service-empty">Записей ССО пока нет.</div>')+'</div>'+
+        '<p>Записи ЖБС и ССО отсортированы по дате. Категория и действия каждой записи сохраняются отдельно.</p>'+
+        '<div class="service-list">'+(historyRows.map(function(x){if(x.kind==='work')return '<div class="service-row"><div class="service-row-main"><div class="service-row-title">'+serviceDate(x.date)+' · '+Number(x.minutes)+' мин</div><div class="service-row-meta">'+serviceEsc(x.title||"Работа")+'</div></div><span class="service-pill">ЖБС · +'+Number(x.points)+' б.</span><button class="service-btn danger" data-service-del-work="'+serviceEsc(x.id)+'" aria-label="Удалить запись ЖБС">×</button></div>';return '<div class="service-row"><div class="service-row-main"><div class="service-row-title">'+serviceDate(x.date)+' · '+serviceEsc(x.title||"Мероприятие")+'</div><div class="service-row-meta">'+Number(x.points)+' б. · '+serviceEsc(x.note||"")+(x.fileName?" · "+serviceEsc(x.fileName):"")+'</div></div><span class="service-pill">ССО</span><button class="service-btn danger" data-service-del-social="'+serviceEsc(x.id)+'" aria-label="Удалить запись ССО">×</button></div>';}).join("")||'<div class="service-empty">Записей ЖБС и ССО пока нет.</div>')+'</div>'+
         '<div class="service-actions"><button class="service-btn primary" data-service-action="export-word">📄 Сформировать Word-отчёт</button></div>'+
         '<div class="report-note">Отчёт включает записи ЖБС и ССО. Перед официальной подачей проверь требования общежития.</div>'+
       '</section>'+
@@ -3999,10 +4033,10 @@ html.vk-light .service-pill {
   function serviceExportWord(){
     const h=serviceData.hostel,total=serviceTotalPoints(),admin=serviceSumWork(),social=serviceSumSocial();
     let rows='';
-    h.work.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))).forEach(x=>rows+='<tr><td>'+serviceEsc(x.date)+'</td><td>Административные</td><td>'+serviceEsc(x.title||'Работа')+'</td><td>'+Number(x.minutes||0)+'</td><td>'+Number(x.points||0)+'</td><td></td><td></td></tr>');
-    h.social.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))).forEach(x=>rows+='<tr><td>'+serviceEsc(x.date)+'</td><td>Социальные</td><td>'+serviceEsc(x.title)+'</td><td></td><td>'+Number(x.points||0)+'</td><td>'+serviceEsc(x.note||'')+'</td><td>'+serviceEsc(x.fileName||'')+'</td></tr>');
+    const reportRows=h.work.map(function(x){return Object.assign({kind:'work'},x);}).concat(h.social.map(function(x){return Object.assign({kind:'social'},x);})).sort(function(a,b){if(!a.date&&b.date)return 1;if(a.date&&!b.date)return -1;return String(a.date||'').localeCompare(String(b.date||''))||String(a.id||'').localeCompare(String(b.id||''));});
+    reportRows.forEach(function(x){if(x.kind==='work')rows+='<tr><td>'+serviceEsc(x.date)+'</td><td>Административные / ЖБС</td><td>'+serviceEsc(x.title||'Работа')+'</td><td>'+Number(x.minutes||0)+'</td><td>'+Number(x.points||0)+'</td><td></td><td></td></tr>';else rows+='<tr><td>'+serviceEsc(x.date)+'</td><td>Социальные / ССО</td><td>'+serviceEsc(x.title||'Мероприятие')+'</td><td></td><td>'+Number(x.points||0)+'</td><td>'+serviceEsc(x.note||'')+'</td><td>'+serviceEsc(x.fileName||'')+'</td></tr>';});
     const doc='<!doctype html><html><head><meta charset="utf-8"><title>Отчёт по баллам</title><style>body{font-family:Arial,sans-serif;font-size:11pt}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:6px}h1{font-size:18pt}</style></head><body>'+
-      '<h1>Отчёт по баллам общежития</h1><p>Группа: '+serviceEsc(GROUP_NAME)+'</p><p>Всего: <b>'+total+'</b> / '+Number(h.totalGoal||250)+' · Административные: <b>'+admin+'</b> · Социальные: <b>'+social+'</b></p>'+
+      '<h1>Отчёт по баллам общежития</h1><p>Группа: '+serviceEsc(GROUP_NAME)+'</p><p>Всего: <b>'+total+'</b> / '+Number(h.totalGoal!=null?h.totalGoal:250)+' · Административные: <b>'+admin+'</b> · Социальные: <b>'+social+'</b></p>'+
       '<table><tr><th>Дата</th><th>Тип</th><th>Событие / работа</th><th>Минуты</th><th>Баллы</th><th>Комментарий</th><th>Подтверждение</th></tr>'+rows+'</table>'+
       '<p>Документ сформирован в KGEU Student Service. Перед официальной подачей проверьте соответствие требованиям общежития.</p></body></html>';
     serviceDownload('KGEU_отчет_по_баллам_'+isoDate(new Date())+'.doc',doc,'application/msword');
@@ -4167,7 +4201,7 @@ html.vk-light .service-pill {
   function serviceRenderData(){
     const bytes=JSON.stringify(serviceData).length;
     const noteCount=(typeof kgeuPersonalData!=='undefined'&&kgeuPersonalData.notes)?Object.keys(kgeuPersonalData.notes).length:0;
-    return '<div class="service-page"><section class="service-hero"><div class="service-kicker">Мой сервис</div><h1 class="service-title">Данные и резервная копия</h1><div class="service-sub">Единая локальная модель данных. Пока без backend — можно безопасно перенести данные вручную.</div><div class="service-actions"><button class="service-btn" data-service-action="service-home">← Мой сервис</button><button class="service-btn" data-service-action="study">Учёба</button></div></section>'+
+    return '<div class="service-page"><section class="service-hero"><div class="service-kicker">Мой сервис</div><h1 class="service-title">Данные и резервная копия</h1><div class="service-sub">Данные сервиса сохраняются на устройстве. Для переноса между Telegram и VK используй синхронизацию, а для отдельной копии — экспорт JSON.</div><div class="service-actions"><button class="service-btn" data-service-action="service-home">← Мой сервис</button><button class="service-btn" data-service-action="study">Учёба</button></div></section>'+
       '<section class="service-card"><div class="service-section-title"><h2>Текущее состояние</h2><span class="service-pill">v'+STUDENT_SERVICE_SCHEMA+'</span></div><div class="service-data-grid">'+
       '<div class="service-data-box"><strong>'+serviceData.tasks.length+'</strong><span>задач</span></div><div class="service-data-box"><strong>'+serviceData.deadlines.length+'</strong><span>дедлайнов</span></div><div class="service-data-box"><strong>'+serviceData.events.length+'</strong><span>мероприятий</span></div><div class="service-data-box"><strong>'+noteCount+'</strong><span>заметок по предметам</span></div></div><p class="service-data-note">Последнее сохранение: '+serviceEsc(new Date(Number(serviceData.updatedAt||Date.now())).toLocaleString('ru-RU'))+' · размер данных: '+Math.round(bytes/1024)+' КБ.</p></section>'+
       '<section class="service-card"><h2 style="margin:0 0 5px">Резервная копия</h2><p class="service-data-note">Экспорт сохраняет задачи, дедлайны, мероприятия, баллы общежития, настройки напоминаний и заметки. Файл остаётся у тебя и никуда автоматически не отправляется.</p><div class="service-actions"><button class="service-btn primary" data-service-action="export-data">Экспортировать JSON</button><button class="service-btn" data-service-action="import-data">Восстановить из JSON</button><input id="service-import-file" type="file" accept="application/json,.json" style="display:none"></div><p class="service-data-note">Перед восстановлением текущие данные сохраняются во внутреннюю резервную копию.</p></section>'+
@@ -4375,13 +4409,13 @@ html.vk-light .service-pill {
       if(a==='schedule'||a==='today'){switchTab('today');return;}
       if(a==='service-home'){document.getElementById('app').innerHTML=serviceRenderToday();serviceBind();return;}
       if(a==='save-hostel-goals'){
-        serviceData.hostel.adminGoal=Math.max(0,Number(document.getElementById('hostel-admin-goal').value||0));
-        serviceData.hostel.socialGoal=Math.max(0,Number(document.getElementById('hostel-social-goal').value||0));
+        serviceData.hostel.adminGoal=serviceNonNegativeNumber(document.getElementById('hostel-admin-goal').value,serviceNonNegativeNumber(serviceData.hostel.adminGoal,100));
+        serviceData.hostel.socialGoal=serviceNonNegativeNumber(document.getElementById('hostel-social-goal').value,serviceNonNegativeNumber(serviceData.hostel.socialGoal,150));
         serviceData.hostel.totalGoal=serviceData.hostel.adminGoal+serviceData.hostel.socialGoal;
         serviceSave();document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();return;
       }
       if(a==='add-work'){
-        const date=document.getElementById('work-date').value||isoDate(new Date()),minutes=Math.max(0,Math.floor(Number(document.getElementById('work-minutes').value||0)));
+        const date=document.getElementById('work-date').value||isoDate(new Date()),minutes=Math.floor(serviceNonNegativeNumber(document.getElementById('work-minutes').value,0));
         if(!minutes){toast('Укажи количество минут');return;}
         const title=document.getElementById('work-title').value.trim()||'Работа';
         serviceData.hostel.work.push({id:'w_'+Date.now(),date:date,minutes:minutes,points:Math.floor(minutes/10),title:title});
@@ -4389,7 +4423,7 @@ html.vk-light .service-pill {
       }
       if(a==='add-social'){
         const file=document.getElementById('social-file').files[0];
-        const rec={id:'s_'+Date.now(),date:document.getElementById('social-date').value||isoDate(new Date()),points:Math.max(0,Math.floor(Number(document.getElementById('social-points').value||0))),title:document.getElementById('social-title').value.trim()||'Мероприятие',note:document.getElementById('social-note').value.trim(),fileName:file?file.name:'',fileData:''};
+        const rec={id:'s_'+Date.now(),date:document.getElementById('social-date').value||isoDate(new Date()),points:Math.floor(serviceNonNegativeNumber(document.getElementById('social-points').value,0)),title:document.getElementById('social-title').value.trim()||'Мероприятие',note:document.getElementById('social-note').value.trim(),fileName:file?file.name:'',fileData:''};
         if(!rec.points){toast('Укажи количество социальных баллов');return;}
         const f=await serviceReadFile(file);rec.fileData=f.data;serviceData.hostel.social.push(rec);serviceSave();document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();toast('Мероприятие ССО добавлено');return;
       }

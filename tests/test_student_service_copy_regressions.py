@@ -78,6 +78,13 @@ class StudentServiceCopyRegressionTest(unittest.TestCase):
                 self.assertIn("if(a==='export-word')return serviceExportWord();", source)
                 self.assertIn("toast('Работа ЖБС добавлена')", source)
                 self.assertIn("toast('Мероприятие ССО добавлено')", source)
+                self.assertIn("const historyRows=h.work.map", source)
+                self.assertIn("if(!a.date&&b.date)return 1;if(a.date&&!b.date)return -1;", source)
+                self.assertIn("const reportRows=h.work.map", source)
+                self.assertIn("h.social.map(function(x){return Object.assign({kind:'social'},x);})", source)
+                self.assertIn("Записи ЖБС и ССО отсортированы по дате.", source)
+                self.assertIn("ЖБС · +", source)
+                self.assertIn("ССО</span>", source)
 
     def test_settings_expose_sync_and_backup_navigation_in_both_frontends(self):
         for relative in ("index.html", "apps/vk/index.html"):
@@ -351,8 +358,11 @@ console.log('Telegram backup-safe note migration assertions passed');
                 export_start = source.index("function serviceExportWord()")
                 export_end = source.index("let serviceCalendarDate", export_start)
                 export = source[export_start:export_end]
-                self.assertIn("h.work.slice()", export)
-                self.assertIn("h.social.slice()", export)
+                self.assertIn("const reportRows=h.work.map", export)
+                self.assertIn("h.social.map(function(x){return Object.assign({kind:'social'},x);})", export)
+                self.assertIn("reportRows.forEach(function(x)", export)
+                self.assertIn("Административные / ЖБС", export)
+                self.assertIn("Социальные / ССО", export)
                 self.assertIn("serviceEsc(x.note||'')", export)
                 self.assertIn("<th>Комментарий</th>", export)
 
@@ -397,6 +407,166 @@ class GroupPickerRegressionTest(unittest.TestCase):
         self.assertIn("origin === 'https://mitrofanovdaniil53-max.github.io'", source)
         self.assertIn("Access-Control-Allow-Origin", source)
         self.assertIn("Vary': 'Origin'", source)
+
+
+class StudentServiceDashboardHierarchyTest(unittest.TestCase):
+    def test_dashboard_prioritizes_todays_agenda_before_secondary_stats_on_both_frontends(self):
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                self.assertIn(".service-page > .service-agenda-section { order: 1; }", source)
+                self.assertIn(".service-page > .service-tasks-section { order: 7; }", source)
+                self.assertIn('<section class="service-tasks-section"><div class="service-section-title"><h2>Последние задачи</h2>', source)
+                self.assertIn(".service-page > .service-grid { order: 2; }", source)
+                self.assertIn("@media (max-width: 360px)", source)
+                self.assertIn(".service-page .service-actions .service-btn, .service-page .service-section-title .service-btn { min-height: 44px; }", source)
+                self.assertIn("prefers-reduced-motion: reduce", source)
+
+
+class StudentServiceDataCopyTextTest(unittest.TestCase):
+    def test_data_screen_explains_current_sync_and_backup_options_on_both_frontends(self):
+        stale = "Пока без backend — можно безопасно перенести данные вручную."
+        current = "Для переноса между Telegram и VK используй синхронизацию, а для отдельной копии — экспорт JSON."
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                self.assertNotIn(stale, source)
+                self.assertIn(current, source)
+                self.assertIn("data-open-service-view=\"sync\"", source)
+                self.assertIn("data-open-service-view=\"data\"", source)
+
+
+class StudentServiceNavigationRegressionTest(unittest.TestCase):
+    def test_settings_and_hostel_navigation_are_bound_on_both_frontends(self):
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                self.assertIn("document.querySelectorAll('[data-open-service-view]')", source)
+                self.assertIn("view==='sync'?serviceRenderSync():serviceRenderData()", source)
+                self.assertIn("document.querySelectorAll('[data-hostel-view]')", source)
+                self.assertIn("serviceHostelApplyView();", source)
+                self.assertIn("button.setAttribute('aria-pressed',active?'true':'false')", source)
+                self.assertIn("data-hostel-view=\"overview\"", source)
+                self.assertIn("data-hostel-view=\"admin\"", source)
+                self.assertIn("data-hostel-view=\"social\"", source)
+                self.assertIn("data-hostel-view=\"history\"", source)
+                self.assertIn("if(a==='service-home')", source)
+
+
+class StudentServiceHostelGoalRegressionTest(unittest.TestCase):
+    def test_zero_point_goals_are_preserved_in_dashboard_and_report_on_both_frontends(self):
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                self.assertIn("h.socialGoal!=null?h.socialGoal:", source)
+                self.assertIn("h.adminGoal!=null?h.adminGoal:100", source)
+                self.assertIn("h.totalGoal!=null?h.totalGoal:250", source)
+
+
+
+class StudentServiceHostelGoalNormalizationRegressionTest(unittest.TestCase):
+    def test_zero_social_goal_survives_normalization_on_both_frontends(self):
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                self.assertIn("socialGoal:serviceNonNegativeNumber(h.socialGoal!=null?h.socialGoal:150,150)", source)
+                self.assertNotIn("Number(h.socialGoal||150)", source)
+                self.assertIn("function serviceNonNegativeNumber(value,fallback)", source)
+                self.assertIn("minutes:serviceNonNegativeNumber(x.minutes,0),points:serviceNonNegativeNumber(x.points,0)", source)
+                self.assertIn("totalGoal:serviceNonNegativeNumber(h.totalGoal!=null?h.totalGoal:250,250)", source)
+
+
+class StudentServiceNumericNormalizationTest(unittest.TestCase):
+    def test_non_negative_number_helper_handles_empty_and_invalid_values_on_both_frontends(self):
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("Node.js is required to execute the real frontend numeric helper")
+
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            marker = "function serviceNonNegativeNumber(value,fallback)"
+            start = source.index(marker)
+            end = source.index("\n", start)
+            helper = source[start:end]
+            script = "\n".join([
+                "const assert = require('node:assert/strict');",
+                helper,
+                "assert.equal(serviceNonNegativeNumber(0, 250), 0);",
+                "assert.equal(serviceNonNegativeNumber('0', 250), 0);",
+                "assert.equal(serviceNonNegativeNumber(12, 250), 12);",
+                "assert.equal(serviceNonNegativeNumber('12', 250), 12);",
+                "assert.equal(serviceNonNegativeNumber(-4, 250), 0);",
+                "assert.equal(serviceNonNegativeNumber('', 250), 250);",
+                "assert.equal(serviceNonNegativeNumber('   ', 250), 250);",
+                "assert.equal(serviceNonNegativeNumber(null, 250), 250);",
+                "assert.equal(serviceNonNegativeNumber(undefined, 250), 250);",
+                "assert.equal(serviceNonNegativeNumber('not-a-number', 250), 250);",
+                "assert.equal(serviceNonNegativeNumber(Infinity, 250), 250);",
+                "assert.equal(serviceNonNegativeNumber(true, 250), 250);",
+                "assert.equal(serviceNonNegativeNumber(false, 250), 250);",
+                "assert.equal(serviceNonNegativeNumber({}, 250), 250);",
+                "console.log('numeric helper assertions passed');",
+            ])
+            with self.subTest(frontend=relative):
+                result = subprocess.run([node, "-e", script], capture_output=True, text=True, check=False)
+                self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+                self.assertIn("numeric helper assertions passed", result.stdout)
+
+
+
+class StudentServiceNormalizationBehaviorTest(unittest.TestCase):
+    def test_real_normalizer_preserves_zero_and_falls_back_for_malformed_hostel_values(self):
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("Node.js is required to execute the real frontend normalizer")
+
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            helper_start = source.index("function serviceNonNegativeNumber(value,fallback)")
+            helper_end = source.index("\n", helper_start)
+            normalize_start = source.index("function serviceNormalizeData(x)")
+            normalize_end = source.index("function serviceLoad()", normalize_start)
+            helper = source[helper_start:helper_end]
+            normalizer = source[normalize_start:normalize_end]
+            script = "\n".join([
+                "const assert = require('node:assert/strict');",
+                "const STUDENT_SERVICE_SCHEMA = 19;",
+                "function serviceRecordArray(value) { return Array.isArray(value) ? value : []; }",
+                "function serviceNormalizeRecord(record, prefix) { return Object.assign({id: prefix + '_test'}, record || {}); }",
+                "function serviceDateKey(value) { return typeof value === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(value); }",
+                helper,
+                normalizer,
+                "const zeros = serviceNormalizeData({hostel:{totalGoal:0,adminGoal:0,socialGoal:0,work:[{minutes:'',points:'bad'}],social:[{points:true}]}});",
+                "assert.equal(zeros.hostel.totalGoal, 0);",
+                "assert.equal(zeros.hostel.adminGoal, 0);",
+                "assert.equal(zeros.hostel.socialGoal, 0);",
+                "assert.equal(zeros.hostel.work[0].minutes, 0);",
+                "assert.equal(zeros.hostel.work[0].points, 0);",
+                "assert.equal(zeros.hostel.social[0].points, 0);",
+                "const malformed = serviceNormalizeData({hostel:{totalGoal:'',adminGoal:'bad',socialGoal:null}});",
+                "assert.equal(malformed.hostel.totalGoal, 250);",
+                "assert.equal(malformed.hostel.adminGoal, 100);",
+                "assert.equal(malformed.hostel.socialGoal, 150);",
+                "console.log('real serviceNormalizeData assertions passed');",
+            ])
+            with self.subTest(frontend=relative):
+                result = subprocess.run([node, "-e", script], capture_output=True, text=True, check=False)
+                self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+                self.assertIn("real serviceNormalizeData assertions passed", result.stdout)
+
+
+
+
+class StudentServiceHostelInputRegressionTest(unittest.TestCase):
+    def test_hostel_forms_use_safe_numeric_normalization_on_both_frontends(self):
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                self.assertIn("serviceData.hostel.adminGoal=serviceNonNegativeNumber(document.getElementById('hostel-admin-goal').value,serviceNonNegativeNumber(serviceData.hostel.adminGoal,100));", source)
+                self.assertIn("serviceData.hostel.socialGoal=serviceNonNegativeNumber(document.getElementById('hostel-social-goal').value,serviceNonNegativeNumber(serviceData.hostel.socialGoal,150));", source)
+                self.assertIn("minutes=Math.floor(serviceNonNegativeNumber(document.getElementById('work-minutes').value,0));", source)
+                self.assertIn("points:Math.floor(serviceNonNegativeNumber(document.getElementById('social-points').value,0))", source)
+
 
 if __name__ == "__main__":
     unittest.main()
