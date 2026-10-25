@@ -457,8 +457,6 @@ class StudentServiceHostelGoalRegressionTest(unittest.TestCase):
                 self.assertIn("h.adminGoal!=null?h.adminGoal:100", source)
                 self.assertIn("h.totalGoal!=null?h.totalGoal:250", source)
 
-if __name__ == "__main__":
-    unittest.main()
 
 
 class StudentServiceHostelGoalNormalizationRegressionTest(unittest.TestCase):
@@ -483,9 +481,9 @@ class StudentServiceNumericNormalizationTest(unittest.TestCase):
             source = (ROOT / relative).read_text(encoding="utf-8")
             marker = "function serviceNonNegativeNumber(value,fallback)"
             start = source.index(marker)
-            end = source.index("\\n", start)
+            end = source.index("\n", start)
             helper = source[start:end]
-            script = "\\n".join([
+            script = "\n".join([
                 "const assert = require('node:assert/strict');",
                 helper,
                 "assert.equal(serviceNonNegativeNumber(0, 250), 0);",
@@ -505,3 +503,6 @@ class StudentServiceNumericNormalizationTest(unittest.TestCase):
                 result = subprocess.run([node, "-e", script], capture_output=True, text=True, check=False)
                 self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
                 self.assertIn("numeric helper assertions passed", result.stdout)
+
+if __name__ == "__main__":
+    unittest.main()
