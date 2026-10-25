@@ -593,3 +593,26 @@ class TelegramReportDeliveryRegressionTest(unittest.TestCase):
         self.assertIn("api.telegram.org/bot' + env.TELEGRAM_BOT_TOKEN + '/sendDocument", source)
         self.assertIn("telegram_start_bot_first", source)
         self.assertIn("telegram_report_too_large", source)
+
+
+class StudentServiceImportBackupSafetyTest(unittest.TestCase):
+    def test_json_restore_backs_up_notes_and_aborts_when_backup_or_save_fails(self):
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                backup_start = source.index("function serviceBackupCurrent()")
+                backup_end = source.index("\n", backup_start)
+                backup = source[backup_start:backup_end]
+                self.assertIn("localStorage.setItem(STUDENT_SERVICE_BACKUP_KEY,JSON.stringify(serviceData))", backup)
+                self.assertIn("kgeu_student_personal_backup_before_cloud_restore_v1", backup)
+                self.assertIn("JSON.stringify(kgeuPersonalData||{version:1,notes:{}})", backup)
+                self.assertIn("return true", backup)
+                self.assertIn("return false", backup)
+                import_start = source.index("function serviceImportData(file)")
+                import_end = source.index("function serviceRenderSync()", import_start)
+                importer = source[import_start:import_end]
+                self.assertIn("if(!serviceBackupCurrent())", importer)
+                self.assertIn("if(!serviceSave())", importer)
+                self.assertIn("if(!kgeuSavePersonalData(importedPersonalData))", importer)
+                self.assertIn("serviceData=previousServiceData", importer)
+                self.assertIn("kgeuPersonalData=previousPersonalData", importer)
