@@ -66,6 +66,8 @@ class StudentServiceCopyRegressionTest(unittest.TestCase):
                 self.assertIn("serviceHostelView=button.getAttribute('data-hostel-view')||'overview';", source)
                 self.assertIn("if(a==='service-home')", source)
                 self.assertIn("if(a==='export-word')return serviceExportWord();", source)
+                self.assertIn("toast('Работа ЖБС добавлена')", source)
+                self.assertIn("toast('Мероприятие ССО добавлено')", source)
 
     def test_settings_expose_sync_and_backup_navigation_in_both_frontends(self):
         for relative in ("index.html", "apps/vk/index.html"):
