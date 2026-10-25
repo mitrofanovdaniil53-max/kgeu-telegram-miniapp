@@ -466,7 +466,7 @@ class StudentServiceHostelGoalNormalizationRegressionTest(unittest.TestCase):
         for relative in ("index.html", "apps/vk/index.html"):
             source = (ROOT / relative).read_text(encoding="utf-8")
             with self.subTest(frontend=relative):
-                self.assertIn("socialGoal:Math.max(0,Number(h.socialGoal!=null?h.socialGoal:150))", source)
+                self.assertIn("socialGoal:serviceNonNegativeNumber(h.socialGoal!=null?h.socialGoal:150,150)", source)
                 self.assertNotIn("Number(h.socialGoal||150)", source)
                 self.assertIn("function serviceNonNegativeNumber(value,fallback)", source)
                 self.assertIn("minutes:serviceNonNegativeNumber(x.minutes,0),points:serviceNonNegativeNumber(x.points,0)", source)
