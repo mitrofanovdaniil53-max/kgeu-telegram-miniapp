@@ -3650,7 +3650,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
         '<h4 class="hostel-history-heading">ССО · Социальные баллы</h4>'+
         '<div class="service-list">'+(h.social.slice().sort(function(a,b){return String(b.date||"").localeCompare(String(a.date||""));}).map(function(x){return `<div class="service-row"><div class="service-row-main"><div class="service-row-title">${serviceDate(x.date)} · ${serviceEsc(x.title)}</div><div class="service-row-meta">${Number(x.points)} б. · ${serviceEsc(x.note||"")}${x.fileName?" · "+serviceEsc(x.fileName):""}</div></div><button class="service-btn danger" data-service-del-social="${serviceEsc(x.id)}" aria-label="Удалить запись ССО">×</button></div>`;}).join("")||'<div class="service-empty">Записей ССО пока нет.</div>')+'</div>'+
         '<div class="service-actions"><button class="service-btn primary" data-service-action="export-word">📄 Сформировать Word-отчёт</button></div>'+
-        '<div class="report-note">Отчёт формируется по текущим социальным начислениям. Перед официальной подачей проверь требования общежития.</div>'+
+        '<div class="report-note">Отчёт включает записи ЖБС и ССО. Перед официальной подачей проверь требования общежития. Перед официальной подачей проверь требования общежития.</div>'+
       '</section>'+
       '</div>';
   }
