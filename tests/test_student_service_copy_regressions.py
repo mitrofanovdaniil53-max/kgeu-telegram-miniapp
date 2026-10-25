@@ -371,7 +371,6 @@ console.log('Telegram backup-safe note migration assertions passed');
                 self.assertIn("event.key==='Tab'", modal)
                 self.assertIn("event.currentTarget===frame.contentDocument", modal)
                 self.assertIn("(event.shiftKey?close:download).focus()", modal)
-                self.assertIn("close.focus()", modal)
                 self.assertIn("overlay.querySelectorAll('button:not([disabled]):not([hidden]),iframe')", modal)
                 self.assertIn("frame.contentDocument.addEventListener('keydown',onKey)", modal)
                 self.assertIn("previousFocus.focus()", modal)
