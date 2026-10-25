@@ -364,6 +364,10 @@ console.log('Telegram backup-safe note migration assertions passed');
                 self.assertIn("Административные / ЖБС", export)
                 self.assertIn("Социальные / ССО", export)
                 self.assertIn("serviceEsc(x.note||'')", export)
+                self.assertIn("function serviceShowWordReport(filename,content)", source)
+                self.assertIn("frame.srcdoc=content", source[source.index("function serviceShowWordReport(filename,content)"):source.index("function serviceExportWord()")])
+                self.assertIn("download.focus()", source[source.index("function serviceShowWordReport(filename,content)"):source.index("function serviceExportWord()")])
+                self.assertIn("serviceShowWordReport('KGEU_отчет_по_баллам_'+isoDate(new Date())+'.doc',doc)", export)
                 self.assertIn("<th>Комментарий</th>", export)
 
 class GroupPickerRegressionTest(unittest.TestCase):
