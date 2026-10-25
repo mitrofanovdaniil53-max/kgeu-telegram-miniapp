@@ -3571,15 +3571,6 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
         '</section>'+
         '<section class="service-card"><h3>Мои дела</h3><div class="service-stat">'+taskOpen+'</div><p>активных задач'+(taskOverdue?' · '+taskOverdue+' просрочено':'')+'</p><p>'+dlOpen+' дедлайнов'+(dlOverdue?' · '+dlOverdue+' просрочено':'')+'</p></section>'+
       '</div>'+
-      '<section class="service-card service-hostel-section"><h3>🏠 Баллы общежития</h3>'+
-        '<div class="hostel-summary">'+
-          '<div class="hostel-box"><strong>'+serviceTotalPoints()+'</strong><span>всего</span></div>'+
-          '<div class="hostel-box"><strong>'+serviceSumSocial()+'</strong><span>социальные</span></div>'+
-        '</div>'+
-        '<div class="service-progress"><span style="width:'+Math.min(100, serviceTotalPoints()/Math.max(1,Number(serviceData.hostel.totalGoal||250))*100)+'%"></span></div>'+
-        '<p>'+serviceTotalPoints()+' / '+Number(serviceData.hostel.totalGoal||250)+' баллов</p>'+
-        '<div class="service-actions"><button class="service-btn primary" data-service-action="hostel">🏠 Учёт баллов общежития</button></div>'+
-      '</section>'+
       '<section class="service-agenda-section"><div class="service-section-title"><h2>Сегодня</h2><button class="service-btn" data-service-action="calendar">Открыть календарь</button></div>'+
         '<div class="service-list">'+
         (function(){
