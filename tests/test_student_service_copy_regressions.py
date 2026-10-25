@@ -356,8 +356,11 @@ console.log('Telegram backup-safe note migration assertions passed');
                 export_start = source.index("function serviceExportWord()")
                 export_end = source.index("let serviceCalendarDate", export_start)
                 export = source[export_start:export_end]
-                self.assertIn("h.work.slice()", export)
-                self.assertIn("h.social.slice()", export)
+                self.assertIn("const reportRows=h.work.map", export)
+                self.assertIn("h.social.map(function(x){return Object.assign({kind:'social'},x);})", export)
+                self.assertIn("reportRows.forEach(function(x)", export)
+                self.assertIn("Административные / ЖБС", export)
+                self.assertIn("Социальные / ССО", export)
                 self.assertIn("serviceEsc(x.note||'')", export)
                 self.assertIn("<th>Комментарий</th>", export)
 
