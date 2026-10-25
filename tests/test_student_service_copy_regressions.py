@@ -497,6 +497,9 @@ class StudentServiceNumericNormalizationTest(unittest.TestCase):
                 "assert.equal(serviceNonNegativeNumber(undefined, 250), 250);",
                 "assert.equal(serviceNonNegativeNumber('not-a-number', 250), 250);",
                 "assert.equal(serviceNonNegativeNumber(Infinity, 250), 250);",
+                "assert.equal(serviceNonNegativeNumber(true, 250), 250);",
+                "assert.equal(serviceNonNegativeNumber(false, 250), 250);",
+                "assert.equal(serviceNonNegativeNumber({}, 250), 250);",
                 "console.log('numeric helper assertions passed');",
             ])
             with self.subTest(frontend=relative):
