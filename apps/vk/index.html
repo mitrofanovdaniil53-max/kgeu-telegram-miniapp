@@ -3771,8 +3771,9 @@ html.vk-light .service-pill {
     return '<div class="service-page service-hostel-module">'+
       '<nav class="hostel-module-nav" aria-label="Разделы общежития">'+
         '<button type="button" class="service-btn" data-hostel-view="overview">Обзор</button>'+
-        '<button type="button" class="service-btn" data-hostel-view="admin">Административные</button>'+
+        '<button type="button" class="service-btn" data-hostel-view="admin">ЖБС / ССО</button>'+
         '<button type="button" class="service-btn" data-hostel-view="social">Социальные</button>'+
+        '<button type="button" class="service-btn" data-hostel-view="history">История и отчёт</button>'+
       '</nav>'+
       '<section class="service-hero" data-hostel-panel="overview"><div class="service-kicker">Общежитие</div><h1 class="service-title">Учёт баллов</h1>'+
       '<div class="service-sub">Цели можно изменить под правила твоего года.</div>'+
@@ -3784,8 +3785,8 @@ html.vk-light .service-pill {
         '<div class="hostel-box"><strong>'+social+'</strong><span>социальные</span></div>'+
         '<div class="hostel-box"><strong>'+Math.max(0,Number(h.totalGoal||250)-total)+'</strong><span>осталось</span></div>'+
       '</div><div class="service-progress"><span style="width:'+Math.min(100,total/Math.max(1,Number(h.totalGoal||250))*100)+'%"></span></div></section>'+
-      '<section class="service-card" data-hostel-panel="admin"><h3>⏱ Административные / GBS</h3><p>За каждые 10 минут — 1 балл. Вводи фактически отработанные минуты, приложение посчитает баллы.</p>'+
-      '<div class="service-form"><div class="service-form-row"><div><label>Дата</label><input id="work-date" type="date" value="'+isoDate(new Date())+'"></div><div><label>Минуты</label><input id="work-minutes" type="number" min="0" step="1" placeholder="20"></div></div><div><label>Что делал</label><input id="work-title" placeholder="GBS / дежурство / работа"></div>'+
+      '<section class="service-card" data-hostel-panel="admin"><h3>⏱ Административные / ЖБС</h3><p>За каждые 10 минут — 1 балл. Вводи фактически отработанные минуты, приложение посчитает баллы.</p>'+
+      '<div class="service-form"><div class="service-form-row"><div><label>Дата</label><input id="work-date" type="date" value="'+isoDate(new Date())+'"></div><div><label>Минуты</label><input id="work-minutes" type="number" min="0" step="1" placeholder="20"></div></div><div><label>Что делал</label><input id="work-title" placeholder="ЖБС / ССО / дежурство / работа"></div>'+
       '<button class="service-btn primary" data-service-action="add-work">Добавить работу</button></div>'+
       '<div class="service-list" style="margin-top:10px">'+(h.work.slice().reverse().slice(0,12).map(x=>
         '<div class="service-row"><div class="service-row-main"><div class="service-row-title">'+serviceDate(x.date)+' · '+Number(x.minutes)+' мин</div><div class="service-row-meta">'+serviceEsc(x.title||'Работа')+'</div></div><span class="service-pill">+'+Number(x.points)+' б.</span><button class="service-btn danger" data-service-del-work="'+serviceEsc(x.id)+'">×</button></div>'
@@ -3798,6 +3799,10 @@ html.vk-light .service-pill {
       ).join('')||'<div class="service-empty">Мероприятий пока нет.</div>')+'</div>'+
       '<div class="service-actions"><button class="service-btn primary" data-service-action="export-word">📄 Сформировать Word-отчёт</button></div>'+
       '<div class="report-note">Отчёт формируется прямо в Mini App. Для официальной подачи проверь шаблон и требования общежития перед отправкой.</div></section>'+
+      '<section class="service-card" data-hostel-panel="history"><h3>История и отчёт</h3>'+
+        '<p>Здесь можно просмотреть историю социальных мероприятий и сформировать отчёт. Открой раздел «Социальные», чтобы посмотреть записи и удалить ошибочную запись.</p>'+
+        '<div class="service-actions"><button class="service-btn primary" data-hostel-view="social">Открыть социальные баллы</button><button class="service-btn" data-service-action="export-word">📄 Сформировать Word-отчёт</button></div>'+
+      '</section>'+
       '</div>';
   }
   function serviceSubjectList(){
