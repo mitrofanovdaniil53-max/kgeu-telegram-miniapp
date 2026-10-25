@@ -1295,6 +1295,18 @@ html.tg-light .service-launch-btn{background:#fff;color:#101828;border-color:#e4
 
 .hostel-history-heading{margin:18px 0 8px;font-size:13px;font-weight:800;color:var(--text)}
 [data-hostel-panel="history"] .service-row{align-items:flex-start}
+
+/* Settings hierarchy: clearer groups, touch targets, and restrained glass navigation. */
+.settings-section{scroll-margin-top:18px}
+.settings-section-title{display:flex;align-items:center;gap:8px;padding-bottom:9px;border-bottom:1px solid color-mix(in srgb,var(--border) 68%,transparent)}
+.settings-section-title:after{content:"";height:1px;flex:1;background:color-mix(in srgb,var(--border) 42%,transparent)}
+.service-settings-links{padding-bottom:14px}
+.setting-navigation-row{min-height:62px;border-radius:16px;text-align:left}
+.setting-navigation-row:focus-visible,.hostel-module-nav .service-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.settings-sheet .settings-section{position:relative}
+.settings-sheet .settings-section+.settings-section{margin-top:14px}
+@media(prefers-reduced-motion:no-preference){.settings-sheet .settings-section{animation:settingsSectionIn .22s ease both}@keyframes settingsSectionIn{from{opacity:.82;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}}
+@media(prefers-reduced-motion:reduce){.settings-sheet .settings-section{animation:none}}
 </style>
 
 <script>
