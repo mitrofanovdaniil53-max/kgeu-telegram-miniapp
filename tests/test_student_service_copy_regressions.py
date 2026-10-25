@@ -69,6 +69,7 @@ class StudentServiceCopyRegressionTest(unittest.TestCase):
                 self.assertLess(nav_end, wrapper_end)
                 self.assertLess(nav_start, overview_panel)
                 self.assertIn('.hostel-navigation-header{position:sticky;top:8px;z-index:5}', source)
+                self.assertIn('.hostel-module-nav .service-btn{min-height:44px;padding:8px 12px;border-radius:12px}', source)
                 self.assertIn('data-service-action="service-home"', hostel[home_action:nav_start])
                 self.assertIn("function serviceHostelApplyView()", source)
                 self.assertIn("button.setAttribute('aria-pressed',active?'true':'false')", source)
