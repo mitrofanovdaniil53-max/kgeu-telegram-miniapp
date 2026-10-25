@@ -635,9 +635,9 @@ class StudentServiceImportBackupSafetyTest(unittest.TestCase):
         for relative in ("index.html", "apps/vk/index.html"):
             source = (ROOT / relative).read_text(encoding="utf-8")
             start = source.index("function serviceBackupCurrent()")
-            end = source.index("\\n", start)
+            end = source.index("\n", start)
             helper = source[start:end]
-            script = "\\n".join([
+            script = "\n".join([
                 "const assert = require('node:assert/strict');",
                 "const STUDENT_SERVICE_BACKUP_KEY = 'service-backup';",
                 "const serviceData = {tasks:[{id:'task-1'}]};",
