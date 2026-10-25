@@ -413,6 +413,8 @@ class StudentServiceDashboardHierarchyTest(unittest.TestCase):
             source = (ROOT / relative).read_text(encoding="utf-8")
             with self.subTest(frontend=relative):
                 self.assertIn(".service-page > .service-agenda-section { order: 1; }", source)
+                self.assertIn(".service-page > .service-tasks-section { order: 7; }", source)
+                self.assertIn('<section class="service-tasks-section"><div class="service-section-title"><h2>Последние задачи</h2>', source)
                 self.assertIn(".service-page > .service-grid { order: 2; }", source)
                 self.assertIn("@media (max-width: 360px)", source)
                 self.assertIn("prefers-reduced-motion: reduce", source)
