@@ -87,7 +87,7 @@ Existing audit artifacts:
 - It is documentation-only; it compares production navigation with the isolated prototype, records source-derived findings and guardrails, and explicitly does not claim live shell testing.
 - PR comment reported GitHub Actions workflow run #258 passed the syntax job, including frontend/Worker syntax, D1 migration, shared-state merge/revision behavior, legacy-field retention and VK launch-signature checks.
 - Cloudflare posted a successful deployment status for commit preview / branch preview. These are Worker previews, **not proof that the published Telegram/VK frontends work in the actual apps**.
-- At last inspection PR #56 remained open. Re-check its current status and review comments before making any merge decision.
+- PR #56 was subsequently merged after workflow #258 passed. Its merge does not complete the real-platform usability audit.
 
 UX audit is **not complete**. Required remaining work:
 1. Perform the checklist inside real Telegram and VK clients, separately, and record pass/fail/blocked, device/platform, steps, elapsed time, errors, confusion and need for assistance.
@@ -122,6 +122,8 @@ Repository issue/PR history inspected on 2026-10-25:
 - **PR #53**: target UX architecture/specification.
 - **PR #54** was superseded by #55.
 - **PR #55**: isolated interactive UX prototype; demo data only, no Worker/API/real account sync.
+- **PR #56**: merged UX gap analysis; workflow #258 passed. Merge commit `85967990a7185c07aad9158789612275ad3ff763`.
+- **PR #57**: merged AI-readable handoff and manual-test template; documentation only.
 - **PR #56**: merged documentation audit of production UX against prototype; CI workflow #258 passed. Merge commit: `85967990a7185c07aad9158789612275ad3ff763`. This is documentation-only and does not establish live Telegram/VK behavior.
 - Legacy VK redirect PR #6 was merged in the legacy repository.
 
@@ -132,11 +134,10 @@ Do not assume that a closed PR means a feature has been manually verified in Tel
 No independent real-shell usability run is evidenced in the latest repository notes. The current blocker is not lack of another speculative redesign; it is that real Telegram/VK access and test-account workflows are required to verify platform behavior. If the assistant cannot operate those clients directly, prepare a compact execution sheet for the owner rather than inventing results.
 
 Recommended next sequence:
-1. Re-check PR #56 status and any CI changes since this handoff.
-2. Complete the documentation review only if PR #56 has unresolved comments or factual gaps; do not merge blindly.
-3. Review the isolated prototype for source-level defects and run repository tests where execution access is available.
-4. Produce a concise manual-test results template and request only the evidence that cannot be collected remotely.
-5. Fix only reproducible issues, add regression coverage, and verify the relevant shell before closing issue #30.
+1. Keep issue #30 open while real Telegram/VK shell and test-account sync/recovery checks remain unverified.
+2. Review the isolated prototype for source-level defects and run repository tests where execution access is available.
+3. Use the manual-test results template to collect evidence that cannot be collected remotely.
+4. Fix only reproducible issues, add regression coverage, and verify the relevant shell before closing issue #30.
 
 ## 9. Evidence / source links
 
