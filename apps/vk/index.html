@@ -3809,6 +3809,7 @@ html.vk-light .service-pill {
   }
   function serviceRenderHostel(){
     const h=serviceData.hostel, total=serviceTotalPoints(), social=serviceSumSocial(), admin=serviceSumWork();
+    const historyRows=h.work.map(function(x){return Object.assign({kind:'work'},x);}).concat(h.social.map(function(x){return Object.assign({kind:'social'},x);})).sort(function(a,b){return String(b.date||'').localeCompare(String(a.date||''))||String(b.id||'').localeCompare(String(a.id||''));});
     return '<div class="service-page service-hostel-module">'+
       '<div class="hostel-navigation-header">'+
       '<div class="service-actions hostel-home-action"><button class="service-btn" data-service-action="service-home">← Мой сервис</button></div>'+
@@ -3838,11 +3839,8 @@ html.vk-light .service-pill {
       '<button class="service-btn primary" data-service-action="add-social">Добавить мероприятие</button></div>'+
       '</section>'+
       '<section class="service-card" data-hostel-panel="history"><h3>История начислений</h3>'+
-        '<p>Все записи по ЖБС и ССО собраны здесь. Удаление записи обновляет общий баланс.</p>'+
-        '<h4 class="hostel-history-heading">ЖБС · Административные баллы</h4>'+
-        '<div class="service-list">'+(h.work.slice().sort(function(a,b){return String(b.date||"").localeCompare(String(a.date||""));}).map(function(x){return `<div class="service-row"><div class="service-row-main"><div class="service-row-title">${serviceDate(x.date)} · ${Number(x.minutes)} мин</div><div class="service-row-meta">${serviceEsc(x.title||"Работа")}</div></div><span class="service-pill">+${Number(x.points)} б.</span><button class="service-btn danger" data-service-del-work="${serviceEsc(x.id)}" aria-label="Удалить запись ЖБС">×</button></div>`;}).join("")||'<div class="service-empty">Записей ЖБС пока нет.</div>')+'</div>'+
-        '<h4 class="hostel-history-heading">ССО · Социальные баллы</h4>'+
-        '<div class="service-list">'+(h.social.slice().sort(function(a,b){return String(b.date||"").localeCompare(String(a.date||""));}).map(function(x){return `<div class="service-row"><div class="service-row-main"><div class="service-row-title">${serviceDate(x.date)} · ${serviceEsc(x.title)}</div><div class="service-row-meta">${Number(x.points)} б. · ${serviceEsc(x.note||"")}${x.fileName?" · "+serviceEsc(x.fileName):""}</div></div><button class="service-btn danger" data-service-del-social="${serviceEsc(x.id)}" aria-label="Удалить запись ССО">×</button></div>`;}).join("")||'<div class="service-empty">Записей ССО пока нет.</div>')+'</div>'+
+        '<p>Записи ЖБС и ССО отсортированы по дате. Категория и действия каждой записи сохраняются отдельно.</p>'+
+        '<div class="service-list">'+(historyRows.map(function(x){if(x.kind==='work')return '<div class="service-row"><div class="service-row-main"><div class="service-row-title">'+serviceDate(x.date)+' · '+Number(x.minutes)+' мин</div><div class="service-row-meta">'+serviceEsc(x.title||"Работа")+'</div></div><span class="service-pill">ЖБС · +'+Number(x.points)+' б.</span><button class="service-btn danger" data-service-del-work="'+serviceEsc(x.id)+'" aria-label="Удалить запись ЖБС">×</button></div>';return '<div class="service-row"><div class="service-row-main"><div class="service-row-title">'+serviceDate(x.date)+' · '+serviceEsc(x.title||"Мероприятие")+'</div><div class="service-row-meta">'+Number(x.points)+' б. · '+serviceEsc(x.note||"")+(x.fileName?" · "+serviceEsc(x.fileName):"")+'</div></div><span class="service-pill">ССО</span><button class="service-btn danger" data-service-del-social="'+serviceEsc(x.id)+'" aria-label="Удалить запись ССО">×</button></div>';}).join("")||'<div class="service-empty">Записей ЖБС и ССО пока нет.</div>')+'</div>'+
         '<div class="service-actions"><button class="service-btn primary" data-service-action="export-word">📄 Сформировать Word-отчёт</button></div>'+
         '<div class="report-note">Отчёт включает записи ЖБС и ССО. Перед официальной подачей проверь требования общежития.</div>'+
       '</section>'+
