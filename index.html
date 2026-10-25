@@ -1314,6 +1314,7 @@ html.tg-light .service-launch-btn{background:#fff;color:#101828;border-color:#e4
 /* Student Service design system v1: hierarchy, spacing, and readable surfaces. */
 .service-page > .service-hero { order: 0; }
 .service-page > .service-agenda-section { order: 1; }
+.service-page > .service-tasks-section { order: 7; }
 .service-page > .service-grid { order: 2; }
 .service-page > .service-hostel-section { order: 3; }
 .service-page > .service-reminder-section { order: 4; }
@@ -3631,7 +3632,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
           '<div class="service-row"><div class="service-row-main"><div class="service-row-title">'+serviceEsc(x.title)+'</div><div class="service-row-meta">'+serviceDate(x.date)+' · '+Number(x.points||0)+' б.</div></div><span class="service-pill">мероприятие</span></div>'
         ).join('') || '<div class="service-empty">Ближайших мероприятий нет.</div>')+
         '</div></section>'+
-      '<section><div class="service-section-title"><h2>Последние задачи</h2></div>'+
+      '<section class="service-tasks-section"><div class="service-section-title"><h2>Последние задачи</h2></div>'+
         '<div class="service-list">'+
         (serviceSortTasks(serviceData.tasks).slice(0,4).map(function(x){const st=serviceTaskStatus(x);return '<div class="service-row '+(x.done?'is-done':'')+'"><button class="service-btn" data-service-toggle-task="'+serviceEsc(x.id)+'">'+(x.done?'✓':'○')+'</button><div class="service-row-main"><div class="service-row-title">'+serviceEsc(x.title)+serviceSubjectText(x.subject)+'</div><div class="service-row-meta">'+(x.dueDate?serviceDate(x.dueDate):'Без срока')+(x.note?' · '+serviceEsc(x.note):'')+'</div></div><span class="service-status '+st.cls+'">'+serviceEsc(st.label)+'</span></div>';}).join('') || '<div class="service-empty">Добавь первую задачу.</div>')+
         '</div></section>'+
