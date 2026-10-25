@@ -417,6 +417,7 @@ class StudentServiceDashboardHierarchyTest(unittest.TestCase):
                 self.assertIn('<section class="service-tasks-section"><div class="service-section-title"><h2>Последние задачи</h2>', source)
                 self.assertIn(".service-page > .service-grid { order: 2; }", source)
                 self.assertIn("@media (max-width: 360px)", source)
+                self.assertIn(".service-page .service-actions .service-btn, .service-page .service-section-title .service-btn { min-height: 44px; }", source)
                 self.assertIn("prefers-reduced-motion: reduce", source)
 
 
