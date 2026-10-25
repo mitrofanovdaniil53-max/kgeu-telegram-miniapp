@@ -678,9 +678,9 @@ class WordReportKeyboardBehaviorTest(unittest.TestCase):
             with self.subTest(frontend=relative):
                 modal_start = source.index("function serviceShowWordReport(filename,content)")
                 handler_start = source.index("function onKey(event){", modal_start)
-                handler_end = source.index("\\n    close.addEventListener('click',dismiss);", handler_start)
+                handler_end = source.index("\n    close.addEventListener('click',dismiss);", handler_start)
                 handler = source[handler_start:handler_end]
-                script = "\\n".join([
+                script = "\n".join([
                     "const assert = require('node:assert/strict');",
                     "const vm = require('node:vm');",
                     "const handler = " + json.dumps(handler) + ";",
