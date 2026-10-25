@@ -3620,6 +3620,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     const h=serviceData.hostel, total=serviceTotalPoints(), social=serviceSumSocial(), admin=serviceSumWork();
     return '<div class="service-page service-hostel-module">'+
       '<nav class="hostel-module-nav" aria-label="Разделы общежития">'+
+      '<div class="service-actions hostel-home-action"><button class="service-btn" data-service-action="service-home">← Мой сервис</button></div>'+
         '<button type="button" class="service-btn" data-hostel-view="overview">Обзор</button>'+
         '<button type="button" class="service-btn" data-hostel-view="admin">ЖБС</button>'+
         '<button type="button" class="service-btn" data-hostel-view="social">ССО · Социальные баллы</button>'+
@@ -3628,7 +3629,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       '<section class="service-hero" data-hostel-panel="overview"><div class="service-kicker">Общежитие</div><h1 class="service-title">Учёт баллов</h1>'+
       '<div class="service-sub">Цели можно изменить под правила твоего года.</div>'+
       '<div class="service-form-row service-form"><div><label>Цель социальных баллов</label><input id="hostel-social-goal" type="number" min="0" value="'+Number(h.socialGoal||Math.max(0,Number(h.totalGoal||250)-Number(h.adminGoal||100)))+'"></div><div><label>Цель административных баллов</label><input id="hostel-admin-goal" type="number" min="0" value="'+Number(h.adminGoal||100)+'"></div></div>'+
-      '<div class="service-actions"><button class="service-btn primary" data-service-action="save-hostel-goals">Сохранить цели</button><button class="service-btn" data-service-action="service-home">← Мой сервис</button></div></section>'+
+      '<div class="service-actions"><button class="service-btn primary" data-service-action="save-hostel-goals">Сохранить цели</button></div></section>'+
       '<section class="service-card" data-hostel-panel="overview"><h3>Прогресс</h3><div class="hostel-summary">'+
         '<div class="hostel-box"><strong>'+total+'</strong><span>всего / '+Number(h.totalGoal||250)+'</span></div>'+
         '<div class="hostel-box"><strong>'+admin+'</strong><span>административные</span></div>'+
