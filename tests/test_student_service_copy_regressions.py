@@ -471,3 +471,37 @@ class StudentServiceHostelGoalNormalizationRegressionTest(unittest.TestCase):
                 self.assertIn("function serviceNonNegativeNumber(value,fallback)", source)
                 self.assertIn("minutes:serviceNonNegativeNumber(x.minutes,0),points:serviceNonNegativeNumber(x.points,0)", source)
                 self.assertIn("totalGoal:serviceNonNegativeNumber(h.totalGoal!=null?h.totalGoal:250,250)", source)
+
+
+class StudentServiceNumericNormalizationTest(unittest.TestCase):
+    def test_non_negative_number_helper_handles_empty_and_invalid_values_on_both_frontends(self):
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("Node.js is required to execute the real frontend numeric helper")
+
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            marker = "function serviceNonNegativeNumber(value,fallback)"
+            start = source.index(marker)
+            end = source.index("\\n", start)
+            helper = source[start:end]
+            script = "\\n".join([
+                "const assert = require('node:assert/strict');",
+                helper,
+                "assert.equal(serviceNonNegativeNumber(0, 250), 0);",
+                "assert.equal(serviceNonNegativeNumber('0', 250), 0);",
+                "assert.equal(serviceNonNegativeNumber(12, 250), 12);",
+                "assert.equal(serviceNonNegativeNumber('12', 250), 12);",
+                "assert.equal(serviceNonNegativeNumber(-4, 250), 0);",
+                "assert.equal(serviceNonNegativeNumber('', 250), 250);",
+                "assert.equal(serviceNonNegativeNumber('   ', 250), 250);",
+                "assert.equal(serviceNonNegativeNumber(null, 250), 250);",
+                "assert.equal(serviceNonNegativeNumber(undefined, 250), 250);",
+                "assert.equal(serviceNonNegativeNumber('not-a-number', 250), 250);",
+                "assert.equal(serviceNonNegativeNumber(Infinity, 250), 250);",
+                "console.log('numeric helper assertions passed');",
+            ])
+            with self.subTest(frontend=relative):
+                result = subprocess.run([node, "-e", script], capture_output=True, text=True, check=False)
+                self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+                self.assertIn("numeric helper assertions passed", result.stdout)
