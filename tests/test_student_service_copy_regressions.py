@@ -61,6 +61,11 @@ class StudentServiceCopyRegressionTest(unittest.TestCase):
                 overview_panel = hostel.index('data-hostel-panel="overview"')
                 self.assertLess(home_action, overview_panel)
                 self.assertIn('data-service-action="service-home"', hostel[home_action:overview_panel])
+                self.assertIn("function serviceHostelApplyView()", source)
+                self.assertIn("button.setAttribute('aria-pressed',active?'true':'false')", source)
+                self.assertIn("serviceHostelView=button.getAttribute('data-hostel-view')||'overview';", source)
+                self.assertIn("if(a==='service-home')", source)
+                self.assertIn("if(a==='export-word')return serviceExportWord();", source)
 
     def test_settings_expose_sync_and_backup_navigation_in_both_frontends(self):
         for relative in ("index.html", "apps/vk/index.html"):
