@@ -57,6 +57,10 @@ class StudentServiceCopyRegressionTest(unittest.TestCase):
                 self.assertIn("data-service-del-work=", hostel)
                 self.assertIn("data-service-del-social=", hostel)
                 self.assertIn('data-service-action="export-word"', hostel)
+                home_action = hostel.index('class="service-actions hostel-home-action"')
+                overview_panel = hostel.index('data-hostel-panel="overview"')
+                self.assertLess(home_action, overview_panel)
+                self.assertIn('data-service-action="service-home"', hostel[home_action:overview_panel])
 
     def test_settings_expose_sync_and_backup_navigation_in_both_frontends(self):
         for relative in ("index.html", "apps/vk/index.html"):
