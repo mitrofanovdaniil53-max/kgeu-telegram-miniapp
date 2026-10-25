@@ -1075,6 +1075,12 @@ function kgeuSetNote(subject, value) {
 .hostel-module-nav .service-btn{flex:1;white-space:nowrap;min-width:max-content;border:1px solid transparent;background:transparent}
 .hostel-module-nav .service-btn.is-active{background:var(--accent,#155eef);color:#fff;border-color:rgba(255,255,255,.38);box-shadow:0 4px 12px rgba(21,94,239,.2)}
 .service-hostel-module [hidden]{display:none!important}
+
+/* Consistent hostel module navigation and compact settings rows. */
+.hostel-module-nav{position:sticky;top:8px;z-index:5;box-shadow:0 6px 20px rgba(18,40,80,.06)}
+.hostel-module-nav .service-btn{min-height:38px;padding:8px 12px;border-radius:12px}
+.service-hostel-module .service-card[hidden]{display:none!important}
+@media(max-width:480px){.hostel-module-nav{gap:5px;padding:5px}.hostel-module-nav .service-btn{font-size:12px;padding:8px 10px}}
 </style>
 
 <script>
@@ -3773,7 +3779,7 @@ html.vk-light .service-pill {
         '<button type="button" class="service-btn" data-hostel-view="overview">Обзор</button>'+
         '<button type="button" class="service-btn" data-hostel-view="admin">ЖБС / ССО</button>'+
         '<button type="button" class="service-btn" data-hostel-view="social">Социальные</button>'+
-        '<button type="button" class="service-btn" data-hostel-view="history">История и отчёт</button>'+
+        '<button type="button" class="service-btn" data-hostel-view="history">История / отчёт</button>'+
       '</nav>'+
       '<section class="service-hero" data-hostel-panel="overview"><div class="service-kicker">Общежитие</div><h1 class="service-title">Учёт баллов</h1>'+
       '<div class="service-sub">Цели можно изменить под правила твоего года.</div>'+
@@ -3799,8 +3805,8 @@ html.vk-light .service-pill {
       ).join('')||'<div class="service-empty">Мероприятий пока нет.</div>')+'</div>'+
       '<div class="service-actions"><button class="service-btn primary" data-service-action="export-word">📄 Сформировать Word-отчёт</button></div>'+
       '<div class="report-note">Отчёт формируется прямо в Mini App. Для официальной подачи проверь шаблон и требования общежития перед отправкой.</div></section>'+
-      '<section class="service-card" data-hostel-panel="history"><h3>История и отчёт</h3>'+
-        '<p>Здесь можно просмотреть историю социальных мероприятий и сформировать отчёт. Открой раздел «Социальные», чтобы посмотреть записи и удалить ошибочную запись.</p>'+
+      '<section class="service-card" data-hostel-panel="history"><h3>История / отчёт</h3>'+
+        '<p>История начислений и формирование итогового отчёта. Записи мероприятий и действия с ними доступны в разделе «Социальные».</p>'+
         '<div class="service-actions"><button class="service-btn primary" data-hostel-view="social">Открыть социальные баллы</button><button class="service-btn" data-service-action="export-word">📄 Сформировать Word-отчёт</button></div>'+
       '</section>'+
       '</div>';
