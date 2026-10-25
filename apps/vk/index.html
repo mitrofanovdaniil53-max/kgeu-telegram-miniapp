@@ -3777,8 +3777,8 @@ html.vk-light .service-pill {
     return '<div class="service-page service-hostel-module">'+
       '<nav class="hostel-module-nav" aria-label="Разделы общежития">'+
         '<button type="button" class="service-btn" data-hostel-view="overview">Обзор</button>'+
-        '<button type="button" class="service-btn" data-hostel-view="admin">ЖБС / ССО</button>'+
-        '<button type="button" class="service-btn" data-hostel-view="social">Социальные</button>'+
+        '<button type="button" class="service-btn" data-hostel-view="admin">ЖБС</button>'+
+        '<button type="button" class="service-btn" data-hostel-view="social">ССО · Социальные баллы</button>'+
         '<button type="button" class="service-btn" data-hostel-view="history">История / отчёт</button>'+
       '</nav>'+
       '<section class="service-hero" data-hostel-panel="overview"><div class="service-kicker">Общежитие</div><h1 class="service-title">Учёт баллов</h1>'+
@@ -3792,12 +3792,12 @@ html.vk-light .service-pill {
         '<div class="hostel-box"><strong>'+Math.max(0,Number(h.totalGoal||250)-total)+'</strong><span>осталось</span></div>'+
       '</div><div class="service-progress"><span style="width:'+Math.min(100,total/Math.max(1,Number(h.totalGoal||250))*100)+'%"></span></div></section>'+
       '<section class="service-card" data-hostel-panel="admin"><h3>⏱ Административные / ЖБС</h3><p>За каждые 10 минут — 1 балл. Вводи фактически отработанные минуты, приложение посчитает баллы.</p>'+
-      '<div class="service-form"><div class="service-form-row"><div><label>Дата</label><input id="work-date" type="date" value="'+isoDate(new Date())+'"></div><div><label>Минуты</label><input id="work-minutes" type="number" min="0" step="1" placeholder="20"></div></div><div><label>Что делал</label><input id="work-title" placeholder="ЖБС / ССО / дежурство / работа"></div>'+
+      '<div class="service-form"><div class="service-form-row"><div><label>Дата</label><input id="work-date" type="date" value="'+isoDate(new Date())+'"></div><div><label>Минуты</label><input id="work-minutes" type="number" min="0" step="1" placeholder="20"></div></div><div><label>Что делал</label><input id="work-title" placeholder="ЖБС / дежурство / работа"></div>'+
       '<button class="service-btn primary" data-service-action="add-work">Добавить работу</button></div>'+
       '<div class="service-list" style="margin-top:10px">'+(h.work.slice().reverse().slice(0,12).map(x=>
         '<div class="service-row"><div class="service-row-main"><div class="service-row-title">'+serviceDate(x.date)+' · '+Number(x.minutes)+' мин</div><div class="service-row-meta">'+serviceEsc(x.title||'Работа')+'</div></div><span class="service-pill">+'+Number(x.points)+' б.</span><button class="service-btn danger" data-service-del-work="'+serviceEsc(x.id)+'">×</button></div>'
       ).join('')||'<div class="service-empty">Записей пока нет.</div>')+'</div></section>'+
-      '<section class="service-card" data-hostel-panel="social"><h3>🎓 Социальные баллы</h3><p>Фиксируй мероприятие, дату, количество баллов и подтверждение участия. Подтверждение сохраняется в записи и синхронизируется вместе с общим аккаунтом. Для крупных файлов может потребоваться уменьшить размер вложения.</p>'+
+      '<section class="service-card" data-hostel-panel="social"><h3>🎓 ССО — социальные баллы</h3><p>Фиксируй мероприятие, дату, количество баллов и подтверждение участия. Подтверждение сохраняется в записи и синхронизируется вместе с общим аккаунтом. Для крупных файлов может потребоваться уменьшить размер вложения.</p>'+
       '<div class="service-form"><div class="service-form-row"><div><label>Дата</label><input id="social-date" type="date" value="'+isoDate(new Date())+'"></div><div><label>Баллы</label><input id="social-points" type="number" min="0" step="1" placeholder="10"></div></div><div><label>Мероприятие</label><input id="social-title" placeholder="Название мероприятия"></div><div><label>Комментарий</label><textarea id="social-note" placeholder="Организатор, роль, что подтверждает участие…"></textarea></div><div><label>Подтверждение</label><input id="social-file" class="service-file" type="file" accept="image/*,.pdf,.doc,.docx"></div>'+
       '<button class="service-btn primary" data-service-action="add-social">Добавить мероприятие</button></div>'+
       '<div class="service-list" style="margin-top:10px">'+(h.social.slice().reverse().slice(0,12).map(x=>
