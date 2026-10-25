@@ -1,6 +1,6 @@
 # AI Project Handoff — KGEU Student Platform (Telegram + VK)
 
-**Last verified:** 2026-10-25 (GitHub repository state and issue/PR metadata inspected on this date).  
+**Last verified:** 2026-10-25 (refreshed after merging UX documentation PR #56; GitHub state checked on this date).  
 **Purpose:** continue development in a new ChatGPT conversation without losing architecture, decisions, safety constraints, current work, or verification status.
 
 ## 1. Product and repositories
@@ -82,8 +82,8 @@ Existing audit artifacts:
 - [Target UX proposal](https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp/blob/main/docs/ux-target-design-proposal.md)
 - [Interactive prototype](https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp/blob/main/docs/ux-prototype.html) (verify exact current path before editing; another prototype also exists under `prototypes/`).
 
-**Latest active PR at handoff:**
-- [PR #56 — docs: audit production UX against prototype](https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp/pull/56)
+**Latest UX documentation state at handoff:**
+- [PR #56 — docs: audit production UX against prototype](https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp/pull/56) — merged after successful workflow #258.
 - It is documentation-only; it compares production navigation with the isolated prototype, records source-derived findings and guardrails, and explicitly does not claim live shell testing.
 - PR comment reported GitHub Actions workflow run #258 passed the syntax job, including frontend/Worker syntax, D1 migration, shared-state merge/revision behavior, legacy-field retention and VK launch-signature checks.
 - Cloudflare posted a successful deployment status for commit preview / branch preview. These are Worker previews, **not proof that the published Telegram/VK frontends work in the actual apps**.
@@ -122,7 +122,7 @@ Repository issue/PR history inspected on 2026-10-25:
 - **PR #53**: target UX architecture/specification.
 - **PR #54** was superseded by #55.
 - **PR #55**: isolated interactive UX prototype; demo data only, no Worker/API/real account sync.
-- **PR #56**: current open documentation audit of production UX against prototype.
+- **PR #56**: merged documentation audit of production UX against prototype; CI workflow #258 passed. Merge commit: `85967990a7185c07aad9158789612275ad3ff763`. This is documentation-only and does not establish live Telegram/VK behavior.
 - Legacy VK redirect PR #6 was merged in the legacy repository.
 
 Do not assume that a closed PR means a feature has been manually verified in Telegram/VK. Read each PR's validation notes.
