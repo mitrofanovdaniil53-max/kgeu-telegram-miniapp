@@ -369,7 +369,8 @@ console.log('Telegram backup-safe note migration assertions passed');
                 modal_end = source.index("function serviceReportAttachment(record)", modal_start)
                 modal = source[modal_start:modal_end]
                 self.assertIn("event.key==='Tab'", modal)
-                self.assertIn("active===frame", modal)
+                self.assertIn("event.currentTarget===frame.contentDocument", modal)
+                self.assertIn("(event.shiftKey?close:download).focus()", modal)
                 self.assertIn("close.focus()", modal)
                 self.assertIn("overlay.querySelectorAll('button:not([disabled]):not([hidden]),iframe')", modal)
                 self.assertIn("frame.contentDocument.addEventListener('keydown',onKey)", modal)
