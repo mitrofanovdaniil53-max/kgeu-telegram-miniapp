@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 import shutil
 import subprocess
 import unittest
@@ -665,3 +666,41 @@ class StudentServiceImportBackupSafetyTest(unittest.TestCase):
                 result = subprocess.run([node, "-e", script], capture_output=True, text=True, check=False)
                 self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
                 self.assertIn("service and personal backup helper assertions passed", result.stdout)
+
+
+class WordReportKeyboardBehaviorTest(unittest.TestCase):
+    def test_iframe_tab_wraps_to_expected_controls_in_both_frontends(self):
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("Node.js is required to execute the keyboard handler")
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                modal_start = source.index("function serviceShowWordReport(filename,content)")
+                handler_start = source.index("function onKey(event){", modal_start)
+                handler_end = source.index("\\n    close.addEventListener('click',dismiss);", handler_start)
+                handler = source[handler_start:handler_end]
+                script = "\\n".join([
+                    "const assert = require('node:assert/strict');",
+                    "const vm = require('node:vm');",
+                    "const handler = " + json.dumps(handler) + ";",
+                    "function runTab(shiftKey, expectedFocus) {",
+                    "  let focused = '', prevented = false;",
+                    "  const frame = { contentDocument: {} };",
+                    "  const close = { focus() { focused = 'close'; } };",
+                    "  const download = { focus() { focused = 'download'; } };",
+                    "  const overlay = { querySelectorAll() { return [download, close, frame]; }, contains() { return true; } };",
+                    "  const document = { activeElement: frame, removeEventListener() {} };",
+                    "  const dismiss = () => {};",
+                    "  const onKey = vm.runInNewContext(handler + '\\nonKey', { document, overlay, frame, close, download, dismiss });",
+                    "  onKey({ key: 'Tab', currentTarget: frame.contentDocument, shiftKey, preventDefault() { prevented = true; } });",
+                    "  assert.equal(focused, expectedFocus);",
+                    "  assert.equal(prevented, true);",
+                    "}",
+                    "runTab(false, 'download');",
+                    "runTab(true, 'close');",
+                    "console.log('iframe Tab / Shift+Tab behavior passed');",
+                ])
+                result = subprocess.run([node, "-e", script], capture_output=True, text=True, check=False)
+                self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+                self.assertIn("iframe Tab / Shift+Tab behavior passed", result.stdout)
