@@ -1077,7 +1077,7 @@ function kgeuSetNote(subject, value) {
 .service-hostel-module [hidden]{display:none!important}
 
 /* Consistent hostel module navigation and compact settings rows. */
-.hostel-module-nav{position:sticky;top:8px;z-index:5;box-shadow:0 6px 20px rgba(18,40,80,.06)}
+.hostel-navigation-header{position:sticky;top:8px;z-index:5}.hostel-home-action{margin:0 0 8px}.hostel-module-nav{box-shadow:0 6px 20px rgba(18,40,80,.06)}
 .hostel-module-nav .service-btn{min-height:38px;padding:8px 12px;border-radius:12px}
 .service-hostel-module .service-card[hidden]{display:none!important}
 @media(max-width:480px){.hostel-module-nav{gap:5px;padding:5px}.hostel-module-nav .service-btn{font-size:12px;padding:8px 10px}}
@@ -3777,6 +3777,7 @@ html.vk-light .service-pill {
   function serviceRenderHostel(){
     const h=serviceData.hostel, total=serviceTotalPoints(), social=serviceSumSocial(), admin=serviceSumWork();
     return '<div class="service-page service-hostel-module">'+
+      '<div class="hostel-navigation-header">'+
       '<div class="service-actions hostel-home-action"><button class="service-btn" data-service-action="service-home">← Мой сервис</button></div>'+
       '<nav class="hostel-module-nav" aria-label="Разделы общежития">'+
         '<button type="button" class="service-btn" data-hostel-view="overview">Обзор</button>'+
@@ -3784,6 +3785,7 @@ html.vk-light .service-pill {
         '<button type="button" class="service-btn" data-hostel-view="social">ССО · Социальные баллы</button>'+
         '<button type="button" class="service-btn" data-hostel-view="history">История / отчёт</button>'+
       '</nav>'+
+      '</div>'+
       '<section class="service-hero" data-hostel-panel="overview"><div class="service-kicker">Общежитие</div><h1 class="service-title">Учёт баллов</h1>'+
       '<div class="service-sub">Цели можно изменить под правила твоего года.</div>'+
       '<div class="service-form-row service-form"><div><label>Цель социальных баллов</label><input id="hostel-social-goal" type="number" min="0" value="'+Number(h.socialGoal||Math.max(0,Number(h.totalGoal||250)-Number(h.adminGoal||100)))+'"></div><div><label>Цель административных баллов</label><input id="hostel-admin-goal" type="number" min="0" value="'+Number(h.adminGoal||100)+'"></div></div>'+
