@@ -3505,7 +3505,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     if(r.note!=null) r.note=String(r.note);
     return r;
   }
-  function serviceNonNegativeNumber(value,fallback){const n=Number(value);return Number.isFinite(n)?Math.max(0,n):fallback;}
+  function serviceNonNegativeNumber(value,fallback){if(value==null||(typeof value==='string'&&value.trim()===''))return fallback;const n=Number(value);return Number.isFinite(n)?Math.max(0,n):fallback;}
   function serviceEmptyData(){return {version:STUDENT_SERVICE_SCHEMA,schemaVersion:STUDENT_SERVICE_SCHEMA,updatedAt:Date.now(),tasks:[],deadlines:[],events:[],hostel:{totalGoal:250,adminGoal:100,socialGoal:150,work:[],social:[]},reminders:{enabled:false,taskDays:1,deadlineDays:1,eventDays:1}};}
   function serviceNormalizeData(x){
     const src=(x&&typeof x==='object')?x:{};
