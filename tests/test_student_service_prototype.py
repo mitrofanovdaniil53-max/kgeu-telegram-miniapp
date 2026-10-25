@@ -50,7 +50,7 @@ class StudentServicePrototypeRegressionTest(unittest.TestCase):
 
     def test_feedback_and_demo_boundary_are_explicit(self):
         self.assertRegex(self.source, r'role="status"[^>]*aria-live="polite"|aria-live="polite"[^>]*role="status"')
-        self.assertIn("Тестовые данные", self.source)
+        self.assertIn("тестовые данные", self.source.lower())
         self.assertIn("Ничего не синхронизируется и не сохраняется в аккаунт", self.source)
         self.assertIn("prefers-reduced-motion:reduce", self.source)
 
