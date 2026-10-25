@@ -53,6 +53,7 @@ class StudentServicePrototypeRegressionTest(unittest.TestCase):
         self.assertIn("тестовые данные", self.source.lower())
         self.assertIn("Ничего не синхронизируется и не сохраняется в аккаунт", self.source)
         self.assertIn("prefers-reduced-motion:reduce", self.source)
+        self.assertIn(".btn.small{min-height:44px", self.source)
 
     def test_modal_supports_escape_focus_trap_and_focus_return(self):
         self.assertIn("e.key==='Escape'", self.source)
