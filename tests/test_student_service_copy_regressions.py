@@ -439,5 +439,15 @@ class StudentServiceNavigationRegressionTest(unittest.TestCase):
                 self.assertIn("data-hostel-view=\"history\"", source)
                 self.assertIn("if(a==='service-home')", source)
 
+
+class StudentServiceHostelGoalRegressionTest(unittest.TestCase):
+    def test_zero_point_goals_are_preserved_in_dashboard_and_report_on_both_frontends(self):
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                self.assertIn("h.socialGoal!=null?h.socialGoal:", source)
+                self.assertIn("h.adminGoal!=null?h.adminGoal:100", source)
+                self.assertIn("h.totalGoal!=null?h.totalGoal:250", source)
+
 if __name__ == "__main__":
     unittest.main()
