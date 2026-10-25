@@ -3652,7 +3652,7 @@ html.vk-light .service-pill {
     const work=serviceRecordArray(h.work).map(function(r){const x=serviceNormalizeRecord(r,'w');return {id:x.id,date:serviceDateKey(x.date)?x.date:'',minutes:Math.max(0,Number(x.minutes||0)),points:Math.max(0,Number(x.points||0)),title:String(x.title||'Работа'),createdAt:Number(x.createdAt||Date.now()),updatedAt:Number(x.updatedAt||x.createdAt||Date.now())};});
     const social=serviceRecordArray(h.social).map(function(r){const x=serviceNormalizeRecord(r,'s');return {id:x.id,date:serviceDateKey(x.date)?x.date:'',points:Math.max(0,Number(x.points||0)),title:String(x.title||'Мероприятие'),note:String(x.note||''),fileName:String(x.fileName||''),fileData:String(x.fileData||''),createdAt:Number(x.createdAt||Date.now()),updatedAt:Number(x.updatedAt||x.createdAt||Date.now())};});
     const rem=src.reminders&&typeof src.reminders==='object'?src.reminders:{};
-    return {version:STUDENT_SERVICE_SCHEMA,schemaVersion:STUDENT_SERVICE_SCHEMA,updatedAt:Number(src.updatedAt||Date.now()),tasks:tasks,deadlines:deadlines,events:events,reminders:{enabled:!!rem.enabled,taskDays:Math.max(0,Math.min(7,Number(rem.taskDays!=null?rem.taskDays:1))),deadlineDays:Math.max(0,Math.min(7,Number(rem.deadlineDays!=null?rem.deadlineDays:1))),eventDays:Math.max(0,Math.min(7,Number(rem.eventDays!=null?rem.eventDays:1)))},hostel:{totalGoal:Math.max(0,Number(h.totalGoal||250)),adminGoal:Math.max(0,Number(h.adminGoal||100)),socialGoal:Math.max(0,Number(h.socialGoal||150)),work:work,social:social}};
+    return {version:STUDENT_SERVICE_SCHEMA,schemaVersion:STUDENT_SERVICE_SCHEMA,updatedAt:Number(src.updatedAt||Date.now()),tasks:tasks,deadlines:deadlines,events:events,reminders:{enabled:!!rem.enabled,taskDays:Math.max(0,Math.min(7,Number(rem.taskDays!=null?rem.taskDays:1))),deadlineDays:Math.max(0,Math.min(7,Number(rem.deadlineDays!=null?rem.deadlineDays:1))),eventDays:Math.max(0,Math.min(7,Number(rem.eventDays!=null?rem.eventDays:1)))},hostel:{totalGoal:Math.max(0,Number(h.totalGoal!=null?h.totalGoal:250)),adminGoal:Math.max(0,Number(h.adminGoal!=null?h.adminGoal:100)),socialGoal:Math.max(0,Number(h.socialGoal||150)),work:work,social:social}};
   }
   function serviceLoad(){
     const fallback=serviceEmptyData();
@@ -3821,14 +3821,14 @@ html.vk-light .service-pill {
       '</div>'+
       '<section class="service-hero" data-hostel-panel="overview"><div class="service-kicker">Общежитие</div><h1 class="service-title">Учёт баллов</h1>'+
       '<div class="service-sub">Цели можно изменить под правила твоего года.</div>'+
-      '<div class="service-form-row service-form"><div><label>Цель социальных баллов</label><input id="hostel-social-goal" type="number" min="0" value="'+Number(h.socialGoal||Math.max(0,Number(h.totalGoal||250)-Number(h.adminGoal||100)))+'"></div><div><label>Цель административных баллов</label><input id="hostel-admin-goal" type="number" min="0" value="'+Number(h.adminGoal||100)+'"></div></div>'+
+      '<div class="service-form-row service-form"><div><label>Цель социальных баллов</label><input id="hostel-social-goal" type="number" min="0" value="'+Number(h.socialGoal!=null?h.socialGoal:Math.max(0,Number(h.totalGoal!=null?h.totalGoal:250)-Number(h.adminGoal!=null?h.adminGoal:100)))+'"></div><div><label>Цель административных баллов</label><input id="hostel-admin-goal" type="number" min="0" value="'+Number(h.adminGoal!=null?h.adminGoal:100)+'"></div></div>'+
       '<div class="service-actions"><button class="service-btn primary" data-service-action="save-hostel-goals">Сохранить цели</button></div></section>'+
       '<section class="service-card" data-hostel-panel="overview"><h3>Прогресс</h3><div class="hostel-summary">'+
-        '<div class="hostel-box"><strong>'+total+'</strong><span>всего / '+Number(h.totalGoal||250)+'</span></div>'+
+        '<div class="hostel-box"><strong>'+total+'</strong><span>всего / '+Number(h.totalGoal!=null?h.totalGoal:250)+'</span></div>'+
         '<div class="hostel-box"><strong>'+admin+'</strong><span>административные</span></div>'+
         '<div class="hostel-box"><strong>'+social+'</strong><span>социальные</span></div>'+
-        '<div class="hostel-box"><strong>'+Math.max(0,Number(h.totalGoal||250)-total)+'</strong><span>осталось</span></div>'+
-      '</div><div class="service-progress"><span style="width:'+Math.min(100,total/Math.max(1,Number(h.totalGoal||250))*100)+'%"></span></div></section>'+
+        '<div class="hostel-box"><strong>'+Math.max(0,Number(h.totalGoal!=null?h.totalGoal:250)-total)+'</strong><span>осталось</span></div>'+
+      '</div><div class="service-progress"><span style="width:'+Math.min(100,total/Math.max(1,Number(h.totalGoal!=null?h.totalGoal:250))*100)+'%"></span></div></section>'+
       '<section class="service-card" data-hostel-panel="admin"><h3>⏱ Административные / ЖБС</h3><p>За каждые 10 минут — 1 балл. Вводи фактически отработанные минуты, приложение посчитает баллы.</p>'+
       '<div class="service-form"><div class="service-form-row"><div><label>Дата</label><input id="work-date" type="date" value="'+isoDate(new Date())+'"></div><div><label>Минуты</label><input id="work-minutes" type="number" min="0" step="1" placeholder="20"></div></div><div><label>Что делал</label><input id="work-title" placeholder="ЖБС / дежурство / работа"></div>'+
       '<button class="service-btn primary" data-service-action="add-work">Добавить работу</button></div>'+
@@ -4035,7 +4035,7 @@ html.vk-light .service-pill {
     h.work.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))).forEach(x=>rows+='<tr><td>'+serviceEsc(x.date)+'</td><td>Административные</td><td>'+serviceEsc(x.title||'Работа')+'</td><td>'+Number(x.minutes||0)+'</td><td>'+Number(x.points||0)+'</td><td></td><td></td></tr>');
     h.social.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))).forEach(x=>rows+='<tr><td>'+serviceEsc(x.date)+'</td><td>Социальные</td><td>'+serviceEsc(x.title)+'</td><td></td><td>'+Number(x.points||0)+'</td><td>'+serviceEsc(x.note||'')+'</td><td>'+serviceEsc(x.fileName||'')+'</td></tr>');
     const doc='<!doctype html><html><head><meta charset="utf-8"><title>Отчёт по баллам</title><style>body{font-family:Arial,sans-serif;font-size:11pt}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:6px}h1{font-size:18pt}</style></head><body>'+
-      '<h1>Отчёт по баллам общежития</h1><p>Группа: '+serviceEsc(GROUP_NAME)+'</p><p>Всего: <b>'+total+'</b> / '+Number(h.totalGoal||250)+' · Административные: <b>'+admin+'</b> · Социальные: <b>'+social+'</b></p>'+
+      '<h1>Отчёт по баллам общежития</h1><p>Группа: '+serviceEsc(GROUP_NAME)+'</p><p>Всего: <b>'+total+'</b> / '+Number(h.totalGoal!=null?h.totalGoal:250)+' · Административные: <b>'+admin+'</b> · Социальные: <b>'+social+'</b></p>'+
       '<table><tr><th>Дата</th><th>Тип</th><th>Событие / работа</th><th>Минуты</th><th>Баллы</th><th>Комментарий</th><th>Подтверждение</th></tr>'+rows+'</table>'+
       '<p>Документ сформирован в KGEU Student Service. Перед официальной подачей проверьте соответствие требованиям общежития.</p></body></html>';
     serviceDownload('KGEU_отчет_по_баллам_'+isoDate(new Date())+'.doc',doc,'application/msword');
