@@ -3844,6 +3844,32 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     const blob=new Blob([content],{type:mime||'text/plain;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');
     a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url);},1000);
   }
+  async function serviceSendWordReportToTelegram(filename,content,button){
+    const tg=window.Telegram&&window.Telegram.WebApp;
+    if(!tg||!tg.initData){if(typeof toast==='function')toast('Отправка в Telegram доступна только внутри Telegram.');return;}
+    const previous=button.textContent;button.disabled=true;button.textContent='Отправляем…';
+    try{
+      const response=await fetch('https://kgeu-telegram-miniapp.2vkv544dmd.workers.dev/api/report/telegram',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},
+        body:JSON.stringify({filename:filename,content:content})
+      });
+      const result=await response.json().catch(function(){return {};});
+      if(!response.ok||!result.ok){
+        const error=String(result.error||'telegram_delivery_failed');
+        if(error==='telegram_start_bot_first')throw new Error('Сначала открой чат с ботом и нажми «Старт», затем повтори отправку.');
+        if(error==='telegram_report_too_large')throw new Error('Отчёт слишком большой для отправки. Уменьши размер или количество фотографий.');
+        if(error==='telegram_auth_unavailable'||error==='telegram_init_data_invalid'||error==='telegram_init_data_expired')throw new Error('Не удалось подтвердить сессию Telegram. Закрой и заново открой мини-приложение.');
+        throw new Error('Telegram не принял документ. Попробуй ещё раз или скачай .doc.');
+      }
+      if(typeof toast==='function')toast('Word-отчёт отправлен в чат Telegram');
+      return true;
+    }catch(error){
+      if(typeof toast==='function')toast(error&&error.message?error.message:'Не удалось отправить отчёт в Telegram.');
+      return false;
+    }finally{button.disabled=false;button.textContent=previous;}
+  }
+
   function serviceShowWordReport(filename,content){
     // Telegram/VK embedded browsers may silently ignore an automatic Blob download.
     // Show a visible report preview first and start the download only after an explicit tap.
@@ -3866,6 +3892,11 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     const download=document.createElement('button');
     download.type='button';download.textContent='Скачать .doc';
     download.style.cssText='min-height:44px;padding:8px 14px;border:0;border-radius:10px;background:var(--accent,#315efb);color:#fff;font-weight:700;';
+    const tg=window.Telegram&&window.Telegram.WebApp;
+    const send=document.createElement('button');
+    send.type='button';send.textContent='Отправить в Telegram';
+    send.style.cssText='min-height:44px;padding:8px 14px;border:0;border-radius:10px;background:#229ed9;color:#fff;font-weight:700;';
+    send.hidden=!(tg&&tg.initData);
     const close=document.createElement('button');
     close.type='button';close.textContent='Закрыть';close.setAttribute('aria-label','Закрыть предпросмотр отчёта');
     close.style.cssText='min-height:44px;padding:8px 14px;border:1px solid var(--line,#ccc);border-radius:10px;background:transparent;color:inherit;font-weight:600;';
@@ -3873,13 +3904,14 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     frame.title='Содержимое Word-отчёта';
     frame.style.cssText='display:block;flex:1;width:100%;min-height:0;border:0;background:#fff;';
     frame.srcdoc=content;
-    actions.appendChild(download);actions.appendChild(close);
+    actions.appendChild(download);if(!send.hidden)actions.appendChild(send);actions.appendChild(close);
     header.appendChild(title);header.appendChild(actions);
     panel.appendChild(header);panel.appendChild(frame);overlay.appendChild(panel);document.body.appendChild(overlay);
     const previousFocus=document.activeElement;
     function dismiss(){document.removeEventListener('keydown',onKey);overlay.remove();if(previousFocus&&typeof previousFocus.focus==='function')previousFocus.focus();}
     function onKey(event){if(event.key==='Escape'){event.preventDefault();dismiss();}}
     close.addEventListener('click',dismiss);
+    send.addEventListener('click',function(){serviceSendWordReportToTelegram(filename,content,send);});
     overlay.addEventListener('click',function(event){if(event.target===overlay)dismiss();});
     document.addEventListener('keydown',onKey);
     download.addEventListener('click',function(){
@@ -3893,11 +3925,23 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     download.focus();
   }
 
+  function serviceReportAttachment(record){
+    const name=serviceEsc(record.fileName||'');
+    const data=String(record.fileData||'');
+    // Only embed raster image data URLs that were captured by the file picker.
+    // Non-image attachments remain clearly identified by filename.
+    if(/^data:image\/(?:png|jpeg|gif|webp);base64,/i.test(data)){
+      return (name?'<div style="font-size:9pt;margin-bottom:4px">'+name+'</div>':'')+
+        '<img src="'+serviceEsc(data)+'" alt="'+name+'" style="max-width:180px;max-height:180px;width:auto;height:auto;object-fit:contain;">';
+    }
+    return name+(name&&!data?' (содержимое файла не сохранено)':'');
+  }
+
   function serviceExportWord(){
     const h=serviceData.hostel,total=serviceTotalPoints(),admin=serviceSumWork(),social=serviceSumSocial();
     let rows='';
     const reportRows=h.work.map(function(x){return Object.assign({kind:'work'},x);}).concat(h.social.map(function(x){return Object.assign({kind:'social'},x);})).sort(function(a,b){if(!a.date&&b.date)return 1;if(a.date&&!b.date)return -1;return String(a.date||'').localeCompare(String(b.date||''))||String(a.id||'').localeCompare(String(b.id||''));});
-    reportRows.forEach(function(x){if(x.kind==='work')rows+='<tr><td>'+serviceEsc(x.date)+'</td><td>Административные / ЖБС</td><td>'+serviceEsc(x.title||'Работа')+'</td><td>'+Number(x.minutes||0)+'</td><td>'+Number(x.points||0)+'</td><td></td><td></td></tr>';else rows+='<tr><td>'+serviceEsc(x.date)+'</td><td>Социальные / ССО</td><td>'+serviceEsc(x.title||'Мероприятие')+'</td><td></td><td>'+Number(x.points||0)+'</td><td>'+serviceEsc(x.note||'')+'</td><td>'+serviceEsc(x.fileName||'')+'</td></tr>';});
+    reportRows.forEach(function(x){if(x.kind==='work')rows+='<tr><td>'+serviceEsc(x.date)+'</td><td>Административные / ЖБС</td><td>'+serviceEsc(x.title||'Работа')+'</td><td>'+Number(x.minutes||0)+'</td><td>'+Number(x.points||0)+'</td><td></td><td></td></tr>';else rows+='<tr><td>'+serviceEsc(x.date)+'</td><td>Социальные / ССО</td><td>'+serviceEsc(x.title||'Мероприятие')+'</td><td></td><td>'+Number(x.points||0)+'</td><td>'+serviceEsc(x.note||'')+'</td><td>'+serviceReportAttachment(x)+'</td></tr>';});
     const doc='<!doctype html><html><head><meta charset="utf-8"><title>Отчёт по баллам</title><style>body{font-family:Arial,sans-serif;font-size:11pt}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:6px}h1{font-size:18pt}</style></head><body>'+
       '<h1>Отчёт по баллам общежития</h1><p>Группа: '+serviceEsc(GROUP_NAME)+'</p><p>Всего: <b>'+total+'</b> / '+Number(h.totalGoal!=null?h.totalGoal:250)+' · Административные: <b>'+admin+'</b> · Социальные: <b>'+social+'</b></p>'+
       '<table><tr><th>Дата</th><th>Тип</th><th>Событие / работа</th><th>Минуты</th><th>Баллы</th><th>Комментарий</th><th>Подтверждение</th></tr>'+rows+'</table>'+
