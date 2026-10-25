@@ -343,6 +343,8 @@ console.log('Telegram backup-safe note migration assertions passed');
                 export = source[export_start:export_end]
                 self.assertIn("h.work.slice()", export)
                 self.assertIn("h.social.slice()", export)
+                self.assertIn("serviceEsc(x.note||'')", export)
+                self.assertIn("<th>Комментарий</th>", export)
 
 class GroupPickerRegressionTest(unittest.TestCase):
     def test_both_frontends_use_shared_group_directory_contract(self):
