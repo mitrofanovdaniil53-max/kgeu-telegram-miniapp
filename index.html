@@ -4142,13 +4142,13 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
         if(!minutes){toast('Укажи количество минут');return;}
         const title=document.getElementById('work-title').value.trim()||'Работа';
         serviceData.hostel.work.push({id:'w_'+Date.now(),date:date,minutes:minutes,points:Math.floor(minutes/10),title:title});
-        serviceSave();document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();return;
+        serviceSave();document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();toast('Работа ЖБС добавлена');return;
       }
       if(a==='add-social'){
         const file=document.getElementById('social-file').files[0];
         const rec={id:'s_'+Date.now(),date:document.getElementById('social-date').value||isoDate(new Date()),points:Math.max(0,Math.floor(Number(document.getElementById('social-points').value||0))),title:document.getElementById('social-title').value.trim()||'Мероприятие',note:document.getElementById('social-note').value.trim(),fileName:file?file.name:'',fileData:''};
         if(!rec.points){toast('Укажи количество социальных баллов');return;}
-        const f=await serviceReadFile(file);rec.fileData=f.data;serviceData.hostel.social.push(rec);serviceSave();document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();return;
+        const f=await serviceReadFile(file);rec.fileData=f.data;serviceData.hostel.social.push(rec);serviceSave();document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();toast('Мероприятие ССО добавлено');return;
       }
       if(a==='export-word')return serviceExportWord();
     });});
