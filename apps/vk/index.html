@@ -3837,7 +3837,7 @@ html.vk-light .service-pill {
       '<div class="service-form"><div class="service-form-row"><div><label>Дата</label><input id="work-date" type="date" value="'+isoDate(new Date())+'"></div><div><label>Минуты</label><input id="work-minutes" type="number" min="0" step="1" placeholder="20"></div></div><div><label>Что делал</label><input id="work-title" placeholder="ЖБС / дежурство / работа"></div>'+
       '<button class="service-btn primary" data-service-action="add-work">Добавить работу</button></div>'+
       '</section>'+
-      '<section class="service-card" data-hostel-panel="social"><h3>🎓 ССО — социальные баллы</h3><p>Фиксируй мероприятие, дату, количество баллов и подтверждение участия. Подтверждение сохраняется в записи и синхронизируется вместе с общим аккаунтом. Для крупных файлов может потребоваться уменьшить размер вложения.</p>'+
+      '<section class="service-card" data-hostel-panel="social"><h3>🎓 ССО — социальные баллы</h3><p>Фиксируй мероприятие, дату, количество баллов и подтверждение участия. Подтверждение сохраняется в записи и синхронизируется вместе с общим аккаунтом. Фотографии автоматически сжимаются для сохранения и включения в Word-отчёт. Для PDF и документов больших размеров сохраняется только название файла.</p>'+
       '<div class="service-form"><div class="service-form-row"><div><label>Дата</label><input id="social-date" type="date" value="'+isoDate(new Date())+'"></div><div><label>Баллы</label><input id="social-points" type="number" min="0" step="1" placeholder="10"></div></div><div><label>Мероприятие</label><input id="social-title" placeholder="Название мероприятия"></div><div><label>Комментарий</label><textarea id="social-note" placeholder="Организатор, роль, что подтверждает участие…"></textarea></div><div><label>Подтверждение</label><input id="social-file" class="service-file" type="file" accept="image/*,.pdf,.doc,.docx"></div>'+
       '<button class="service-btn primary" data-service-action="add-social">Добавить мероприятие</button></div>'+
       '</section>'+
@@ -4016,13 +4016,47 @@ html.vk-light .service-pill {
     serviceData.hostel.social.push({id:'s_'+Date.now(),title:title.trim(),date:date,points:points,note:'Добавлено из раздела мероприятий',fileName:''});
     serviceSave();render();
   }
+  function serviceCompressImage(file){
+    return new Promise(function(resolve){
+      const maxBytes=140000, maxSide=1000;
+      const imageUrl=URL.createObjectURL(file);
+      const img=new Image();
+      function finish(value){URL.revokeObjectURL(imageUrl);resolve(value);}
+      img.onload=function(){
+        try{
+          let scale=Math.min(1,maxSide/Math.max(img.naturalWidth||img.width,img.naturalHeight||img.height));
+          let canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
+          if(!ctx){finish('');return;}
+          let result='';
+          for(let attempt=0;attempt<7;attempt++){
+            canvas.width=Math.max(1,Math.round((img.naturalWidth||img.width)*scale));
+            canvas.height=Math.max(1,Math.round((img.naturalHeight||img.height)*scale));
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            ctx.drawImage(img,0,0,canvas.width,canvas.height);
+            const quality=[0.76,0.68,0.60,0.52,0.46,0.40,0.36][attempt];
+            result=canvas.toDataURL('image/jpeg',quality);
+            if(result.length*0.75<=maxBytes)break;
+            scale*=0.82;
+          }
+          finish(result&&result.length*0.75<=maxBytes?result:'');
+        }catch(e){finish('');}
+      };
+      img.onerror=function(){finish('');};
+      img.src=imageUrl;
+    });
+  }
   function serviceReadFile(file){
     return new Promise(function(resolve){
       if(!file){resolve({name:'',data:''});return;}
-      // localStorage is intentionally only a temporary local cache; large base64
-      // attachments can exceed browser/WebView quotas. Keep the filename if the
-      // file is too large and leave actual sync/storage for the future backend.
-      if(file.size>1500000){toast('Файл больше 1,5 МБ — сохраню только его название');resolve({name:file.name,data:''});return;}
+      if(/^image\//i.test(file.type||'')){
+        serviceCompressImage(file).then(function(data){
+          if(!data){toast('Не удалось сжать фотографию. Попробуй JPG или PNG меньшего размера.');resolve({name:file.name,data:''});return;}
+          resolve({name:file.name,data:data});
+        });
+        return;
+      }
+      // Preserve filenames for non-image files, but avoid oversized localStorage payloads.
+      if(file.size>1500000){toast('Файл больше 1,5 МБ — сохраню только его название. Фото автоматически сжимаются.');resolve({name:file.name,data:''});return;}
       const r=new FileReader();r.onload=function(){resolve({name:file.name,data:String(r.result||'')});};r.onerror=function(){resolve({name:file.name,data:''});};r.readAsDataURL(file);
     });
   }
