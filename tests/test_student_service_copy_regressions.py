@@ -627,3 +627,32 @@ class StudentServiceImportBackupSafetyTest(unittest.TestCase):
                 self.assertIn("if(!kgeuSavePersonalData(importedPersonalData))", apply)
                 self.assertIn("serviceData=previousServiceData", apply)
                 self.assertIn("kgeuPersonalData=previousPersonalData", apply)
+
+    def test_backup_helper_persists_both_data_sets_and_reports_partial_failure(self):
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("Node.js is required to execute the backup helper")
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            start = source.index("function serviceBackupCurrent()")
+            end = source.index("\\n", start)
+            helper = source[start:end]
+            script = "\\n".join([
+                "const assert = require('node:assert/strict');",
+                "const STUDENT_SERVICE_BACKUP_KEY = 'service-backup';",
+                "const serviceData = {tasks:[{id:'task-1'}]};",
+                "const kgeuPersonalData = {version:1,notes:{math:'saved note'}};",
+                "const saved = {}; let failPersonal = false;",
+                "const localStorage = {setItem(key,value){if(failPersonal && key === 'kgeu_student_personal_backup_before_cloud_restore_v1') throw new Error('quota'); saved[key]=String(value);}};",
+                helper,
+                "assert.equal(serviceBackupCurrent(), true);",
+                "assert.deepEqual(JSON.parse(saved['service-backup']), serviceData);",
+                "assert.deepEqual(JSON.parse(saved['kgeu_student_personal_backup_before_cloud_restore_v1']), kgeuPersonalData);",
+                "failPersonal = true;",
+                "assert.equal(serviceBackupCurrent(), false);",
+                "console.log('service and personal backup helper assertions passed');",
+            ])
+            with self.subTest(frontend=relative):
+                result = subprocess.run([node, "-e", script], capture_output=True, text=True, check=False)
+                self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+                self.assertIn("service and personal backup helper assertions passed", result.stdout)
