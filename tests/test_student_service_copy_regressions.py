@@ -550,5 +550,18 @@ class StudentServiceNormalizationBehaviorTest(unittest.TestCase):
                 self.assertIn("real serviceNormalizeData assertions passed", result.stdout)
 
 
+
+
+class StudentServiceHostelInputRegressionTest(unittest.TestCase):
+    def test_hostel_forms_use_safe_numeric_normalization_on_both_frontends(self):
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                self.assertIn("serviceData.hostel.adminGoal=serviceNonNegativeNumber(document.getElementById('hostel-admin-goal').value,serviceNonNegativeNumber(serviceData.hostel.adminGoal,100));", source)
+                self.assertIn("serviceData.hostel.socialGoal=serviceNonNegativeNumber(document.getElementById('hostel-social-goal').value,serviceNonNegativeNumber(serviceData.hostel.socialGoal,150));", source)
+                self.assertIn("minutes=Math.floor(serviceNonNegativeNumber(document.getElementById('work-minutes').value,0));", source)
+                self.assertIn("points:Math.floor(serviceNonNegativeNumber(document.getElementById('social-points').value,0))", source)
+
+
 if __name__ == "__main__":
     unittest.main()
