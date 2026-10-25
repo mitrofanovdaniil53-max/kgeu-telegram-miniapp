@@ -369,6 +369,11 @@ console.log('Telegram backup-safe note migration assertions passed');
                 self.assertIn("download.focus()", source[source.index("function serviceShowWordReport(filename,content)"):source.index("function serviceExportWord()")])
                 self.assertIn("serviceShowWordReport('KGEU_отчет_по_баллам_'+isoDate(new Date())+'.doc',doc)", export)
                 self.assertIn("<th>Комментарий</th>", export)
+                self.assertIn("function serviceReportAttachment(record)", source)
+                self.assertIn("serviceReportAttachment(x)", export)
+                self.assertIn("data:image/", source)
+                self.assertIn("function serviceSendWordReportToTelegram(filename,content,button)", source)
+                self.assertIn("api/report/telegram", source)
 
 class GroupPickerRegressionTest(unittest.TestCase):
     def test_both_frontends_use_shared_group_directory_contract(self):
@@ -574,3 +579,13 @@ class StudentServiceHostelInputRegressionTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TelegramReportDeliveryRegressionTest(unittest.TestCase):
+    def test_worker_sends_report_only_to_authenticated_telegram_user(self):
+        source = (ROOT / "backend/worker.js").read_text(encoding="utf-8")
+        self.assertIn("const telegramReportPath = url.pathname === '/api/report/telegram';", source)
+        self.assertIn("if (identity.provider !== 'telegram')", source)
+        self.assertIn("api.telegram.org/bot' + env.TELEGRAM_BOT_TOKEN + '/sendDocument", source)
+        self.assertIn("telegram_start_bot_first", source)
+        self.assertIn("telegram_report_too_large", source)
