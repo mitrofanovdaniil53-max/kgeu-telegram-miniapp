@@ -17,12 +17,13 @@ class StudentServiceCopyRegressionTest(unittest.TestCase):
                 self.assertNotIn(stale, source)
                 self.assertIn(replacement, source)
 
-    def test_telegram_service_home_has_one_analytics_action(self):
+    def test_telegram_service_home_hides_analytics_but_keeps_implementation(self):
         source = (ROOT / "index.html").read_text(encoding="utf-8")
         start = source.index("function serviceRenderToday()")
         end = source.index("function serviceRenderHostel()", start)
         home_renderer = source[start:end]
-        self.assertEqual(home_renderer.count('data-service-action="analytics"'), 1)
+        self.assertNotIn('data-service-action="analytics"', home_renderer)
+        self.assertIn("function serviceRenderAnalytics(", source)
 
     def test_vk_link_code_is_hidden_after_persistent_account_link(self):
         source = (ROOT / "apps" / "vk" / "index.html").read_text(encoding="utf-8")
