@@ -623,16 +623,47 @@ export default {
     const mePath = url.pathname === '/api/account/me';
     const linkCodePath = url.pathname === '/api/account/link-code';
     const linkPath = url.pathname === '/api/account/link';
-    if (!syncPath && !mePath && !linkCodePath && !linkPath) return json(request, { ok: false, error: 'not_found' }, 404);
+    const telegramReportPath = url.pathname === '/api/report/telegram';
+    if (!syncPath && !mePath && !linkCodePath && !linkPath && !telegramReportPath) return json(request, { ok: false, error: 'not_found' }, 404);
     if (mePath && request.method !== 'GET') return json(request, { ok: false, error: 'method_not_allowed' }, 405);
     if ((syncPath && request.method !== 'GET' && request.method !== 'POST') ||
-        ((linkCodePath || linkPath) && request.method !== 'POST')) {
+        ((linkCodePath || linkPath || telegramReportPath) && request.method !== 'POST')) {
       return json(request, { ok: false, error: 'method_not_allowed' }, 405);
     }
 
     try {
-      if (!env.DB) throw new Error('database_not_configured');
       const identity = await authenticateIdentity(request, env);
+      if (telegramReportPath) {
+        if (identity.provider !== 'telegram') return json(request, { ok: false, error: 'telegram_only' }, 403);
+        const payload = await request.json();
+        const filename = String(payload && payload.filename || 'KGEU_отчет_по_баллам.doc')
+          .replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').slice(0, 100);
+        const content = String(payload && payload.content || '');
+        const contentBytes = new TextEncoder().encode(content).byteLength;
+        if (!content || !/<html[\s>]/i.test(content) || !/<body[\s>]/i.test(content)) {
+          return json(request, { ok: false, error: 'invalid_report' }, 400);
+        }
+        if (contentBytes > 8 * 1024 * 1024) return json(request, { ok: false, error: 'telegram_report_too_large' }, 413);
+        if (!env.TELEGRAM_BOT_TOKEN) return json(request, { ok: false, error: 'telegram_auth_unavailable' }, 503);
+        const form = new FormData();
+        form.append('chat_id', identity.userId);
+        form.append('caption', 'Word-отчёт по баллам общежития');
+        form.append('document', new Blob([content], { type: 'application/msword;charset=utf-8' }), filename.endsWith('.doc') ? filename : filename + '.doc');
+        const telegramResponse = await fetch('https://api.telegram.org/bot' + env.TELEGRAM_BOT_TOKEN + '/sendDocument', {
+          method: 'POST',
+          body: form,
+        });
+        const telegramResult = await telegramResponse.json().catch(() => ({}));
+        if (!telegramResponse.ok || !telegramResult.ok) {
+          const description = String(telegramResult.description || '').toLowerCase();
+          if (description.includes('chat not found') || description.includes('bot was blocked') || description.includes('user is deactivated')) {
+            return json(request, { ok: false, error: 'telegram_start_bot_first' }, 400);
+          }
+          return json(request, { ok: false, error: 'telegram_delivery_failed' }, 502);
+        }
+        return json(request, { ok: true, status: 'sent', messageId: telegramResult.result && telegramResult.result.message_id });
+      }
+      if (!env.DB) throw new Error('database_not_configured');
       const accountId = await resolveAccount(env, identity);
 
       if (mePath) {
