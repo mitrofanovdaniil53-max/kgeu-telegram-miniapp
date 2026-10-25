@@ -372,6 +372,10 @@ console.log('Telegram backup-safe note migration assertions passed');
                 self.assertIn("function serviceReportAttachment(record)", source)
                 self.assertIn("serviceReportAttachment(x)", export)
                 self.assertIn("data:image/", source)
+                self.assertIn("function serviceCompressImage(file)", source)
+                self.assertIn("const maxBytes=140000, maxSide=1000", source)
+                self.assertIn("serviceCompressImage(file).then(function(data)", source)
+                self.assertIn("canvas.toDataURL('image/jpeg',quality)", source)
                 self.assertIn("function serviceSendWordReportToTelegram(filename,content,button)", source)
                 self.assertIn("api/report/telegram", source)
 
