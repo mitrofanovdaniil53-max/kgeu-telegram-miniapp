@@ -4128,12 +4128,13 @@ html.vk-light .service-pill {
     header.appendChild(title);header.appendChild(actions);
     panel.appendChild(header);panel.appendChild(frame);overlay.appendChild(panel);document.body.appendChild(overlay);
     const previousFocus=document.activeElement;
-    function dismiss(){document.removeEventListener('keydown',onKey);overlay.remove();if(previousFocus&&typeof previousFocus.focus==='function')previousFocus.focus();}
-    function onKey(event){if(event.key==='Escape'){event.preventDefault();dismiss();}}
+    function dismiss(){document.removeEventListener('keydown',onKey);try{frame.contentDocument.removeEventListener('keydown',onKey);}catch(e){}overlay.remove();if(previousFocus&&typeof previousFocus.focus==='function')previousFocus.focus();}
+    function onKey(event){if(event.key==='Escape'){event.preventDefault();dismiss();return;}if(event.key==='Tab'){const focusable=Array.from(overlay.querySelectorAll('button:not([disabled]):not([hidden]),iframe'));if(!focusable.length){event.preventDefault();return;}const first=focusable[0],last=focusable[focusable.length-1],active=document.activeElement;if(event.shiftKey&&(active===first||!overlay.contains(active))){event.preventDefault();last.focus();}else if(!event.shiftKey&&(active===last||!overlay.contains(active))){event.preventDefault();first.focus();}}}
     close.addEventListener('click',dismiss);
     send.addEventListener('click',function(){serviceSendWordReportToTelegram(filename,content,send);});
     overlay.addEventListener('click',function(event){if(event.target===overlay)dismiss();});
     document.addEventListener('keydown',onKey);
+    frame.addEventListener('load',function(){try{frame.contentDocument.addEventListener('keydown',onKey);}catch(e){}});
     download.addEventListener('click',function(){
       try{
         const blob=new Blob(['\ufeff',content],{type:'application/msword;charset=utf-8'});
