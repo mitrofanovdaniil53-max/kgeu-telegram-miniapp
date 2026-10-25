@@ -25,6 +25,34 @@ class StudentServiceCopyRegressionTest(unittest.TestCase):
         self.assertNotIn('data-service-action="analytics"', home_renderer)
         self.assertIn("function serviceRenderAnalytics(", source)
 
+    def test_hostel_is_a_standalone_module_in_both_frontends(self):
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                home_start = source.index("function serviceRenderToday()")
+                home_end = source.index("function serviceRenderHostel()", home_start)
+                home = source[home_start:home_end]
+                self.assertIn('data-service-action="hostel"', home)
+                self.assertNotIn("service-hostel-section", home)
+                hostel_start = source.index("function serviceRenderHostel()")
+                hostel_end = source.index("function serviceSubjectList()", hostel_start)
+                hostel = source[hostel_start:hostel_end]
+                for view in ("overview", "admin", "social", "history"):
+                    self.assertIn('data-hostel-panel="' + view + '"', hostel)
+                    self.assertIn('data-hostel-view="' + view + '"', hostel)
+                self.assertIn("data-service-del-work=", hostel)
+                self.assertIn("data-service-del-social=", hostel)
+                self.assertIn('data-service-action="export-word"', hostel)
+
+    def test_settings_expose_sync_and_backup_navigation_in_both_frontends(self):
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                self.assertIn('data-open-service-view="sync"', source)
+                self.assertIn('data-open-service-view="data"', source)
+                self.assertIn("serviceRenderSync()", source)
+                self.assertIn("serviceRenderData()", source)
+
     def test_vk_link_code_is_hidden_after_persistent_account_link(self):
         source = (ROOT / "apps" / "vk" / "index.html").read_text(encoding="utf-8")
         self.assertIn("function setLinkUiState(linked)", source)
