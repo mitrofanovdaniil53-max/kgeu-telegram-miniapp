@@ -409,5 +409,18 @@ class StudentServiceDashboardHierarchyTest(unittest.TestCase):
                 self.assertIn("@media (max-width: 360px)", source)
                 self.assertIn("prefers-reduced-motion: reduce", source)
 
+
+class StudentServiceDataCopyTextTest(unittest.TestCase):
+    def test_data_screen_explains_current_sync_and_backup_options_on_both_frontends(self):
+        stale = "Пока без backend — можно безопасно перенести данные вручную."
+        current = "Для переноса между Telegram и VK используй синхронизацию, а для отдельной копии — экспорт JSON."
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                self.assertNotIn(stale, source)
+                self.assertIn(current, source)
+                self.assertIn("data-open-service-view=\"sync\"", source)
+                self.assertIn("data-open-service-view=\"data\"", source)
+
 if __name__ == "__main__":
     unittest.main()
