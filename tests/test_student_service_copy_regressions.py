@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import unittest
@@ -665,3 +666,36 @@ class StudentServiceImportBackupSafetyTest(unittest.TestCase):
                 result = subprocess.run([node, "-e", script], capture_output=True, text=True, check=False)
                 self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
                 self.assertIn("service and personal backup helper assertions passed", result.stdout)
+
+
+class UXPrototypeRegressionTest(unittest.TestCase):
+    def test_documented_prototype_is_isolated_and_inline_script_parses(self):
+        source = (ROOT / "docs" / "ux-prototype.html").read_text(encoding="utf-8")
+        for expected in (
+            'data-view="schedule"',
+            'data-view="tasks"',
+            'data-view="service"',
+            'data-view="settings"',
+            'data-service-tab="zhbs"',
+            'data-service-tab="sso"',
+            'aria-modal="true"',
+            "реальная резервная копия не создавалась",
+        ):
+            with self.subTest(expected=expected):
+                self.assertIn(expected, source)
+        self.assertNotIn("fetch(", source)
+        self.assertNotIn("Telegram.WebApp", source)
+        self.assertNotIn("VKWebApp", source)
+        match = re.search(r"<script>([\s\S]*?)</script>", source)
+        self.assertIsNotNone(match, "prototype should contain one inline behavior script")
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("Node.js is required to parse the prototype script")
+        result = subprocess.run(
+            [node, "--check"],
+            input=match.group(1),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
