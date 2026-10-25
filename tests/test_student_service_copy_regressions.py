@@ -468,3 +468,6 @@ class StudentServiceHostelGoalNormalizationRegressionTest(unittest.TestCase):
             with self.subTest(frontend=relative):
                 self.assertIn("socialGoal:Math.max(0,Number(h.socialGoal!=null?h.socialGoal:150))", source)
                 self.assertNotIn("Number(h.socialGoal||150)", source)
+                self.assertIn("function serviceNonNegativeNumber(value,fallback)", source)
+                self.assertIn("minutes:serviceNonNegativeNumber(x.minutes,0),points:serviceNonNegativeNumber(x.points,0)", source)
+                self.assertIn("totalGoal:serviceNonNegativeNumber(h.totalGoal!=null?h.totalGoal:250,250)", source)
