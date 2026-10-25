@@ -3844,6 +3844,55 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     const blob=new Blob([content],{type:mime||'text/plain;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');
     a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url);},1000);
   }
+  function serviceShowWordReport(filename,content){
+    // Telegram/VK embedded browsers may silently ignore an automatic Blob download.
+    // Show a visible report preview first and start the download only after an explicit tap.
+    const old=document.getElementById('service-word-report-modal');
+    if(old)old.remove();
+    const overlay=document.createElement('div');
+    overlay.id='service-word-report-modal';
+    overlay.setAttribute('role','dialog');
+    overlay.setAttribute('aria-modal','true');
+    overlay.setAttribute('aria-label','Предпросмотр Word-отчёта');
+    overlay.style.cssText='position:fixed;inset:0;z-index:2147483000;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box;';
+    const panel=document.createElement('div');
+    panel.style.cssText='background:var(--bg, #fff);color:var(--text, #111);width:100%;max-width:900px;height:min(88dvh,900px);border-radius:16px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 12px 48px rgba(0,0,0,.3);';
+    const header=document.createElement('div');
+    header.style.cssText='display:flex;gap:8px;align-items:center;justify-content:space-between;padding:12px;flex-wrap:wrap;border-bottom:1px solid var(--line,#ddd);';
+    const title=document.createElement('strong');
+    title.textContent='Предпросмотр Word-отчёта';
+    const actions=document.createElement('div');
+    actions.style.cssText='display:flex;gap:8px;flex-wrap:wrap;';
+    const download=document.createElement('button');
+    download.type='button';download.textContent='Скачать .doc';
+    download.style.cssText='min-height:44px;padding:8px 14px;border:0;border-radius:10px;background:var(--accent,#315efb);color:#fff;font-weight:700;';
+    const close=document.createElement('button');
+    close.type='button';close.textContent='Закрыть';close.setAttribute('aria-label','Закрыть предпросмотр отчёта');
+    close.style.cssText='min-height:44px;padding:8px 14px;border:1px solid var(--line,#ccc);border-radius:10px;background:transparent;color:inherit;font-weight:600;';
+    const frame=document.createElement('iframe');
+    frame.title='Содержимое Word-отчёта';
+    frame.style.cssText='display:block;flex:1;width:100%;min-height:0;border:0;background:#fff;';
+    frame.srcdoc=content;
+    actions.appendChild(download);actions.appendChild(close);
+    header.appendChild(title);header.appendChild(actions);
+    panel.appendChild(header);panel.appendChild(frame);overlay.appendChild(panel);document.body.appendChild(overlay);
+    const previousFocus=document.activeElement;
+    function dismiss(){document.removeEventListener('keydown',onKey);overlay.remove();if(previousFocus&&typeof previousFocus.focus==='function')previousFocus.focus();}
+    function onKey(event){if(event.key==='Escape'){event.preventDefault();dismiss();}}
+    close.addEventListener('click',dismiss);
+    overlay.addEventListener('click',function(event){if(event.target===overlay)dismiss();});
+    document.addEventListener('keydown',onKey);
+    download.addEventListener('click',function(){
+      try{
+        const blob=new Blob(['\ufeff',content],{type:'application/msword;charset=utf-8'});
+        const url=URL.createObjectURL(blob),a=document.createElement('a');
+        a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();
+        setTimeout(function(){URL.revokeObjectURL(url);},10000);
+      }catch(e){if(typeof toast==='function')toast('Не удалось скачать отчёт. Попробуй открыть приложение в браузере.');}
+    });
+    download.focus();
+  }
+
   function serviceExportWord(){
     const h=serviceData.hostel,total=serviceTotalPoints(),admin=serviceSumWork(),social=serviceSumSocial();
     let rows='';
@@ -3853,7 +3902,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       '<h1>Отчёт по баллам общежития</h1><p>Группа: '+serviceEsc(GROUP_NAME)+'</p><p>Всего: <b>'+total+'</b> / '+Number(h.totalGoal!=null?h.totalGoal:250)+' · Административные: <b>'+admin+'</b> · Социальные: <b>'+social+'</b></p>'+
       '<table><tr><th>Дата</th><th>Тип</th><th>Событие / работа</th><th>Минуты</th><th>Баллы</th><th>Комментарий</th><th>Подтверждение</th></tr>'+rows+'</table>'+
       '<p>Документ сформирован в KGEU Student Service. Перед официальной подачей проверьте соответствие требованиям общежития.</p></body></html>';
-    serviceDownload('KGEU_отчет_по_баллам_'+isoDate(new Date())+'.doc',doc,'application/msword');
+    serviceShowWordReport('KGEU_отчет_по_баллам_'+isoDate(new Date())+'.doc',doc);
   }
   let serviceCalendarDate=new Date();
   let serviceCalendarSelected=isoDate(new Date());
