@@ -4407,13 +4407,13 @@ html.vk-light .service-pill {
       if(a==='schedule'||a==='today'){switchTab('today');return;}
       if(a==='service-home'){document.getElementById('app').innerHTML=serviceRenderToday();serviceBind();return;}
       if(a==='save-hostel-goals'){
-        serviceData.hostel.adminGoal=Math.max(0,Number(document.getElementById('hostel-admin-goal').value||0));
-        serviceData.hostel.socialGoal=Math.max(0,Number(document.getElementById('hostel-social-goal').value||0));
+        serviceData.hostel.adminGoal=serviceNonNegativeNumber(document.getElementById('hostel-admin-goal').value,serviceNonNegativeNumber(serviceData.hostel.adminGoal,100));
+        serviceData.hostel.socialGoal=serviceNonNegativeNumber(document.getElementById('hostel-social-goal').value,serviceNonNegativeNumber(serviceData.hostel.socialGoal,150));
         serviceData.hostel.totalGoal=serviceData.hostel.adminGoal+serviceData.hostel.socialGoal;
         serviceSave();document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();return;
       }
       if(a==='add-work'){
-        const date=document.getElementById('work-date').value||isoDate(new Date()),minutes=Math.max(0,Math.floor(Number(document.getElementById('work-minutes').value||0)));
+        const date=document.getElementById('work-date').value||isoDate(new Date()),minutes=Math.floor(serviceNonNegativeNumber(document.getElementById('work-minutes').value,0));
         if(!minutes){toast('Укажи количество минут');return;}
         const title=document.getElementById('work-title').value.trim()||'Работа';
         serviceData.hostel.work.push({id:'w_'+Date.now(),date:date,minutes:minutes,points:Math.floor(minutes/10),title:title});
@@ -4421,7 +4421,7 @@ html.vk-light .service-pill {
       }
       if(a==='add-social'){
         const file=document.getElementById('social-file').files[0];
-        const rec={id:'s_'+Date.now(),date:document.getElementById('social-date').value||isoDate(new Date()),points:Math.max(0,Math.floor(Number(document.getElementById('social-points').value||0))),title:document.getElementById('social-title').value.trim()||'Мероприятие',note:document.getElementById('social-note').value.trim(),fileName:file?file.name:'',fileData:''};
+        const rec={id:'s_'+Date.now(),date:document.getElementById('social-date').value||isoDate(new Date()),points:Math.floor(serviceNonNegativeNumber(document.getElementById('social-points').value,0)),title:document.getElementById('social-title').value.trim()||'Мероприятие',note:document.getElementById('social-note').value.trim(),fileName:file?file.name:'',fileData:''};
         if(!rec.points){toast('Укажи количество социальных баллов');return;}
         const f=await serviceReadFile(file);rec.fileData=f.data;serviceData.hostel.social.push(rec);serviceSave();document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();toast('Мероприятие ССО добавлено');return;
       }
