@@ -602,3 +602,66 @@ class TelegramReportDeliveryRegressionTest(unittest.TestCase):
         self.assertIn("api.telegram.org/bot' + env.TELEGRAM_BOT_TOKEN + '/sendDocument", source)
         self.assertIn("telegram_start_bot_first", source)
         self.assertIn("telegram_report_too_large", source)
+
+
+class StudentServiceImportBackupSafetyTest(unittest.TestCase):
+    def test_json_restore_backs_up_notes_and_aborts_when_backup_or_save_fails(self):
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                backup_start = source.index("function serviceBackupCurrent()")
+                backup_end = source.index("\n", backup_start)
+                backup = source[backup_start:backup_end]
+                self.assertIn("localStorage.setItem(STUDENT_SERVICE_BACKUP_KEY,JSON.stringify(serviceData))", backup)
+                self.assertIn("kgeu_student_personal_backup_before_cloud_restore_v1", backup)
+                self.assertIn("JSON.stringify(kgeuPersonalData||{version:1,notes:{}})", backup)
+                self.assertIn("return true", backup)
+                self.assertIn("return false", backup)
+                import_start = source.index("function serviceImportData(file)")
+                import_end = source.index("function serviceRenderSync()", import_start)
+                importer = source[import_start:import_end]
+                self.assertIn("function serviceConfirmDataRestore(onConfirm)", source)
+                confirm_start = source.index("function serviceConfirmDataRestore(onConfirm)")
+                confirm_end = source.index("function serviceApplyImportedData(payload)", confirm_start)
+                confirm = source[confirm_start:confirm_end]
+                self.assertIn("tg.showConfirm(message", confirm)
+                self.assertIn("window.confirm(message)", confirm)
+                self.assertIn("Перед применением текущие данные и заметки сохранятся в резервных копиях", confirm)
+                self.assertIn("serviceConfirmDataRestore(function(){serviceApplyImportedData(payload);})", importer)
+                apply_start = source.index("function serviceApplyImportedData(payload)")
+                apply_end = source.index("function serviceImportData(file)", apply_start)
+                apply = source[apply_start:apply_end]
+                self.assertIn("if(!serviceBackupCurrent())", apply)
+                self.assertIn("if(!serviceSave())", apply)
+                self.assertIn("if(!kgeuSavePersonalData(importedPersonalData))", apply)
+                self.assertIn("serviceData=previousServiceData", apply)
+                self.assertIn("kgeuPersonalData=previousPersonalData", apply)
+
+    def test_backup_helper_persists_both_data_sets_and_reports_partial_failure(self):
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("Node.js is required to execute the backup helper")
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            start = source.index("function serviceBackupCurrent()")
+            end = source.index("\n", start)
+            helper = source[start:end]
+            script = "\n".join([
+                "const assert = require('node:assert/strict');",
+                "const STUDENT_SERVICE_BACKUP_KEY = 'service-backup';",
+                "const serviceData = {tasks:[{id:'task-1'}]};",
+                "const kgeuPersonalData = {version:1,notes:{math:'saved note'}};",
+                "const saved = {}; let failPersonal = false;",
+                "const localStorage = {setItem(key,value){if(failPersonal && key === 'kgeu_student_personal_backup_before_cloud_restore_v1') throw new Error('quota'); saved[key]=String(value);}};",
+                helper,
+                "assert.equal(serviceBackupCurrent(), true);",
+                "assert.deepEqual(JSON.parse(saved['service-backup']), serviceData);",
+                "assert.deepEqual(JSON.parse(saved['kgeu_student_personal_backup_before_cloud_restore_v1']), kgeuPersonalData);",
+                "failPersonal = true;",
+                "assert.equal(serviceBackupCurrent(), false);",
+                "console.log('service and personal backup helper assertions passed');",
+            ])
+            with self.subTest(frontend=relative):
+                result = subprocess.run([node, "-e", script], capture_output=True, text=True, check=False)
+                self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+                self.assertIn("service and personal backup helper assertions passed", result.stdout)
