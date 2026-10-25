@@ -398,5 +398,16 @@ class GroupPickerRegressionTest(unittest.TestCase):
         self.assertIn("Access-Control-Allow-Origin", source)
         self.assertIn("Vary': 'Origin'", source)
 
+
+class StudentServiceDashboardHierarchyTest(unittest.TestCase):
+    def test_dashboard_prioritizes_todays_agenda_before_secondary_stats_on_both_frontends(self):
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                self.assertIn(".service-page > .service-agenda-section { order: 1; }", source)
+                self.assertIn(".service-page > .service-grid { order: 2; }", source)
+                self.assertIn("@media (max-width: 360px)", source)
+                self.assertIn("prefers-reduced-motion: reduce", source)
+
 if __name__ == "__main__":
     unittest.main()
