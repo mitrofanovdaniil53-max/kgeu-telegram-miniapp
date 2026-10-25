@@ -318,6 +318,21 @@ console.log('Telegram backup-safe note migration assertions passed');
         self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
         self.assertIn("Telegram backup-safe note migration assertions passed", result.stdout)
 
+
+    def test_hostel_word_report_copy_matches_export_scope(self):
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                hostel_start = source.index("function serviceRenderHostel()")
+                hostel_end = source.index("function serviceSubjectList()", hostel_start)
+                hostel = source[hostel_start:hostel_end]
+                self.assertIn("Отчёт включает записи ЖБС и ССО.", hostel)
+                export_start = source.index("function serviceExportWord()")
+                export_end = source.index("let serviceCalendarDate", export_start)
+                export = source[export_start:export_end]
+                self.assertIn("h.work.slice()", export)
+                self.assertIn("h.social.slice()", export)
+
 class GroupPickerRegressionTest(unittest.TestCase):
     def test_both_frontends_use_shared_group_directory_contract(self):
         for relative in ("index.html", "apps/vk/index.html"):
