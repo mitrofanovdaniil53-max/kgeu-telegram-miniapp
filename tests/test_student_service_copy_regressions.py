@@ -451,3 +451,12 @@ class StudentServiceHostelGoalRegressionTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StudentServiceHostelGoalNormalizationRegressionTest(unittest.TestCase):
+    def test_zero_social_goal_survives_normalization_on_both_frontends(self):
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                self.assertIn("socialGoal:Math.max(0,Number(h.socialGoal!=null?h.socialGoal:150))", source)
+                self.assertNotIn("Number(h.socialGoal||150)", source)
