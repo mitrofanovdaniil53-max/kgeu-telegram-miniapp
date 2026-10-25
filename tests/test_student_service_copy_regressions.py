@@ -422,5 +422,22 @@ class StudentServiceDataCopyTextTest(unittest.TestCase):
                 self.assertIn("data-open-service-view=\"sync\"", source)
                 self.assertIn("data-open-service-view=\"data\"", source)
 
+
+class StudentServiceNavigationRegressionTest(unittest.TestCase):
+    def test_settings_and_hostel_navigation_are_bound_on_both_frontends(self):
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                self.assertIn("document.querySelectorAll('[data-open-service-view]')", source)
+                self.assertIn("view==='sync'?serviceRenderSync():serviceRenderData()", source)
+                self.assertIn("document.querySelectorAll('[data-hostel-view]')", source)
+                self.assertIn("serviceHostelApplyView();", source)
+                self.assertIn("button.setAttribute('aria-pressed',active?'true':'false')", source)
+                self.assertIn("data-hostel-view=\"overview\"", source)
+                self.assertIn("data-hostel-view=\"admin\"", source)
+                self.assertIn("data-hostel-view=\"social\"", source)
+                self.assertIn("data-hostel-view=\"history\"", source)
+                self.assertIn("if(a==='service-home')", source)
+
 if __name__ == "__main__":
     unittest.main()
