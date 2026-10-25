@@ -17,12 +17,76 @@ class StudentServiceCopyRegressionTest(unittest.TestCase):
                 self.assertNotIn(stale, source)
                 self.assertIn(replacement, source)
 
-    def test_telegram_service_home_has_one_analytics_action(self):
+    def test_telegram_service_home_hides_analytics_but_keeps_implementation(self):
         source = (ROOT / "index.html").read_text(encoding="utf-8")
         start = source.index("function serviceRenderToday()")
         end = source.index("function serviceRenderHostel()", start)
         home_renderer = source[start:end]
-        self.assertEqual(home_renderer.count('data-service-action="analytics"'), 1)
+        self.assertNotIn('data-service-action="analytics"', home_renderer)
+        self.assertIn("function serviceRenderAnalytics(", source)
+
+    def test_dashboard_navigation_is_compact_and_redundant_week_summary_is_removed(self):
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                home_start = source.index("function serviceRenderToday()")
+                home_end = source.index("function serviceRenderHostel()", home_start)
+                home = source[home_start:home_end]
+                self.assertIn('class="service-btn service-hostel-entry" data-service-action="hostel"', home)
+                self.assertNotIn('class="service-reminder-section"', home)
+                self.assertNotIn("На ближайшие 7 дней", home)
+                self.assertIn('data-service-action="calendar"', home)
+                self.assertIn('data-service-action="study"', home)
+                self.assertIn('data-service-action="reminders"', home)
+
+    def test_hostel_is_a_standalone_module_in_both_frontends(self):
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                home_start = source.index("function serviceRenderToday()")
+                home_end = source.index("function serviceRenderHostel()", home_start)
+                home = source[home_start:home_end]
+                self.assertIn('data-service-action="hostel"', home)
+                self.assertNotIn("service-hostel-section", home)
+                hostel_start = source.index("function serviceRenderHostel()")
+                hostel_end = source.index("function serviceSubjectList()", hostel_start)
+                hostel = source[hostel_start:hostel_end]
+                for view in ("overview", "admin", "social", "history"):
+                    self.assertIn('data-hostel-panel="' + view + '"', hostel)
+                    self.assertIn('data-hostel-view="' + view + '"', hostel)
+                self.assertIn("data-service-del-work=", hostel)
+                self.assertIn("data-service-del-social=", hostel)
+                self.assertIn('data-service-action="export-word"', hostel)
+                home_action = hostel.index('class="service-actions hostel-home-action"')
+                nav_start = hostel.index('<nav class="hostel-module-nav"')
+                nav_end = hostel.index('</nav>', nav_start)
+                overview_panel = hostel.index('data-hostel-panel="overview"')
+                wrapper_start = hostel.index('<div class="hostel-navigation-header">')
+                wrapper_end = hostel.index("</div>'+", nav_end)
+                self.assertLess(wrapper_start, home_action)
+                self.assertLess(home_action, nav_start)
+                self.assertNotIn('hostel-home-action', hostel[nav_start:nav_end])
+                self.assertLess(nav_end, wrapper_end)
+                self.assertLess(nav_start, overview_panel)
+                self.assertIn('.hostel-navigation-header{position:sticky;top:8px;z-index:5}', source)
+                self.assertIn('.hostel-module-nav .service-btn{min-height:44px;padding:8px 12px;border-radius:12px}', source)
+                self.assertIn('data-service-action="service-home"', hostel[home_action:nav_start])
+                self.assertIn("function serviceHostelApplyView()", source)
+                self.assertIn("button.setAttribute('aria-pressed',active?'true':'false')", source)
+                self.assertIn("serviceHostelView=button.getAttribute('data-hostel-view')||'overview';", source)
+                self.assertIn("if(a==='service-home')", source)
+                self.assertIn("if(a==='export-word')return serviceExportWord();", source)
+                self.assertIn("toast('Работа ЖБС добавлена')", source)
+                self.assertIn("toast('Мероприятие ССО добавлено')", source)
+
+    def test_settings_expose_sync_and_backup_navigation_in_both_frontends(self):
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                self.assertIn('data-open-service-view="sync"', source)
+                self.assertIn('data-open-service-view="data"', source)
+                self.assertIn("serviceRenderSync()", source)
+                self.assertIn("serviceRenderData()", source)
 
     def test_vk_link_code_is_hidden_after_persistent_account_link(self):
         source = (ROOT / "apps" / "vk" / "index.html").read_text(encoding="utf-8")
@@ -274,6 +338,23 @@ console.log('Telegram backup-safe note migration assertions passed');
         result = subprocess.run([node, "-e", script], capture_output=True, text=True, check=False)
         self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
         self.assertIn("Telegram backup-safe note migration assertions passed", result.stdout)
+
+
+    def test_hostel_word_report_copy_matches_export_scope(self):
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                hostel_start = source.index("function serviceRenderHostel()")
+                hostel_end = source.index("function serviceSubjectList()", hostel_start)
+                hostel = source[hostel_start:hostel_end]
+                self.assertIn("Отчёт включает записи ЖБС и ССО.", hostel)
+                export_start = source.index("function serviceExportWord()")
+                export_end = source.index("let serviceCalendarDate", export_start)
+                export = source[export_start:export_end]
+                self.assertIn("h.work.slice()", export)
+                self.assertIn("h.social.slice()", export)
+                self.assertIn("serviceEsc(x.note||'')", export)
+                self.assertIn("<th>Комментарий</th>", export)
 
 class GroupPickerRegressionTest(unittest.TestCase):
     def test_both_frontends_use_shared_group_directory_contract(self):

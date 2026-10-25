@@ -1059,6 +1059,47 @@ function kgeuSetNote(subject, value) {
     #shared-service-section .shared-service-form strong{font-size:13px}
     #shared-service-section .shared-service-row-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
     #shared-service-section .shared-service-row-actions button{font-size:11px;padding:6px 8px}
+/* Redesign foundation: restrained Liquid Glass for navigation and controls. */
+.service-main-nav .service-btn,.service-launch-btn,.setting-navigation-row,.icon-btn,.modal-sheet.settings-sheet .modal-close{-webkit-backdrop-filter:blur(18px) saturate(1.35);backdrop-filter:blur(18px) saturate(1.35)}
+.service-main-nav .service-btn,.setting-navigation-row{background:color-mix(in srgb,var(--bg2) 78%,transparent);border:1px solid color-mix(in srgb,var(--border) 72%,white 28%);box-shadow:inset 0 1px 0 rgba(255,255,255,.48),0 4px 14px rgba(25,45,80,.055)}
+.setting-navigation-row{display:flex;align-items:center;justify-content:space-between;gap:14px;width:100%;padding:13px 14px;margin-top:8px;text-align:left;color:var(--text);border-radius:14px;cursor:pointer;font:inherit}
+.setting-navigation-row span:first-child{display:flex;flex-direction:column;gap:4px}
+.setting-navigation-row strong{font-size:14px;font-weight:750}
+.setting-navigation-row small{color:var(--muted);font-size:12px;line-height:1.35}
+.setting-navigation-row span:last-child{font-size:24px;color:var(--muted)}
+.service-main-nav .service-btn:active,.setting-navigation-row:active{transform:scale(.985)}
+@media(prefers-reduced-motion:no-preference){.service-main-nav .service-btn,.setting-navigation-row{transition:transform .16s ease,background .16s ease,box-shadow .16s ease}}
+
+/* Hostel module: compact segmented navigation with Liquid Glass surface. */
+.hostel-module-nav{display:flex;gap:7px;overflow-x:auto;padding:7px;margin:0 0 12px;border:1px solid color-mix(in srgb,var(--border) 65%,transparent);border-radius:17px;background:color-mix(in srgb,var(--bg2) 76%,transparent);-webkit-backdrop-filter:blur(18px) saturate(1.35);backdrop-filter:blur(18px) saturate(1.35)}
+.hostel-module-nav .service-btn{flex:1;white-space:nowrap;min-width:max-content;border:1px solid transparent;background:transparent}
+.hostel-module-nav .service-btn.is-active{background:var(--accent,#155eef);color:#fff;border-color:rgba(255,255,255,.38);box-shadow:0 4px 12px rgba(21,94,239,.2)}
+.service-hostel-module [hidden]{display:none!important}
+
+/* Consistent hostel module navigation and compact settings rows. */
+.hostel-navigation-header{position:sticky;top:8px;z-index:5}.hostel-home-action{margin:0 0 8px}.hostel-module-nav{box-shadow:0 6px 20px rgba(18,40,80,.06)}
+.hostel-module-nav .service-btn{min-height:44px;padding:8px 12px;border-radius:12px}
+.service-hostel-module .service-card[hidden]{display:none!important}
+@media(max-width:480px){.hostel-module-nav{gap:5px;padding:5px}.hostel-module-nav .service-btn{font-size:12px;padding:8px 10px}}
+
+.hostel-history-heading{margin:18px 0 8px;font-size:13px;font-weight:800;color:var(--text)}
+[data-hostel-panel="history"] .service-row{align-items:flex-start}
+
+/* Settings hierarchy: clearer groups, touch targets, and restrained glass navigation. */
+.settings-section{scroll-margin-top:18px}
+.settings-section-title{display:flex;align-items:center;gap:8px;padding-bottom:9px;border-bottom:1px solid color-mix(in srgb,var(--border) 68%,transparent)}
+.settings-section-title:after{content:"";height:1px;flex:1;background:color-mix(in srgb,var(--border) 42%,transparent)}
+.service-settings-links{padding-bottom:14px}
+.setting-navigation-row{min-height:62px;border-radius:16px;text-align:left}
+.setting-navigation-row:focus-visible,.hostel-module-nav .service-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.settings-sheet .settings-section{position:relative}
+.settings-sheet .settings-section+.settings-section{margin-top:14px}
+@media(prefers-reduced-motion:no-preference){.settings-sheet .settings-section{animation:settingsSectionIn .22s ease both}@keyframes settingsSectionIn{from{opacity:.82;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}}
+@media(prefers-reduced-motion:reduce){.settings-sheet .settings-section{animation:none}}
+
+/* Keep the standalone Hostel destination easy to spot without adding another dashboard row. */
+.service-hostel-entry{border-color:var(--accent);box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
+@media (hover:hover){.service-hostel-entry:hover{filter:brightness(.98)}}
 </style>
 
 <script>
@@ -1919,6 +1960,12 @@ html.vk-light .service-pill {
       <div class="mini-note">Общие задачи, дедлайны, события и баллы ЖБС можно просматривать и редактировать здесь. Подтверждающие файлы к записям ЖБС пока добавляются в Telegram.</div>
       <div id="shared-service-view" aria-live="polite"></div>
     </div>
+    <div class="settings-section service-settings-links">
+      <div class="settings-section-title">Сервис и данные</div>
+      <button type="button" class="setting-navigation-row" data-open-service-view="sync"><span><strong>Синхронизация</strong><small>Облачная копия и связь Telegram ↔ VK</small></span><span aria-hidden="true">›</span></button>
+      <button type="button" class="setting-navigation-row" data-open-service-view="data"><span><strong>Данные и резервная копия</strong><small>Экспорт и восстановление данных</small></span><span aria-hidden="true">›</span></button>
+    </div>
+
     <div class="settings-section about-section">
       <div class="settings-section-title">О приложении</div>
       <div class="about-app">
@@ -3673,15 +3720,9 @@ html.vk-light .service-pill {
             '<button class="service-btn" data-service-action="study">Учёба</button>'+
             '<button class="service-btn" data-service-action="reminders">Напоминания</button>'+
             '<button class="service-btn" data-service-action="notes">Заметки</button>'+
+            '<button class="service-btn service-hostel-entry" data-service-action="hostel">🏠 Общежитие</button>'+
           '</div>'+
-          '<details class="service-more-nav">'+
-            '<summary>Ещё разделы</summary>'+
-            '<div class="service-action-row">'+
-              '<button class="service-btn" data-service-action="analytics">Аналитика</button>'+
-              '<button class="service-btn" data-service-action="data">Данные и резервная копия</button>'+
-              '<button class="service-btn" data-service-action="sync">Синхронизация</button>'+
-            '</div>'+
-          '</details>'+
+
         '</div>'+
       '</section>'+
       '<div class="service-grid">'+
@@ -3690,15 +3731,6 @@ html.vk-light .service-pill {
         '</section>'+
         '<section class="service-card"><h3>Мои дела</h3><div class="service-stat">'+taskOpen+'</div><p>активных задач'+(taskOverdue?' · '+taskOverdue+' просрочено':'')+'</p><p>'+dlOpen+' дедлайнов'+(dlOverdue?' · '+dlOverdue+' просрочено':'')+'</p></section>'+
       '</div>'+
-      '<section class="service-card service-hostel-section"><h3>🏠 Баллы общежития</h3>'+
-        '<div class="hostel-summary">'+
-          '<div class="hostel-box"><strong>'+serviceTotalPoints()+'</strong><span>всего</span></div>'+
-          '<div class="hostel-box"><strong>'+serviceSumSocial()+'</strong><span>социальные</span></div>'+
-        '</div>'+
-        '<div class="service-progress"><span style="width:'+Math.min(100, serviceTotalPoints()/Math.max(1,Number(serviceData.hostel.totalGoal||250))*100)+'%"></span></div>'+
-        '<p>'+serviceTotalPoints()+' / '+Number(serviceData.hostel.totalGoal||250)+' баллов</p>'+
-        '<div class="service-actions"><button class="service-btn primary" data-service-action="hostel">🏠 Учёт баллов общежития</button></div>'+
-      '</section>'+
       '<section class="service-agenda-section"><div class="service-section-title"><h2>Сегодня</h2><button class="service-btn" data-service-action="calendar">Открыть календарь</button></div>'+
         '<div class="service-list">'+
         (function(){
@@ -3710,12 +3742,6 @@ html.vk-light .service-pill {
           serviceData.events.filter(function(x){return serviceDateKey(x.date)===todayKey;}).forEach(function(x){rows.push('<div class="service-agenda-row"><div class="service-agenda-time">★</div><div class="service-row-main"><div class="service-row-title">'+serviceEsc(x.title)+'</div><div class="service-agenda-kind">Мероприятие · '+Number(x.points||0)+' б.</div></div></div>');});
           return rows.join('')||'<div class="service-calendar-empty">На сегодня ничего дополнительного нет.</div>';
         })()+
-        '</div></section>'+
-      '<section class="service-reminder-section"><div class="service-section-title"><h2>На ближайшие 7 дней</h2><button class="service-btn" data-service-action="reminders">Напоминания</button></div>'+
-        '<div class="service-reminder-grid">'+
-          '<div class="service-reminder-box"><strong>'+serviceData.tasks.filter(function(x){return !x.done&&serviceDateKey(x.dueDate)&&x.dueDate>=isoDate(new Date())&&x.dueDate<=isoDate(new Date(Date.now()+6*86400000));}).length+'</strong><span>задач</span></div>'+
-          '<div class="service-reminder-box"><strong>'+serviceData.deadlines.filter(function(x){return !x.done&&serviceDateKey(x.date)&&x.date>=isoDate(new Date())&&x.date<=isoDate(new Date(Date.now()+6*86400000));}).length+'</strong><span>дедлайнов</span></div>'+
-          '<div class="service-reminder-box"><strong>'+serviceData.events.filter(function(x){return serviceDateKey(x.date)&&x.date>=isoDate(new Date())&&x.date<=isoDate(new Date(Date.now()+6*86400000));}).length+'</strong><span>мероприятий</span></div>'+
         '</div></section>'+
       '<section class="service-deadlines-section"><div class="service-section-title"><h2>Ближайшие дедлайны</h2></div>'+
         '<div class="service-list">'+
@@ -3735,33 +3761,58 @@ html.vk-light .service-pill {
         '</div></section>'+
       '</div>';
   }
+  let serviceHostelView='overview';
+  function serviceHostelApplyView(){
+    const root=document.querySelector('.service-hostel-module');
+    if(!root)return;
+    root.querySelectorAll('[data-hostel-panel]').forEach(function(panel){
+      panel.hidden=panel.getAttribute('data-hostel-panel')!==serviceHostelView;
+    });
+    root.querySelectorAll('[data-hostel-view]').forEach(function(button){
+      const active=button.getAttribute('data-hostel-view')===serviceHostelView;
+      button.classList.toggle('is-active',active);
+      button.setAttribute('aria-pressed',active?'true':'false');
+    });
+  }
   function serviceRenderHostel(){
     const h=serviceData.hostel, total=serviceTotalPoints(), social=serviceSumSocial(), admin=serviceSumWork();
-    return '<div class="service-page">'+
-      '<section class="service-hero"><div class="service-kicker">Общежитие</div><h1 class="service-title">Учёт баллов</h1>'+
+    return '<div class="service-page service-hostel-module">'+
+      '<div class="hostel-navigation-header">'+
+      '<div class="service-actions hostel-home-action"><button class="service-btn" data-service-action="service-home">← Мой сервис</button></div>'+
+      '<nav class="hostel-module-nav" aria-label="Разделы общежития">'+
+        '<button type="button" class="service-btn" data-hostel-view="overview">Обзор</button>'+
+        '<button type="button" class="service-btn" data-hostel-view="admin">ЖБС</button>'+
+        '<button type="button" class="service-btn" data-hostel-view="social">ССО · Социальные баллы</button>'+
+        '<button type="button" class="service-btn" data-hostel-view="history">История / отчёт</button>'+
+      '</nav>'+
+      '</div>'+
+      '<section class="service-hero" data-hostel-panel="overview"><div class="service-kicker">Общежитие</div><h1 class="service-title">Учёт баллов</h1>'+
       '<div class="service-sub">Цели можно изменить под правила твоего года.</div>'+
       '<div class="service-form-row service-form"><div><label>Цель социальных баллов</label><input id="hostel-social-goal" type="number" min="0" value="'+Number(h.socialGoal||Math.max(0,Number(h.totalGoal||250)-Number(h.adminGoal||100)))+'"></div><div><label>Цель административных баллов</label><input id="hostel-admin-goal" type="number" min="0" value="'+Number(h.adminGoal||100)+'"></div></div>'+
-      '<div class="service-actions"><button class="service-btn primary" data-service-action="save-hostel-goals">Сохранить цели</button><button class="service-btn" data-service-action="service-home">← Мой сервис</button></div></section>'+
-      '<section class="service-card"><h3>Прогресс</h3><div class="hostel-summary">'+
+      '<div class="service-actions"><button class="service-btn primary" data-service-action="save-hostel-goals">Сохранить цели</button></div></section>'+
+      '<section class="service-card" data-hostel-panel="overview"><h3>Прогресс</h3><div class="hostel-summary">'+
         '<div class="hostel-box"><strong>'+total+'</strong><span>всего / '+Number(h.totalGoal||250)+'</span></div>'+
         '<div class="hostel-box"><strong>'+admin+'</strong><span>административные</span></div>'+
         '<div class="hostel-box"><strong>'+social+'</strong><span>социальные</span></div>'+
         '<div class="hostel-box"><strong>'+Math.max(0,Number(h.totalGoal||250)-total)+'</strong><span>осталось</span></div>'+
       '</div><div class="service-progress"><span style="width:'+Math.min(100,total/Math.max(1,Number(h.totalGoal||250))*100)+'%"></span></div></section>'+
-      '<section class="service-card"><h3>⏱ Административные / GBS</h3><p>За каждые 10 минут — 1 балл. Вводи фактически отработанные минуты, приложение посчитает баллы.</p>'+
-      '<div class="service-form"><div class="service-form-row"><div><label>Дата</label><input id="work-date" type="date" value="'+isoDate(new Date())+'"></div><div><label>Минуты</label><input id="work-minutes" type="number" min="0" step="1" placeholder="20"></div></div><div><label>Что делал</label><input id="work-title" placeholder="GBS / дежурство / работа"></div>'+
+      '<section class="service-card" data-hostel-panel="admin"><h3>⏱ Административные / ЖБС</h3><p>За каждые 10 минут — 1 балл. Вводи фактически отработанные минуты, приложение посчитает баллы.</p>'+
+      '<div class="service-form"><div class="service-form-row"><div><label>Дата</label><input id="work-date" type="date" value="'+isoDate(new Date())+'"></div><div><label>Минуты</label><input id="work-minutes" type="number" min="0" step="1" placeholder="20"></div></div><div><label>Что делал</label><input id="work-title" placeholder="ЖБС / дежурство / работа"></div>'+
       '<button class="service-btn primary" data-service-action="add-work">Добавить работу</button></div>'+
-      '<div class="service-list" style="margin-top:10px">'+(h.work.slice().reverse().slice(0,12).map(x=>
-        '<div class="service-row"><div class="service-row-main"><div class="service-row-title">'+serviceDate(x.date)+' · '+Number(x.minutes)+' мин</div><div class="service-row-meta">'+serviceEsc(x.title||'Работа')+'</div></div><span class="service-pill">+'+Number(x.points)+' б.</span><button class="service-btn danger" data-service-del-work="'+serviceEsc(x.id)+'">×</button></div>'
-      ).join('')||'<div class="service-empty">Записей пока нет.</div>')+'</div></section>'+
-      '<section class="service-card"><h3>🎓 Социальные баллы</h3><p>Фиксируй мероприятие, дату, количество баллов и подтверждение участия. Подтверждение сохраняется в записи и синхронизируется вместе с общим аккаунтом. Для крупных файлов может потребоваться уменьшить размер вложения.</p>'+
+      '</section>'+
+      '<section class="service-card" data-hostel-panel="social"><h3>🎓 ССО — социальные баллы</h3><p>Фиксируй мероприятие, дату, количество баллов и подтверждение участия. Подтверждение сохраняется в записи и синхронизируется вместе с общим аккаунтом. Для крупных файлов может потребоваться уменьшить размер вложения.</p>'+
       '<div class="service-form"><div class="service-form-row"><div><label>Дата</label><input id="social-date" type="date" value="'+isoDate(new Date())+'"></div><div><label>Баллы</label><input id="social-points" type="number" min="0" step="1" placeholder="10"></div></div><div><label>Мероприятие</label><input id="social-title" placeholder="Название мероприятия"></div><div><label>Комментарий</label><textarea id="social-note" placeholder="Организатор, роль, что подтверждает участие…"></textarea></div><div><label>Подтверждение</label><input id="social-file" class="service-file" type="file" accept="image/*,.pdf,.doc,.docx"></div>'+
       '<button class="service-btn primary" data-service-action="add-social">Добавить мероприятие</button></div>'+
-      '<div class="service-list" style="margin-top:10px">'+(h.social.slice().reverse().slice(0,12).map(x=>
-        '<div class="service-row"><div class="service-row-main"><div class="service-row-title">'+serviceDate(x.date)+' · '+serviceEsc(x.title)+'</div><div class="service-row-meta">'+Number(x.points)+' б. · '+serviceEsc(x.note||'')+(x.fileName?' · '+serviceEsc(x.fileName):'')+'</div></div><button class="service-btn danger" data-service-del-social="'+serviceEsc(x.id)+'">×</button></div>'
-      ).join('')||'<div class="service-empty">Мероприятий пока нет.</div>')+'</div>'+
-      '<div class="service-actions"><button class="service-btn primary" data-service-action="export-word">📄 Сформировать Word-отчёт</button></div>'+
-      '<div class="report-note">Отчёт формируется прямо в Mini App. Для официальной подачи проверь шаблон и требования общежития перед отправкой.</div></section>'+
+      '</section>'+
+      '<section class="service-card" data-hostel-panel="history"><h3>История начислений</h3>'+
+        '<p>Все записи по ЖБС и ССО собраны здесь. Удаление записи обновляет общий баланс.</p>'+
+        '<h4 class="hostel-history-heading">ЖБС · Административные баллы</h4>'+
+        '<div class="service-list">'+(h.work.slice().sort(function(a,b){return String(b.date||"").localeCompare(String(a.date||""));}).map(function(x){return `<div class="service-row"><div class="service-row-main"><div class="service-row-title">${serviceDate(x.date)} · ${Number(x.minutes)} мин</div><div class="service-row-meta">${serviceEsc(x.title||"Работа")}</div></div><span class="service-pill">+${Number(x.points)} б.</span><button class="service-btn danger" data-service-del-work="${serviceEsc(x.id)}" aria-label="Удалить запись ЖБС">×</button></div>`;}).join("")||'<div class="service-empty">Записей ЖБС пока нет.</div>')+'</div>'+
+        '<h4 class="hostel-history-heading">ССО · Социальные баллы</h4>'+
+        '<div class="service-list">'+(h.social.slice().sort(function(a,b){return String(b.date||"").localeCompare(String(a.date||""));}).map(function(x){return `<div class="service-row"><div class="service-row-main"><div class="service-row-title">${serviceDate(x.date)} · ${serviceEsc(x.title)}</div><div class="service-row-meta">${Number(x.points)} б. · ${serviceEsc(x.note||"")}${x.fileName?" · "+serviceEsc(x.fileName):""}</div></div><button class="service-btn danger" data-service-del-social="${serviceEsc(x.id)}" aria-label="Удалить запись ССО">×</button></div>`;}).join("")||'<div class="service-empty">Записей ССО пока нет.</div>')+'</div>'+
+        '<div class="service-actions"><button class="service-btn primary" data-service-action="export-word">📄 Сформировать Word-отчёт</button></div>'+
+        '<div class="report-note">Отчёт включает записи ЖБС и ССО. Перед официальной подачей проверь требования общежития.</div>'+
+      '</section>'+
       '</div>';
   }
   function serviceSubjectList(){
@@ -3948,11 +3999,11 @@ html.vk-light .service-pill {
   function serviceExportWord(){
     const h=serviceData.hostel,total=serviceTotalPoints(),admin=serviceSumWork(),social=serviceSumSocial();
     let rows='';
-    h.work.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))).forEach(x=>rows+='<tr><td>'+serviceEsc(x.date)+'</td><td>Административные</td><td>'+serviceEsc(x.title||'Работа')+'</td><td>'+Number(x.minutes||0)+'</td><td>'+Number(x.points||0)+'</td><td></td></tr>');
-    h.social.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))).forEach(x=>rows+='<tr><td>'+serviceEsc(x.date)+'</td><td>Социальные</td><td>'+serviceEsc(x.title)+'</td><td></td><td>'+Number(x.points||0)+'</td><td>'+serviceEsc(x.fileName||'')+'</td></tr>');
+    h.work.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))).forEach(x=>rows+='<tr><td>'+serviceEsc(x.date)+'</td><td>Административные</td><td>'+serviceEsc(x.title||'Работа')+'</td><td>'+Number(x.minutes||0)+'</td><td>'+Number(x.points||0)+'</td><td></td><td></td></tr>');
+    h.social.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))).forEach(x=>rows+='<tr><td>'+serviceEsc(x.date)+'</td><td>Социальные</td><td>'+serviceEsc(x.title)+'</td><td></td><td>'+Number(x.points||0)+'</td><td>'+serviceEsc(x.note||'')+'</td><td>'+serviceEsc(x.fileName||'')+'</td></tr>');
     const doc='<!doctype html><html><head><meta charset="utf-8"><title>Отчёт по баллам</title><style>body{font-family:Arial,sans-serif;font-size:11pt}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:6px}h1{font-size:18pt}</style></head><body>'+
       '<h1>Отчёт по баллам общежития</h1><p>Группа: '+serviceEsc(GROUP_NAME)+'</p><p>Всего: <b>'+total+'</b> / '+Number(h.totalGoal||250)+' · Административные: <b>'+admin+'</b> · Социальные: <b>'+social+'</b></p>'+
-      '<table><tr><th>Дата</th><th>Тип</th><th>Событие / работа</th><th>Минуты</th><th>Баллы</th><th>Подтверждение</th></tr>'+rows+'</table>'+
+      '<table><tr><th>Дата</th><th>Тип</th><th>Событие / работа</th><th>Минуты</th><th>Баллы</th><th>Комментарий</th><th>Подтверждение</th></tr>'+rows+'</table>'+
       '<p>Документ сформирован в KGEU Student Service. Перед официальной подачей проверьте соответствие требованиям общежития.</p></body></html>';
     serviceDownload('KGEU_отчет_по_баллам_'+isoDate(new Date())+'.doc',doc,'application/msword');
   }
@@ -4137,7 +4188,31 @@ html.vk-light .service-pill {
     });
   })();
 
+  document.querySelectorAll('[data-open-service-view]').forEach(function(button){
+    button.addEventListener('click',function(){
+      const view=button.getAttribute('data-open-service-view');
+      const close=document.getElementById('group-close');
+      if(close) close.click();
+      const app=document.getElementById('app');
+      if(!app) return;
+      app.innerHTML=view==='sync'?serviceRenderSync():serviceRenderData();
+      serviceBind();
+      window.scrollTo({top:0,behavior:'smooth'});
+    });
+  });
+
   function serviceBind(){
+    if(document.querySelector('.service-hostel-module')){
+      serviceHostelApplyView();
+      document.querySelectorAll('[data-hostel-view]').forEach(function(button){
+        button.addEventListener('click',function(){
+          serviceHostelView=button.getAttribute('data-hostel-view')||'overview';
+          document.getElementById('app').innerHTML=serviceRenderHostel();
+          serviceBind();
+          window.scrollTo({top:0,behavior:'smooth'});
+        });
+      });
+    }
     const noteEditForm=document.getElementById('service-note-edit-form');
     if(noteEditForm)noteEditForm.addEventListener('submit',function(e){
       e.preventDefault();
@@ -4295,7 +4370,7 @@ html.vk-light .service-pill {
         if('Notification' in window){try{const p=await Notification.requestPermission();toast(p==='granted'?'Уведомления разрешены':'Разрешение не выдано');}catch(e){toast('Не удалось запросить разрешение');}}else toast('Этот WebView не поддерживает системные уведомления');
         return;
       }
-      if(a==='hostel'){document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();return;}
+      if(a==='hostel'){serviceHostelView='overview';document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();return;}
       if(a==='study'){document.getElementById('app').innerHTML=serviceRenderStudy();serviceBind();return;}
       if(a==='schedule'||a==='today'){switchTab('today');return;}
       if(a==='service-home'){document.getElementById('app').innerHTML=serviceRenderToday();serviceBind();return;}
@@ -4310,13 +4385,13 @@ html.vk-light .service-pill {
         if(!minutes){toast('Укажи количество минут');return;}
         const title=document.getElementById('work-title').value.trim()||'Работа';
         serviceData.hostel.work.push({id:'w_'+Date.now(),date:date,minutes:minutes,points:Math.floor(minutes/10),title:title});
-        serviceSave();document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();return;
+        serviceSave();document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();toast('Работа ЖБС добавлена');return;
       }
       if(a==='add-social'){
         const file=document.getElementById('social-file').files[0];
         const rec={id:'s_'+Date.now(),date:document.getElementById('social-date').value||isoDate(new Date()),points:Math.max(0,Math.floor(Number(document.getElementById('social-points').value||0))),title:document.getElementById('social-title').value.trim()||'Мероприятие',note:document.getElementById('social-note').value.trim(),fileName:file?file.name:'',fileData:''};
         if(!rec.points){toast('Укажи количество социальных баллов');return;}
-        const f=await serviceReadFile(file);rec.fileData=f.data;serviceData.hostel.social.push(rec);serviceSave();document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();return;
+        const f=await serviceReadFile(file);rec.fileData=f.data;serviceData.hostel.social.push(rec);serviceSave();document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();toast('Мероприятие ССО добавлено');return;
       }
       if(a==='export-word')return serviceExportWord();
     });});
