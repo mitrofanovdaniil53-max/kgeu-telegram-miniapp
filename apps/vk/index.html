@@ -4289,7 +4289,7 @@ html.vk-light .service-pill {
       a.href=url;a.download='kgeu-student-service-backup-'+isoDate(new Date())+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url);},1000);toast('Резервная копия подготовлена');
     }catch(e){toast('Не удалось создать резервную копию');}
   }
-  function serviceBackupCurrent(){try{localStorage.setItem(STUDENT_SERVICE_BACKUP_KEY,JSON.stringify(serviceData));}catch(e){}}
+  function serviceBackupCurrent(){try{localStorage.setItem(STUDENT_SERVICE_BACKUP_KEY,JSON.stringify(serviceData));localStorage.setItem('kgeu_student_personal_backup_before_cloud_restore_v1',JSON.stringify(kgeuPersonalData||{version:1,notes:{}}));return true;}catch(e){return false;}}
   function serviceImportData(file){
     if(!file)return;
     if(file.size>5*1024*1024){toast('Файл больше 5 МБ');return;}
@@ -4299,13 +4299,22 @@ html.vk-light .service-pill {
         const payload=JSON.parse(String(reader.result||''));
         const incoming=payload&&payload.serviceData?payload.serviceData:payload;
         if(!incoming||typeof incoming!=='object'||(!Array.isArray(incoming.tasks)&&!Array.isArray(incoming.deadlines)&&!Array.isArray(incoming.events))){throw new Error('bad');}
-        serviceBackupCurrent();
+        const previousServiceData=serviceData;
+        const previousPersonalData=kgeuPersonalData;
+        if(!serviceBackupCurrent()){toast('Не удалось создать резервную копию текущих данных. Восстановление отменено.');return;}
         serviceData=serviceNormalizeData(incoming);
-        serviceSave();
+        if(!serviceSave()){serviceData=previousServiceData;toast('Не удалось сохранить восстановленные данные. Текущие данные оставлены без изменений.');return;}
         if(payload.personalData&&typeof payload.personalData==='object'&&typeof kgeuSavePersonalData==='function'){
           const pd=payload.personalData;
-          kgeuPersonalData={version:1,notes:(pd.notes&&typeof pd.notes==='object')?pd.notes:{},updatedAt:Date.now()};
-          kgeuSavePersonalData(kgeuPersonalData);
+          const importedPersonalData={version:1,notes:(pd.notes&&typeof pd.notes==='object')?pd.notes:{},updatedAt:Date.now()};
+          if(!kgeuSavePersonalData(importedPersonalData)){
+            serviceData=previousServiceData;
+            serviceSave();
+            kgeuPersonalData=previousPersonalData;
+            toast('Не удалось сохранить заметки. Восстановление отменено; текущая копия сохранена.');
+            return;
+          }
+          kgeuPersonalData=importedPersonalData;
         }
         toast('Данные восстановлены');document.getElementById('app').innerHTML=serviceRenderData();serviceBind();
       }catch(e){toast('Не удалось прочитать резервную копию');}
