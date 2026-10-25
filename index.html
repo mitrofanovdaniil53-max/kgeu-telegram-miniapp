@@ -3558,9 +3558,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
             '<button class="service-btn" data-service-action="calendar">Календарь</button>'+
             '<button class="service-btn" data-service-action="study">Учёба</button>'+
             '<button class="service-btn" data-service-action="reminders">Напоминания</button>'+
-          '</div>'+
-          '<div class="service-action-row service-main-nav">'+
-            '<button class="service-btn" data-service-action="hostel">🏠 Общежитие</button>'+
+            '<button class="service-btn service-hostel-entry" data-service-action="hostel">🏠 Общежитие</button>'+
           '</div>'+
 
         '</div>'+
@@ -3582,12 +3580,6 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
           serviceData.events.filter(function(x){return serviceDateKey(x.date)===todayKey;}).forEach(function(x){rows.push('<div class="service-agenda-row"><div class="service-agenda-time">★</div><div class="service-row-main"><div class="service-row-title">'+serviceEsc(x.title)+'</div><div class="service-agenda-kind">Мероприятие · '+Number(x.points||0)+' б.</div></div></div>');});
           return rows.join('')||'<div class="service-calendar-empty">На сегодня ничего дополнительного нет.</div>';
         })()+
-        '</div></section>'+
-      '<section class="service-reminder-section"><div class="service-section-title"><h2>На ближайшие 7 дней</h2><button class="service-btn" data-service-action="reminders">Напоминания</button></div>'+
-        '<div class="service-reminder-grid">'+
-          '<div class="service-reminder-box"><strong>'+serviceData.tasks.filter(function(x){return !x.done&&serviceDateKey(x.dueDate)&&x.dueDate>=isoDate(new Date())&&x.dueDate<=isoDate(new Date(Date.now()+6*86400000));}).length+'</strong><span>задач</span></div>'+
-          '<div class="service-reminder-box"><strong>'+serviceData.deadlines.filter(function(x){return !x.done&&serviceDateKey(x.date)&&x.date>=isoDate(new Date())&&x.date<=isoDate(new Date(Date.now()+6*86400000));}).length+'</strong><span>дедлайнов</span></div>'+
-          '<div class="service-reminder-box"><strong>'+serviceData.events.filter(function(x){return serviceDateKey(x.date)&&x.date>=isoDate(new Date())&&x.date<=isoDate(new Date(Date.now()+6*86400000));}).length+'</strong><span>мероприятий</span></div>'+
         '</div></section>'+
       '<section class="service-deadlines-section"><div class="service-section-title"><h2>Ближайшие дедлайны</h2></div>'+
         '<div class="service-list">'+
