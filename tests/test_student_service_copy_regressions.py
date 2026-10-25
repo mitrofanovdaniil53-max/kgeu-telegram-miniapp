@@ -507,5 +507,48 @@ class StudentServiceNumericNormalizationTest(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
                 self.assertIn("numeric helper assertions passed", result.stdout)
 
+
+
+class StudentServiceNormalizationBehaviorTest(unittest.TestCase):
+    def test_real_normalizer_preserves_zero_and_falls_back_for_malformed_hostel_values(self):
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("Node.js is required to execute the real frontend normalizer")
+
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            helper_start = source.index("function serviceNonNegativeNumber(value,fallback)")
+            helper_end = source.index("\n", helper_start)
+            normalize_start = source.index("function serviceNormalizeData(x)")
+            normalize_end = source.index("function serviceLoad()", normalize_start)
+            helper = source[helper_start:helper_end]
+            normalizer = source[normalize_start:normalize_end]
+            script = "\n".join([
+                "const assert = require('node:assert/strict');",
+                "const STUDENT_SERVICE_SCHEMA = 19;",
+                "function serviceRecordArray(value) { return Array.isArray(value) ? value : []; }",
+                "function serviceNormalizeRecord(record, prefix) { return Object.assign({id: prefix + '_test'}, record || {}); }",
+                "function serviceDateKey(value) { return typeof value === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(value); }",
+                helper,
+                normalizer,
+                "const zeros = serviceNormalizeData({hostel:{totalGoal:0,adminGoal:0,socialGoal:0,work:[{minutes:'',points:'bad'}],social:[{points:true}]}});",
+                "assert.equal(zeros.hostel.totalGoal, 0);",
+                "assert.equal(zeros.hostel.adminGoal, 0);",
+                "assert.equal(zeros.hostel.socialGoal, 0);",
+                "assert.equal(zeros.hostel.work[0].minutes, 0);",
+                "assert.equal(zeros.hostel.work[0].points, 0);",
+                "assert.equal(zeros.hostel.social[0].points, 0);",
+                "const malformed = serviceNormalizeData({hostel:{totalGoal:'',adminGoal:'bad',socialGoal:null}});",
+                "assert.equal(malformed.hostel.totalGoal, 250);",
+                "assert.equal(malformed.hostel.adminGoal, 100);",
+                "assert.equal(malformed.hostel.socialGoal, 150);",
+                "console.log('real serviceNormalizeData assertions passed');",
+            ])
+            with self.subTest(frontend=relative):
+                result = subprocess.run([node, "-e", script], capture_output=True, text=True, check=False)
+                self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+                self.assertIn("real serviceNormalizeData assertions passed", result.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()
