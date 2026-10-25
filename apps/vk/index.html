@@ -1100,6 +1100,50 @@ function kgeuSetNote(subject, value) {
 /* Keep the standalone Hostel destination easy to spot without adding another dashboard row. */
 .service-hostel-entry{border-color:var(--accent);box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
 @media (hover:hover){.service-hostel-entry:hover{filter:brightness(.98)}}
+
+/* Student Service design system v1: hierarchy, spacing, and readable surfaces. */
+.service-page > .service-hero { order: 0; }
+.service-page > .service-agenda-section { order: 1; }
+.service-page > .service-grid { order: 2; }
+.service-page > .service-hostel-section { order: 3; }
+.service-page > .service-reminder-section { order: 4; }
+.service-page > .service-deadlines-section { order: 5; }
+.service-page > .service-events-section { order: 6; }
+.service-page .service-hero,
+.service-page .service-card,
+.service-page .service-agenda-section,
+.service-page .service-deadlines-section,
+.service-page .service-events-section { min-width: 0; }
+.service-page .service-grid { align-items: stretch; }
+.service-page .service-grid > .service-card { min-height: 112px; }
+.service-page .service-card h3 { line-height: 1.3; letter-spacing: -.015em; }
+.service-page .service-card p { line-height: 1.45; overflow-wrap: anywhere; }
+.service-page .service-agenda-row,
+.service-page .service-agenda-row .service-row-main { min-width: 0; }
+.service-page .service-agenda-row .service-row-title { overflow-wrap: anywhere; }
+.service-page .service-section-title h2 { min-width: 0; line-height: 1.25; }
+.service-page .service-section-title .service-btn { flex-shrink: 0; }
+.service-page .service-action-row .service-btn { min-height: 44px; }
+@media (min-width: 641px) {
+  .service-page > .service-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .service-page > .service-agenda-section { margin-top: 0; }
+}
+@media (max-width: 640px) {
+  .service-page > .service-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .service-page .service-grid > .service-card { padding: 12px; min-height: 108px; }
+  .service-page .service-card h3 { font-size: 14px; }
+  .service-page .service-stat { overflow-wrap: anywhere; }
+}
+@media (max-width: 360px) {
+  .service-page > .service-grid { grid-template-columns: minmax(0, 1fr); }
+  .service-page .service-section-title { align-items: flex-start; }
+  .service-page .service-section-title .service-btn { white-space: normal; max-width: 48%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .service-page .service-card,
+  .service-page .service-btn { scroll-behavior: auto; transition: none !important; }
+}
+
 </style>
 
 <script>
@@ -4002,47 +4046,7 @@ html.vk-light .service-pill {
     h.work.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))).forEach(x=>rows+='<tr><td>'+serviceEsc(x.date)+'</td><td>Административные</td><td>'+serviceEsc(x.title||'Работа')+'</td><td>'+Number(x.minutes||0)+'</td><td>'+Number(x.points||0)+'</td><td></td><td></td></tr>');
     h.social.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))).forEach(x=>rows+='<tr><td>'+serviceEsc(x.date)+'</td><td>Социальные</td><td>'+serviceEsc(x.title)+'</td><td></td><td>'+Number(x.points||0)+'</td><td>'+serviceEsc(x.note||'')+'</td><td>'+serviceEsc(x.fileName||'')+'</td></tr>');
     const doc='<!doctype html><html><head><meta charset="utf-8"><title>Отчёт по баллам</title><style>body{font-family:Arial,sans-serif;font-size:11pt}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:6px}h1{font-size:18pt}
-/* Student Service design system v1: hierarchy, spacing, and readable surfaces. */
-.service-page > .service-hero { order: 0; }
-.service-page > .service-agenda-section { order: 1; }
-.service-page > .service-grid { order: 2; }
-.service-page > .service-hostel-section { order: 3; }
-.service-page > .service-reminder-section { order: 4; }
-.service-page > .service-deadlines-section { order: 5; }
-.service-page > .service-events-section { order: 6; }
-.service-page .service-hero,
-.service-page .service-card,
-.service-page .service-agenda-section,
-.service-page .service-deadlines-section,
-.service-page .service-events-section {
-  min-width: 0;
-}
-.service-page .service-grid { align-items: stretch; }
-.service-page .service-grid > .service-card { min-height: 112px; }
-.service-page .service-card h3 { line-height: 1.3; letter-spacing: -.015em; }
-.service-page .service-card p { line-height: 1.45; overflow-wrap: anywhere; }
-.service-page .service-agenda-row { min-width: 0; }
-.service-page .service-agenda-row .service-row-main { min-width: 0; }
-.service-page .service-agenda-row .service-row-title { overflow-wrap: anywhere; }
-.service-page .service-section-title h2 { min-width: 0; line-height: 1.25; }
-.service-page .service-section-title .service-btn { flex-shrink: 0; }
-.service-page .service-action-row .service-btn { min-height: 44px; }
-@media (min-width: 641px) {
-  .service-page > .service-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .service-page > .service-agenda-section { margin-top: 0; }
-}
-@media (max-width: 640px) {
-  .service-page > .service-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .service-page .service-grid > .service-card { padding: 12px; min-height: 108px; }
-  .service-page .service-card h3 { font-size: 14px; }
-  .service-page .service-stat { overflow-wrap: anywhere; }
-}
-@media (max-width: 360px) {
-  .service-page > .service-grid { grid-template-columns: minmax(0, 1fr); }
-  .service-page .service-section-title { align-items: flex-start; }
-  .service-page .service-section-title .service-btn { white-space: normal; max-width: 48%; }
-}
-@media (prefers-reduced-motion: reduce) {
+media (prefers-reduced-motion: reduce) {
   .service-page .service-card,
   .service-page .service-btn { scroll-behavior: auto; transition: none !important; }
 }
