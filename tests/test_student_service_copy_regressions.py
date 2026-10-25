@@ -79,6 +79,8 @@ class StudentServiceCopyRegressionTest(unittest.TestCase):
                 self.assertIn("toast('Работа ЖБС добавлена')", source)
                 self.assertIn("toast('Мероприятие ССО добавлено')", source)
                 self.assertIn("const historyRows=h.work.map", source)
+                self.assertIn("if(!a.date&&b.date)return 1;if(a.date&&!b.date)return -1;", source)
+                self.assertIn("const reportRows=h.work.map", source)
                 self.assertIn("h.social.map(function(x){return Object.assign({kind:'social'},x);})", source)
                 self.assertIn("Записи ЖБС и ССО отсортированы по дате.", source)
                 self.assertIn("ЖБС · +", source)
