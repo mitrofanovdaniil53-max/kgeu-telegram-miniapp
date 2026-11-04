@@ -664,6 +664,58 @@ class TelegramReportDeliveryRegressionTest(unittest.TestCase):
 
 
 class StudentServiceImportBackupSafetyTest(unittest.TestCase):
+    def test_cloud_snapshot_rolls_back_when_personal_notes_cannot_be_saved(self):
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("Node.js is required to execute cloud snapshot restore")
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            start = source.index("function serviceApplyCloudSnapshot(snapshot)")
+            end = source.index("// Refresh only the visible Student Service screen", start)
+            apply_function = source[start:end]
+            script = "\\n".join([
+                "const assert = require('node:assert/strict');",
+                "const STUDENT_SERVICE_KEY = 'service-data';",
+                "const STUDENT_SERVICE_SYNC_KEY = 'service-sync';",
+                "let serviceData = { tasks: [{ id: 'local' }] };",
+                "let kgeuPersonalData = { version: 1, notes: { local: 'saved locally' } };",
+                "const previousServiceData = JSON.stringify(serviceData);",
+                "const previousPersonalData = kgeuPersonalData;",
+                "const store = { [STUDENT_SERVICE_KEY]: previousServiceData };",
+                "let failRollbackWrite = false;",
+                "const localStorage = {",
+                "  getItem(key) { return Object.prototype.hasOwnProperty.call(store, key) ? store[key] : null; },",
+                "  setItem(key, value) {",
+                "    if (failRollbackWrite && key === STUDENT_SERVICE_KEY && value === previousServiceData) throw new Error('quota');",
+                "    store[key] = String(value);",
+                "  }",
+                "};",
+                "const window = { __kgeuApplyingSharedProfile: false };",
+                "const hasExplicitGroupFromLaunch = false;",
+                "function serviceBackupBeforeCloudRestore() {}",
+                "function serviceNormalizeData(value) { return value; }",
+                "function kgeuSavePersonalData() { return false; }",
+                "function kgeuMigrateLegacyNotesForActiveGroup() { throw new Error('must not migrate after failed save'); }",
+                "function serviceSyncMeta() { return {}; }",
+                "function kgeuFlushLegacyNoteMigrationSync() {}",
+                apply_function,
+                "const snapshot = { found: true, serviceData: { tasks: [{ id: 'cloud' }] }, personalData: { notes: { cloud: 'cloud note' } } };",
+                "assert.throws(() => serviceApplyCloudSnapshot(snapshot), /cloud_snapshot_personal_save_failed/);",
+                "assert.deepEqual(serviceData, { tasks: [{ id: 'local' }] });",
+                "assert.equal(store[STUDENT_SERVICE_KEY], previousServiceData);",
+                "assert.equal(kgeuPersonalData, previousPersonalData);",
+                "assert.equal(store[STUDENT_SERVICE_SYNC_KEY], undefined);",
+                "failRollbackWrite = true;",
+                "assert.throws(() => serviceApplyCloudSnapshot(snapshot), /cloud_snapshot_rollback_failed/);",
+                "assert.deepEqual(serviceData, { tasks: [{ id: 'local' }] });",
+                "assert.equal(kgeuPersonalData, previousPersonalData);",
+                "console.log('cloud snapshot rollback assertions passed');",
+            ])
+            with self.subTest(frontend=relative):
+                result = subprocess.run([node, "-e", script], capture_output=True, text=True, check=False)
+                self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+                self.assertIn("cloud snapshot rollback assertions passed", result.stdout)
+
     def test_json_restore_backs_up_notes_and_aborts_when_backup_or_save_fails(self):
         for relative in ("index.html", "apps/vk/index.html"):
             source = (ROOT / relative).read_text(encoding="utf-8")
