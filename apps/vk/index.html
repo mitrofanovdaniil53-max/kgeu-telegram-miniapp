@@ -1135,6 +1135,51 @@ function kgeuSetNote(subject, value) {
 }
 @media (prefers-reduced-motion: reduce) { .service-page .service-card, .service-page .service-btn { transition: none !important; } }
 
+
+/* Liquid Glass surface restoration — presentation only; keep all existing app flows intact. */
+:root {
+  --glass-surface: color-mix(in srgb, var(--card) 78%, transparent);
+  --glass-border: color-mix(in srgb, var(--border) 62%, white 38%);
+  --glass-shadow: 0 10px 28px rgba(16,24,40,.075), inset 0 1px 0 rgba(255,255,255,.62);
+}
+html.tg-dark, html.vk-dark {
+  --glass-border: rgba(255,255,255,.12);
+  --glass-shadow: 0 12px 30px rgba(0,0,0,.20), inset 0 1px 0 rgba(255,255,255,.10);
+}
+html.tg-light, html.vk-light {
+  --glass-border: rgba(255,255,255,.18);
+  --glass-shadow: 0 12px 30px rgba(16,24,40,.16), inset 0 1px 0 rgba(255,255,255,.12);
+}
+.hero, .next-mini, .lesson-card, .day-summary, .feature-box,
+.service-page .service-hero, .service-page .service-card,
+.service-page .service-agenda-section, .service-page .service-deadlines-section,
+.service-page .service-events-section {
+  background: var(--glass-surface);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: blur(20px) saturate(1.35);
+  backdrop-filter: blur(20px) saturate(1.35);
+}
+.tabs, .hostel-module-nav {
+  -webkit-backdrop-filter: blur(22px) saturate(1.45);
+  backdrop-filter: blur(22px) saturate(1.45);
+}
+.tabs .tab.active, .hostel-module-nav .service-btn.is-active {
+  box-shadow: 0 5px 16px rgba(16,24,40,.12), inset 0 1px 0 rgba(255,255,255,.72);
+}
+.date-nav button, .service-main-nav .service-btn, .service-actions .service-btn,
+.service-action-row .service-btn, .setting-navigation-row {
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  backdrop-filter: blur(16px) saturate(1.3);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero, .next-mini, .lesson-card, .day-summary, .feature-box,
+  .service-page .service-hero, .service-page .service-card {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
 </style>
 
 <script>
@@ -4163,52 +4208,7 @@ html.vk-light .service-pill {
     let rows='';
     const reportRows=h.work.map(function(x){return Object.assign({kind:'work'},x);}).concat(h.social.map(function(x){return Object.assign({kind:'social'},x);})).sort(function(a,b){if(!a.date&&b.date)return 1;if(a.date&&!b.date)return -1;return String(a.date||'').localeCompare(String(b.date||''))||String(a.id||'').localeCompare(String(b.id||''));});
     reportRows.forEach(function(x){if(x.kind==='work')rows+='<tr><td>'+serviceEsc(x.date)+'</td><td>Административные / ЖБС</td><td>'+serviceEsc(x.title||'Работа')+'</td><td>'+Number(x.minutes||0)+'</td><td>'+Number(x.points||0)+'</td><td></td><td></td></tr>';else rows+='<tr><td>'+serviceEsc(x.date)+'</td><td>Социальные / ССО</td><td>'+serviceEsc(x.title||'Мероприятие')+'</td><td></td><td>'+Number(x.points||0)+'</td><td>'+serviceEsc(x.note||'')+'</td><td>'+serviceReportAttachment(x)+'</td></tr>';});
-    const doc='<!doctype html><html><head><meta charset="utf-8"><title>Отчёт по баллам</title><style>body{font-family:Arial,sans-serif;font-size:11pt}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:6px}h1{font-size:18pt}
-/* Liquid Glass surface restoration — presentation only; keep all existing app flows intact. */
-:root {
-  --glass-surface: color-mix(in srgb, var(--card) 78%, transparent);
-  --glass-border: color-mix(in srgb, var(--border) 62%, white 38%);
-  --glass-shadow: 0 10px 28px rgba(16,24,40,.075), inset 0 1px 0 rgba(255,255,255,.62);
-}
-html.tg-dark, html.vk-dark {
-  --glass-border: rgba(255,255,255,.12);
-  --glass-shadow: 0 12px 30px rgba(0,0,0,.20), inset 0 1px 0 rgba(255,255,255,.10);
-}
-html.tg-light, html.vk-light {
-  --glass-border: rgba(255,255,255,.18);
-  --glass-shadow: 0 12px 30px rgba(16,24,40,.16), inset 0 1px 0 rgba(255,255,255,.12);
-}
-.hero, .next-mini, .lesson-card, .day-summary, .feature-box,
-.service-page .service-hero, .service-page .service-card,
-.service-page .service-agenda-section, .service-page .service-deadlines-section,
-.service-page .service-events-section {
-  background: var(--glass-surface);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow);
-  -webkit-backdrop-filter: blur(20px) saturate(1.35);
-  backdrop-filter: blur(20px) saturate(1.35);
-}
-.tabs, .hostel-module-nav {
-  -webkit-backdrop-filter: blur(22px) saturate(1.45);
-  backdrop-filter: blur(22px) saturate(1.45);
-}
-.tabs .tab.active, .hostel-module-nav .service-btn.is-active {
-  box-shadow: 0 5px 16px rgba(16,24,40,.12), inset 0 1px 0 rgba(255,255,255,.72);
-}
-.date-nav button, .service-main-nav .service-btn, .service-actions .service-btn,
-.service-action-row .service-btn, .setting-navigation-row {
-  -webkit-backdrop-filter: blur(16px) saturate(1.3);
-  backdrop-filter: blur(16px) saturate(1.3);
-}
-@media (prefers-reduced-motion: reduce) {
-  .hero, .next-mini, .lesson-card, .day-summary, .feature-box,
-  .service-page .service-hero, .service-page .service-card {
-    transition: none !important;
-    animation: none !important;
-  }
-}
-
-</style></head><body>'+
+    const doc='<!doctype html><html><head><meta charset="utf-8"><title>Отчёт по баллам</title><style>body{font-family:Arial,sans-serif;font-size:11pt}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:6px}h1{font-size:18pt}</style></head><body>'+
       '<h1>Отчёт по баллам общежития</h1><p>Группа: '+serviceEsc(GROUP_NAME)+'</p><p>Всего: <b>'+total+'</b> / '+Number(h.totalGoal!=null?h.totalGoal:250)+' · Административные: <b>'+admin+'</b> · Социальные: <b>'+social+'</b></p>'+
       '<table><tr><th>Дата</th><th>Тип</th><th>Событие / работа</th><th>Минуты</th><th>Баллы</th><th>Комментарий</th><th>Подтверждение</th></tr>'+rows+'</table>'+
       '<p>Документ сформирован в KGEU Student Service. Перед официальной подачей проверьте соответствие требованиям общежития.</p></body></html>';
