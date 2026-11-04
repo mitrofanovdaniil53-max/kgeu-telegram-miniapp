@@ -4026,27 +4026,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       '<h1>Отчёт по баллам общежития</h1><p>Группа: '+serviceEsc(GROUP_NAME)+'</p><p>Всего: <b>'+total+'</b> / '+Number(h.totalGoal!=null?h.totalGoal:250)+' · Административные: <b>'+admin+'</b> · Социальные: <b>'+social+'</b></p>'+
       '<table><tr><th>Дата</th><th>Тип</th><th>Событие / работа</th><th>Минуты</th><th>Баллы</th><th>Комментарий</th><th>Подтверждение</th></tr>'+rows+'</table>'+
       '<p>Документ сформирован в KGEU Student Service. Перед официальной подачей проверьте соответствие требованиям общежития.</p>
-  <style id="schedule-card-layout-polish">
-    /* Keep long university names, teacher names and room labels readable on narrow screens. */
-    .card-top { flex-wrap:wrap; row-gap:8px; }
-    .card-time { white-space:nowrap; font-variant-numeric:tabular-nums; }
-    .badge { flex-shrink:0; white-space:nowrap; }
-    .card-subject { overflow-wrap:anywhere; hyphens:auto; }
-    .card-meta .row {
-      min-width:0;
-      align-items:flex-start;
-      flex-wrap:wrap;
-      overflow-wrap:anywhere;
-    }
-    .card-meta .row > * { min-width:0; }
-    .hero-row { min-width:0; flex-wrap:wrap; overflow-wrap:anywhere; }
-    .next-mini > :last-child { min-width:0; flex:1; overflow-wrap:anywhere; }
-    .next-mini .nm-sub { overflow-wrap:anywhere; }
-    @media (max-width: 380px) {
-      .card-top { align-items:flex-start; }
-      .badge { max-width:100%; white-space:normal; }
-    }
-  </style>
+  
 
 </body></html>';
     serviceShowWordReport('KGEU_отчет_по_баллам_'+isoDate(new Date())+'.doc',doc);
@@ -4816,5 +4796,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </script>
 
+  <style id="schedule-card-layout-polish">
+    /* Keep long university names, teacher names and room labels readable on narrow screens. */
+    .card-top { flex-wrap:wrap; row-gap:8px; }
+    .card-time { white-space:nowrap; font-variant-numeric:tabular-nums; }
+    .badge { flex-shrink:0; white-space:nowrap; }
+    .card-subject { overflow-wrap:anywhere; hyphens:auto; }
+    .card-meta .row {
+      min-width:0;
+      align-items:flex-start;
+      flex-wrap:wrap;
+      overflow-wrap:anywhere;
+    }
+    .card-meta .row > * { min-width:0; }
+    .hero-row { min-width:0; flex-wrap:wrap; overflow-wrap:anywhere; }
+    .next-mini > :last-child { min-width:0; flex:1; overflow-wrap:anywhere; }
+    .next-mini .nm-sub { overflow-wrap:anywhere; }
+    @media (max-width: 380px) {
+      .card-top { align-items:flex-start; }
+      .badge { max-width:100%; white-space:normal; }
+    }
+  </style>
 </body>
 </html>
