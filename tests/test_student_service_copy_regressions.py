@@ -738,7 +738,7 @@ class VkSyncInFlightEditRegressionTest(unittest.TestCase):
         sync_start = source.index("async function syncNow(reason)")
         sync_end = source.index("\n  async function linkAccount()", sync_start)
         sync_function = source[sync_start:sync_end]
-        script = "\\n".join([
+        script = "\n".join([
             "const assert = require('node:assert/strict');",
             "let busy = false, scheduled = 0, resolvePost, postedPayload = null;",
             "let kgeuPersonalData = { version: 1, notes: { keep: 'old value' } };",
