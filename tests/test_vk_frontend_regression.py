@@ -63,6 +63,8 @@ class VkFrontendRegressionTest(unittest.TestCase):
 
         rules = [
             "html.vk-light .hero-kicker.live { color:#15803d; }",
+            "html.vk-light { --muted:#475569; }",
+            "html.vk-light .offline-banner { color:#92400e; }",
             "html.vk-light .status-dot { background:#15803d; }",
             "html.vk-light .status-dot.warn { background:#92400e; }",
             "html.vk-light .status-dot.err { background:#b91c1c; }",
@@ -98,6 +100,8 @@ class VkFrontendRegressionTest(unittest.TestCase):
             ("#92400e", composite("#d97706", "#ffffff", 0.12)),
             ("#166534", composite("#35c98a", "#ffffff", 0.13)),
             ("#475569", "#eef2f7"),
+            ("#475569", "#f4f6f9"),
+            ("#92400e", composite("#f59e0b", "#f4f6f9", 0.12)),
             ("#667085", "#ffffff"),
             ("#475569", composite("#94a3b8", "#ffffff", 0.15)),
         ]
