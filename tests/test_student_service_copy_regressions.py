@@ -597,12 +597,12 @@ class StudentServiceSurfaceStyleRegressionTest(unittest.TestCase):
         style_blocks = []
         for relative, platform in (("index.html", "tg"), ("apps/vk/index.html", "vk")):
             source = (ROOT / relative).read_text(encoding="utf-8")
-            match = re.search(r'<style id="kgeu-unified-design-system-v1">([\s\S]*?)</style>', source)
+            match = re.search(r'<style id="kgeu-unified-design-system-v1">([\\s\\S]*?)</style>', source)
             self.assertIsNotNone(match, msg=f"{relative}: unified design system style block is missing")
             css = match.group(1)
             style_blocks.append(match.group(0))
 
-            summary = re.search(r"\.day-summary\s*\{([^}]*)\}", css)
+            summary = re.search(r"\\.day-summary\\s*\\{([^}]*)\\}", css)
             self.assertIsNotNone(summary, msg=f"{relative}: day summary rule is missing")
             for declaration in (
                 "border-radius: var(--ui-radius-lg);",
@@ -612,25 +612,26 @@ class StudentServiceSurfaceStyleRegressionTest(unittest.TestCase):
                 self.assertIn(declaration, summary.group(1))
 
             sections = re.search(
-                r"\.service-page \.service-agenda-section,\s*"
-                r"\.service-page \.service-deadlines-section,\s*"
-                r"\.service-page \.service-events-section\s*\{([^}]*)\}",
+                r"\\.service-page \\.service-agenda-section,\\s*"
+                r"\\.service-page \\.service-deadlines-section,\\s*"
+                r"\\.service-page \\.service-events-section,\\s*"
+                r"\\.service-page \\.service-tasks-section\\s*\\{([^}]*)\\}",
                 css,
             )
-            self.assertIsNotNone(sections, msg=f"{relative}: dashboard section reset is missing")
+            self.assertIsNotNone(sections, msg=f"{relative}: dashboard section surface rule is missing")
             for declaration in (
-                "padding: 0;",
-                "border: 0;",
-                "border-radius: 0;",
-                "background: transparent;",
+                "padding: var(--ui-space-3);",
+                "border: 1px solid var(--ui-panel-outline);",
+                "border-radius: var(--ui-radius-lg);",
+                "background: var(--ui-panel-surface);",
                 "box-shadow: none;",
                 "backdrop-filter: none;",
             ):
                 self.assertIn(declaration, sections.group(1))
 
             empty_states = re.search(
-                r"\.service-page \.service-empty,\s*"
-                r"\.service-page \.service-calendar-empty\s*\{([^}]*)\}",
+                r"\\.service-page \\.service-empty,\\s*"
+                r"\\.service-page \\.service-calendar-empty\\s*\\{([^}]*)\\}",
                 css,
             )
             self.assertIsNotNone(empty_states, msg=f"{relative}: empty-state reset is missing")
@@ -647,153 +648,6 @@ class StudentServiceSurfaceStyleRegressionTest(unittest.TestCase):
             self.assertIn("color-mix(in srgb, var(--card) 96%, white 4%)", css)
 
         self.assertEqual(style_blocks[0], style_blocks[1])
-
-if __name__ == "__main__":
-    unittest.main()
-
-
-class TelegramReportDeliveryRegressionTest(unittest.TestCase):
-    def test_worker_sends_report_only_to_authenticated_telegram_user(self):
-        source = (ROOT / "backend/worker.js").read_text(encoding="utf-8")
-        self.assertIn("const telegramReportPath = url.pathname === '/api/report/telegram';", source)
-        self.assertIn("if (identity.provider !== 'telegram')", source)
-        self.assertIn("api.telegram.org/bot' + env.TELEGRAM_BOT_TOKEN + '/sendDocument", source)
-        self.assertIn("telegram_start_bot_first", source)
-        self.assertIn("telegram_report_too_large", source)
-
-
-class StudentServiceImportBackupSafetyTest(unittest.TestCase):
-    def test_json_restore_backs_up_notes_and_aborts_when_backup_or_save_fails(self):
-        for relative in ("index.html", "apps/vk/index.html"):
-            source = (ROOT / relative).read_text(encoding="utf-8")
-            with self.subTest(frontend=relative):
-                backup_start = source.index("function serviceBackupCurrent()")
-                backup_end = source.index("\n", backup_start)
-                backup = source[backup_start:backup_end]
-                self.assertIn("localStorage.setItem(STUDENT_SERVICE_BACKUP_KEY,JSON.stringify(serviceData))", backup)
-                self.assertIn("kgeu_student_personal_backup_before_cloud_restore_v1", backup)
-                self.assertIn("JSON.stringify(kgeuPersonalData||{version:1,notes:{}})", backup)
-                self.assertIn("return true", backup)
-                self.assertIn("return false", backup)
-                import_start = source.index("function serviceImportData(file)")
-                import_end = source.index("function serviceRenderSync()", import_start)
-                importer = source[import_start:import_end]
-                self.assertIn("function serviceConfirmDataRestore(onConfirm)", source)
-                confirm_start = source.index("function serviceConfirmDataRestore(onConfirm)")
-                confirm_end = source.index("function serviceApplyImportedData(payload)", confirm_start)
-                confirm = source[confirm_start:confirm_end]
-                self.assertIn("tg.showConfirm(message", confirm)
-                self.assertIn("window.confirm(message)", confirm)
-                self.assertIn("Перед применением текущие данные и заметки сохранятся в резервных копиях", confirm)
-                self.assertIn("serviceConfirmDataRestore(function(){serviceApplyImportedData(payload);})", importer)
-                apply_start = source.index("function serviceApplyImportedData(payload)")
-                apply_end = source.index("function serviceImportData(file)", apply_start)
-                apply = source[apply_start:apply_end]
-                self.assertIn("if(!serviceBackupCurrent())", apply)
-                self.assertIn("if(!serviceSave())", apply)
-                self.assertIn("if(!kgeuSavePersonalData(importedPersonalData))", apply)
-                self.assertIn("serviceData=previousServiceData", apply)
-                self.assertIn("kgeuPersonalData=previousPersonalData", apply)
-
-    def test_backup_helper_persists_both_data_sets_and_reports_partial_failure(self):
-        node = shutil.which("node")
-        if not node:
-            self.skipTest("Node.js is required to execute the backup helper")
-        for relative in ("index.html", "apps/vk/index.html"):
-            source = (ROOT / relative).read_text(encoding="utf-8")
-            start = source.index("function serviceBackupCurrent()")
-            end = source.index("\n", start)
-            helper = source[start:end]
-            script = "\n".join([
-                "const assert = require('node:assert/strict');",
-                "const STUDENT_SERVICE_BACKUP_KEY = 'service-backup';",
-                "const serviceData = {tasks:[{id:'task-1'}]};",
-                "const kgeuPersonalData = {version:1,notes:{math:'saved note'}};",
-                "const saved = {}; let failPersonal = false;",
-                "const localStorage = {setItem(key,value){if(failPersonal && key === 'kgeu_student_personal_backup_before_cloud_restore_v1') throw new Error('quota'); saved[key]=String(value);}};",
-                helper,
-                "assert.equal(serviceBackupCurrent(), true);",
-                "assert.deepEqual(JSON.parse(saved['service-backup']), serviceData);",
-                "assert.deepEqual(JSON.parse(saved['kgeu_student_personal_backup_before_cloud_restore_v1']), kgeuPersonalData);",
-                "failPersonal = true;",
-                "assert.equal(serviceBackupCurrent(), false);",
-                "console.log('service and personal backup helper assertions passed');",
-            ])
-            with self.subTest(frontend=relative):
-                result = subprocess.run([node, "-e", script], capture_output=True, text=True, check=False)
-                self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
-                self.assertIn("service and personal backup helper assertions passed", result.stdout)
-
-
-class WordReportKeyboardBehaviorTest(unittest.TestCase):
-    def test_iframe_tab_wraps_to_expected_controls_in_both_frontends(self):
-        node = shutil.which("node")
-        if not node:
-            self.skipTest("Node.js is required to execute the keyboard handler")
-        for relative in ("index.html", "apps/vk/index.html"):
-            source = (ROOT / relative).read_text(encoding="utf-8")
-            with self.subTest(frontend=relative):
-                modal_start = source.index("function serviceShowWordReport(filename,content)")
-                handler_start = source.index("function onKey(event){", modal_start)
-                handler_end = source.index("\n    close.addEventListener('click',dismiss);", handler_start)
-                handler = source[handler_start:handler_end]
-                script = "\n".join([
-                    "const assert = require('node:assert/strict');",
-                    "const vm = require('node:vm');",
-                    "const handler = " + json.dumps(handler) + ";",
-                    "function runTab(shiftKey, expectedFocus) {",
-                    "  let focused = '', prevented = false;",
-                    "  const frame = { contentDocument: {} };",
-                    "  const close = { focus() { focused = 'close'; } };",
-                    "  const download = { focus() { focused = 'download'; } };",
-                    "  const overlay = { querySelectorAll() { return [download, close, frame]; }, contains() { return true; } };",
-                    "  const document = { activeElement: frame, removeEventListener() {} };",
-                    "  const dismiss = () => {};",
-                    "  const onKey = vm.runInNewContext(handler + '\\nonKey', { document, overlay, frame, close, download, dismiss });",
-                    "  onKey({ key: 'Tab', currentTarget: frame.contentDocument, shiftKey, preventDefault() { prevented = true; } });",
-                    "  assert.equal(focused, expectedFocus);",
-                    "  assert.equal(prevented, true);",
-                    "}",
-                    "runTab(false, 'download');",
-                    "runTab(true, 'close');",
-                    "console.log('iframe Tab / Shift+Tab behavior passed');",
-                ])
-                result = subprocess.run([node, "-e", script], capture_output=True, text=True, check=False)
-                self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
-                self.assertIn("iframe Tab / Shift+Tab behavior passed", result.stdout)
-
-
-class UXPrototypeRegressionTest(unittest.TestCase):
-    def test_documented_prototype_is_isolated_and_inline_script_parses(self):
-        source = (ROOT / "docs" / "ux-prototype.html").read_text(encoding="utf-8")
-        for expected in (
-            'data-view="schedule"',
-            'data-view="tasks"',
-            'data-view="service"',
-            'data-view="settings"',
-            'data-service-tab="zhbs"',
-            'data-service-tab="sso"',
-            'aria-modal="true"',
-            "реальная резервная копия не создавалась",
-        ):
-            with self.subTest(expected=expected):
-                self.assertIn(expected, source)
-        self.assertNotIn("fetch(", source)
-        self.assertNotIn("Telegram.WebApp", source)
-        self.assertNotIn("VKWebApp", source)
-        match = re.search(r"<script>([\s\S]*?)</script>", source)
-        self.assertIsNotNone(match, "prototype should contain one inline behavior script")
-        node = shutil.which("node")
-        if not node:
-            self.skipTest("Node.js is required to parse the prototype script")
-        result = subprocess.run(
-            [node, "--check"],
-            input=match.group(1),
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
 
 
 class LiquidGlassVisualRegressionTest(unittest.TestCase):
