@@ -3448,12 +3448,22 @@ html.vk-light .service-pill {
   function serviceApplyCloudSnapshot(snapshot){
     if(!snapshot||!snapshot.found||!snapshot.serviceData||typeof snapshot.serviceData!=='object')throw new Error('cloud_data_not_found');
     serviceBackupBeforeCloudRestore();
-    serviceData=serviceNormalizeData(snapshot.serviceData);
-    localStorage.setItem(STUDENT_SERVICE_KEY,JSON.stringify(serviceData));
+    const previousServiceData=serviceData;
+    const previousPersonalData=kgeuPersonalData;
+    const nextServiceData=serviceNormalizeData(snapshot.serviceData);
+    localStorage.setItem(STUDENT_SERVICE_KEY,JSON.stringify(nextServiceData));
+    serviceData=nextServiceData;
     if(snapshot.personalData&&typeof snapshot.personalData==='object'){
       const pd=snapshot.personalData;
-      kgeuPersonalData={version:1,notes:(pd.notes&&typeof pd.notes==='object')?pd.notes:{},updatedAt:Date.now()};
-      if(typeof kgeuSavePersonalData==='function')kgeuSavePersonalData(kgeuPersonalData);
+      const nextPersonalData={version:1,notes:(pd.notes&&typeof pd.notes==='object')?pd.notes:{},updatedAt:Date.now()};
+      if(typeof kgeuSavePersonalData!=='function'||!kgeuSavePersonalData(nextPersonalData)){
+        serviceData=previousServiceData;
+        kgeuPersonalData=previousPersonalData;
+        try{localStorage.setItem(STUDENT_SERVICE_KEY,JSON.stringify(previousServiceData));}
+        catch(rollbackError){throw new Error('cloud_snapshot_rollback_failed');}
+        throw new Error('cloud_snapshot_personal_save_failed');
+      }
+      kgeuPersonalData=nextPersonalData;
       if(typeof kgeuMigrateLegacyNotesForActiveGroup==='function')kgeuMigrateLegacyNotesForActiveGroup();
     }
     let profileChanged=false;
