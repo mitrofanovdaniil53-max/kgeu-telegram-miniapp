@@ -10,6 +10,16 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class StudentServiceCopyRegressionTest(unittest.TestCase):
+    def test_student_service_controls_have_consistent_touch_and_focus_states(self):
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                self.assertIn('id="student-service-control-polish"', source)
+                self.assertIn(".service-main-nav .service-btn", source)
+                self.assertIn("min-height: 44px;", source)
+                self.assertIn(".service-page input:focus-visible", source)
+                self.assertIn("@media (prefers-reduced-motion: no-preference)", source)
+
     def test_social_attachment_copy_matches_shared_account_sync(self):
         stale = "Файл остаётся в данных этого устройства до подключения синхронизации с ботом."
         replacement = "Подтверждение сохраняется в записи и синхронизируется вместе с общим аккаунтом."
