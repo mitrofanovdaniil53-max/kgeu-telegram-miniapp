@@ -4213,7 +4213,7 @@ html.vk-light .service-pill {
       '<table><tr><th>Дата</th><th>Тип</th><th>Событие / работа</th><th>Минуты</th><th>Баллы</th><th>Комментарий</th><th>Подтверждение</th></tr>'+rows+'</table>'+
       '<p>Документ сформирован в KGEU Student Service. Перед официальной подачей проверьте соответствие требованиям общежития.</p>
 <style id="kgeu-unified-design-system-v1">
-  /* One visual language for schedule, Student Service, calendar and settings. */
+  /* One visual language for schedule, Student Service, calendar, modals and settings. */
   :root {
     --ui-radius-sm: 10px;
     --ui-radius-md: 14px;
@@ -4229,26 +4229,43 @@ html.vk-light .service-pill {
     --ui-shadow: var(--glass-shadow, var(--shadow));
   }
 
-  /* Shared card geometry and surface treatment; avoid glass on every nested element. */
-  .hero, .next-mini, .lesson-card, .day-summary, .feature-box,
-  .card, .service-page .service-hero, .service-page .service-card,
+  /* Shared geometry for primary cards, secondary panels and modal surfaces. */
+  .hero, .next-mini, .lesson-card, .day-summary, .feature-box, .card,
+  .service-page .service-hero, .service-page .service-card,
   .service-agenda-row, .service-row, .service-study-tools,
   .service-subject-card, .service-data-box, .service-analytics-box,
   .settings-section, .hostel-box, .service-reminder-row,
-  .service-reminder-box {
+  .service-reminder-box, .service-calendar-day, .service-calendar-empty,
+  .service-calendar-day, .service-study-item, .saved-group, .group-result,
+  .modal-sheet, .settings-sheet, .service-empty, .service-filter-empty {
     min-width: 0;
     border-radius: var(--ui-radius-lg);
   }
-  .hero, .next-mini, .lesson-card, .day-summary, .feature-box,
-  .card, .service-page .service-hero, .service-page .service-card {
+  .hero, .next-mini, .lesson-card, .day-summary, .feature-box, .card,
+  .service-page .service-hero, .service-page .service-card,
+  .modal-sheet, .settings-sheet {
     border-color: var(--ui-outline);
     box-shadow: var(--ui-shadow);
   }
   .service-agenda-row, .service-row, .service-study-tools,
   .service-subject-card, .service-data-box, .service-analytics-box,
   .settings-section, .hostel-box, .service-reminder-row,
-  .service-reminder-box {
+  .service-reminder-box, .service-calendar-day, .service-calendar-empty,
+  .service-study-item, .saved-group, .group-result, .service-empty {
     border-color: var(--ui-outline);
+  }
+  .modal-sheet, .settings-sheet { overflow: hidden; }
+
+  /* Shared navigation surfaces and active-state shape. */
+  .tabs, .hostel-module-nav, .date-nav, .month-nav {
+    border-radius: var(--ui-radius-xl);
+  }
+  .tabs .tab, .hostel-module-nav .service-btn,
+  .date-nav button, .month-nav button {
+    border-radius: var(--ui-radius-md);
+  }
+  .tabs .tab.active, .hostel-module-nav .service-btn.is-active {
+    font-weight: 750;
   }
 
   /* Consistent type hierarchy and safe wrapping across all sections. */
@@ -4265,7 +4282,7 @@ html.vk-light .service-pill {
   }
   .service-row-title, .service-agenda-row .service-row-title,
   .service-card p, .service-card h3, .service-subject-card,
-  .settings-section, .hostel-box {
+  .settings-section, .hostel-box, .service-calendar-empty {
     overflow-wrap: anywhere;
   }
   .service-row-main, .service-section-title, .service-agenda-row,
@@ -4318,6 +4335,7 @@ html.vk-light .service-pill {
     .service-analytics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .service-bar-row { grid-template-columns: minmax(0, 1fr) 64px 28px; }
     .service-section-title { gap: 8px; }
+    .service-calendar-grid { gap: 3px; }
   }
   @media (prefers-reduced-motion: reduce) {
     .service-btn, .setting-navigation-row, .service-filter-chip,
