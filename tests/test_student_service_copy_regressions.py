@@ -592,6 +592,63 @@ class StudentServiceHostelInputRegressionTest(unittest.TestCase):
                 self.assertIn("points:Math.floor(serviceNonNegativeNumber(document.getElementById('social-points').value,0))", source)
 
 
+class StudentServiceSurfaceStyleRegressionTest(unittest.TestCase):
+    def test_summary_and_dashboard_surface_rules_are_explicit_and_theme_aware(self):
+        style_blocks = []
+        for relative, platform in (("index.html", "tg"), ("apps/vk/index.html", "vk")):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            match = re.search(r'<style id="kgeu-unified-design-system-v1">([\\s\\S]*?)</style>', source)
+            self.assertIsNotNone(match, msg=f"{relative}: unified design system style block is missing")
+            css = match.group(1)
+            style_blocks.append(match.group(0))
+
+            summary = re.search(r"\\.day-summary\\s*\\{([^}]*)\\}", css)
+            self.assertIsNotNone(summary, msg=f"{relative}: day summary rule is missing")
+            for declaration in (
+                "border-radius: var(--ui-radius-lg);",
+                "background: var(--ui-panel-surface);",
+                "box-shadow: var(--ui-shadow);",
+            ):
+                self.assertIn(declaration, summary.group(1))
+
+            sections = re.search(
+                r"\\.service-page \\.service-agenda-section,\\s*"
+                r"\\.service-page \\.service-deadlines-section,\\s*"
+                r"\\.service-page \\.service-events-section\\s*\\{([^}]*)\\}",
+                css,
+            )
+            self.assertIsNotNone(sections, msg=f"{relative}: dashboard section reset is missing")
+            for declaration in (
+                "padding: 0;",
+                "border: 0;",
+                "border-radius: 0;",
+                "background: transparent;",
+                "box-shadow: none;",
+                "backdrop-filter: none;",
+            ):
+                self.assertIn(declaration, sections.group(1))
+
+            empty_states = re.search(
+                r"\\.service-page \\.service-empty,\\s*"
+                r"\\.service-page \\.service-calendar-empty\\s*\\{([^}]*)\\}",
+                css,
+            )
+            self.assertIsNotNone(empty_states, msg=f"{relative}: empty-state reset is missing")
+            for declaration in (
+                "border: 0;",
+                "border-radius: 0;",
+                "background: transparent;",
+                "box-shadow: none;",
+            ):
+                self.assertIn(declaration, empty_states.group(1))
+
+            for theme_selector in (f"html.{platform}-dark", f"html.{platform}-light"):
+                self.assertIn(theme_selector, css)
+            self.assertIn("color-mix(in srgb, var(--card) 96%, white 4%)", css)
+
+        self.assertEqual(style_blocks[0], style_blocks[1])
+
+
 if __name__ == "__main__":
     unittest.main()
 
