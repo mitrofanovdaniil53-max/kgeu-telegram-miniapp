@@ -754,3 +754,17 @@ class LiquidGlassVisualRegressionTest(unittest.TestCase):
                     self.assertIn(selector, source)
                 self.assertIn("html." + platform + "-dark", source)
                 self.assertIn("html." + platform + "-light", source)
+
+
+
+class ScheduleCardLayoutPolishRegressionTest(unittest.TestCase):
+    def test_schedule_cards_wrap_long_content_on_both_frontends(self):
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                self.assertIn('id="schedule-card-layout-polish"', source)
+                self.assertIn(".card-top { flex-wrap:wrap; row-gap:8px; }", source)
+                self.assertIn(".card-subject { overflow-wrap:anywhere; hyphens:auto; }", source)
+                self.assertIn(".card-meta .row", source)
+                self.assertIn(".hero-row { min-width:0; flex-wrap:wrap; overflow-wrap:anywhere; }", source)
+                self.assertIn("@media (max-width: 380px)", source)
