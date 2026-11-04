@@ -10,6 +10,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class StudentServiceCopyRegressionTest(unittest.TestCase):
+    def test_schedule_mode_buttons_expose_the_selected_state_accessibly(self):
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                self.assertIn('id="tabs" role="group" aria-label="Режим расписания"', source)
+                self.assertIn('data-mode="today" aria-pressed="true"', source)
+                self.assertIn("t.setAttribute('aria-pressed', selected ? 'true' : 'false')", source)
+
     def test_social_attachment_copy_matches_shared_account_sync(self):
         stale = "Файл остаётся в данных этого устройства до подключения синхронизации с ботом."
         replacement = "Подтверждение сохраняется в записи и синхронизируется вместе с общим аккаунтом."
