@@ -259,33 +259,6 @@ function kgeuSetNote(subject, value) {
     }
     .top-shell > * { position: relative; z-index: 1; }
 
-    /* Theme-aware Liquid Glass header: dark in light mode, light in dark mode. */
-    .vk-light .top-shell {
-      background: rgba(17,24,39,.90); color:#fff; border-color:rgba(255,255,255,.10);
-      box-shadow:0 14px 34px rgba(16,24,40,.18), inset 0 1px 0 rgba(255,255,255,.10);
-    }
-    .vk-light .top-shell::before {
-      background:radial-gradient(circle at 12% 0%, rgba(59,130,246,.22), transparent 32%), linear-gradient(135deg, rgba(255,255,255,.06), rgba(15,23,42,.10));
-    }
-    .vk-light .top-shell .brand h1 { color:#fff; }
-    .vk-light .top-shell .brand .sub { color:#aeb8c8; }
-    .vk-light .top-shell .icon-btn { color:#fff; background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.12); }
-    .vk-light .tabs { background:rgba(255,255,255,.07); border-color:rgba(255,255,255,.10); box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 4px 16px rgba(0,0,0,.12); }
-    .vk-light .tab { color:#aeb8c8; }
-    .vk-light .tab.active { background:rgba(255,255,255,.16); border-color:rgba(255,255,255,.18); color:#fff; box-shadow:0 4px 12px rgba(0,0,0,.14), inset 0 1px 0 rgba(255,255,255,.12); }
-    .vk-dark .top-shell {
-      background:rgba(255,255,255,.78); color:#101828; border-color:rgba(255,255,255,.82);
-      box-shadow:0 14px 34px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.96);
-    }
-    .vk-dark .top-shell::before {
-      background:radial-gradient(circle at 12% 0%, rgba(255,255,255,.96), transparent 32%), linear-gradient(135deg, rgba(255,255,255,.32), rgba(230,237,248,.18));
-    }
-    .vk-dark .top-shell .brand h1 { color:#101828; }
-    .vk-dark .top-shell .brand .sub { color:#667085; }
-    .vk-dark .top-shell .icon-btn { color:#101828; background:rgba(255,255,255,.44); border-color:rgba(255,255,255,.62); }
-    .vk-dark .tabs { background:rgba(255,255,255,.38); border-color:rgba(255,255,255,.74); }
-    .vk-dark .tab { color:#667085; }
-    .vk-dark .tab.active { background:rgba(255,255,255,.88); border-color:rgba(255,255,255,.92); color:#101828; }
 
 
     /* v6: subtle motion + explicit offline state */
@@ -883,43 +856,6 @@ function kgeuSetNote(subject, value) {
       text-overflow:ellipsis;
     }
     .top-actions { flex-shrink:0; }
-    /* Liquid Glass upper shell stays light in every theme. */
-    .top-shell .icon-btn {
-      color:#344054;
-      background:rgba(255,255,255,.46);
-      border-color:rgba(255,255,255,.82);
-    }
-    html.vk-dark .top-shell,
-    html.vk-light .top-shell {
-      background:rgba(255,255,255,.72);
-      color:#101828;
-      box-shadow:
-        0 14px 34px rgba(16,24,40,.10),
-        inset 0 1px 0 rgba(255,255,255,.95);
-    }
-    html.vk-dark .top-shell .brand h1,
-    html.vk-light .top-shell .brand h1 { color:#101828; }
-    html.vk-dark .top-shell .brand .sub,
-    html.vk-dark .top-shell .status-line,
-    html.vk-light .top-shell .brand .sub,
-    html.vk-light .top-shell .status-line { color:#667085; }
-    html.vk-dark .top-shell .icon-btn,
-    html.vk-light .top-shell .icon-btn {
-      color:#344054;
-      background:rgba(255,255,255,.46);
-      border-color:rgba(255,255,255,.82);
-    }
-    html.vk-dark .top-shell .tab,
-    html.vk-light .top-shell .tab {
-      background:transparent;
-      color:#667085;
-    }
-    html.vk-dark .top-shell .tab.active,
-    html.vk-light .top-shell .tab.active {
-      background:rgba(255,255,255,.88);
-      color:#101828;
-      border-color:rgba(255,255,255,.92);
-    }
     .kgeu-logo-img {
       width:48px; height:48px; object-fit:contain; flex:0 0 48px;
     }
@@ -1767,6 +1703,17 @@ html.vk-light .service-pill {
 .top-shell::before { display: none !important; }
 .top-shell .brand h1 { color: var(--text) !important; }
 .top-shell .brand .sub { color: var(--muted) !important; }
+/* Keep the selected institute and group readable beside the action buttons. */
+.topbar { min-width: 0; }
+.brand { min-width: 0; flex: 1 1 auto; }
+.brand > div:last-child { min-width: 0; flex: 1 1 auto; }
+.brand .sub {
+  display: block;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
 .top-actions { gap: 6px !important; }
 .top-shell .icon-btn {
   width: 40px !important;
@@ -3179,7 +3126,7 @@ html.vk-light .service-pill {
         '';
 
       setActiveGroup(id, resolvedName);
-      INSTITUTE_NAME = resolvedInstitute || INSTITUTE_NAME || '';
+      INSTITUTE_NAME = resolvedInstitute || (id === DEFAULT_GROUP_ID ? DEFAULT_INSTITUTE_NAME : '');
       updateGroupLabel();
       saveActiveGroup();
 
