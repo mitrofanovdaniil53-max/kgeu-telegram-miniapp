@@ -29,6 +29,8 @@ class VkFrontendRegressionTest(unittest.TestCase):
         self.assertIn("color: var(--text) !important;", self.html)
         self.assertIn("overflow-wrap: anywhere;", self.html)
         self.assertIn("white-space: normal;", self.html)
+        self.assertIn("html.vk-light { color-scheme: light; }", self.html)
+        self.assertIn("html.vk-dark { color-scheme: dark; }", self.html)
         self.assertNotIn(".vk-light .top-shell {", self.html)
         self.assertNotIn("html.vk-dark .top-shell,", self.html)
 
