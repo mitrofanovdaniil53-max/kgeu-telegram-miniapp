@@ -681,7 +681,7 @@ class UnifiedDesignSystemRegressionTest(unittest.TestCase):
                     ".service-page .service-grid { gap: var(--ui-space-2) !important; }",
                     ".service-page { gap: var(--ui-space-3) !important; }",
                     ".service-list { gap: var(--ui-space-2) !important; }",
-                    "Dashboard sections are content groups, not nested cards: remove the extra backing layer.",
+                    "Student Service dashboard groups use one restrained card surface.",
                     "background: transparent;",
                     "box-shadow: none;",
                     "-webkit-backdrop-filter: none;",
