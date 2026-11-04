@@ -36,6 +36,67 @@ class VkFrontendRegressionTest(unittest.TestCase):
         self.assertNotIn(".vk-light .top-shell {", self.html)
         self.assertNotIn("html.vk-dark .top-shell,", self.html)
 
+    def test_light_theme_semantic_labels_meet_wcag_aa_contrast(self):
+        def luminance(hex_color):
+            value = hex_color.lstrip("#")
+            channels = [int(value[index:index + 2], 16) / 255 for index in (0, 2, 4)]
+            linear = [
+                channel / 12.92 if channel <= 0.04045
+                else ((channel + 0.055) / 1.055) ** 2.4
+                for channel in channels
+            ]
+            return sum(weight * channel for weight, channel in zip((0.2126, 0.7152, 0.0722), linear))
+
+        def contrast(foreground, background):
+            high, low = sorted((luminance(foreground), luminance(background)), reverse=True)
+            return (high + 0.05) / (low + 0.05)
+
+        def composite(foreground, background, alpha):
+            def channels(value):
+                value = value.lstrip("#")
+                return [int(value[index:index + 2], 16) for index in (0, 2, 4)]
+            front, back = channels(foreground), channels(background)
+            return "#" + "".join(
+                f"{round(alpha * a + (1 - alpha) * b):02x}"
+                for a, b in zip(front, back)
+            )
+
+        rules = [
+            "html.vk-light .hero-kicker.live,",
+            "html.vk-light .hero-kicker.soon,",
+            "html.vk-light .next-mini .nm-label",
+            "html.vk-light .badge.pr { color:#0f766e; }",
+            "html.vk-light .badge.lab { color:#6d28d9; }",
+            "html.vk-light .badge.replace { color:#9a3412; }",
+            "html.vk-light .service-status.overdue { color:#b91c1c; }",
+            "html.vk-light .service-status.today { color:#92400e; }",
+            "html.vk-light .service-status.done { color:#166534; }",
+            "html.vk-light .service-pill { color:#475569 !important; }",
+            "html.vk-light .kgeu-note-icon { color:#667085; }",
+        ]
+        for rule in rules:
+            self.assertIn(rule, self.html)
+
+        text_pairs = [
+            ("#15803d", "#ffffff"),
+            ("#92400e", "#ffffff"),
+            ("#0f766e", composite("#16a085", "#ffffff", 0.13)),
+            ("#6d28d9", composite("#7c3aed", "#ffffff", 0.12)),
+            ("#9a3412", composite("#ea580c", "#ffffff", 0.12)),
+            ("#b91c1c", composite("#dc2626", "#ffffff", 0.12)),
+            ("#92400e", composite("#d97706", "#ffffff", 0.12)),
+            ("#166534", composite("#35c98a", "#ffffff", 0.13)),
+            ("#475569", "#eef2f7"),
+            ("#667085", "#ffffff"),
+        ]
+        for foreground, background in text_pairs:
+            self.assertGreaterEqual(
+                contrast(foreground, background),
+                4.5,
+                msg=f"{foreground} on {background} must meet WCAG AA for normal text",
+            )
+
+
     def test_group_switch_does_not_reuse_previous_institute_label(self):
         self.assertIn(
             "INSTITUTE_NAME = resolvedInstitute || (id === DEFAULT_GROUP_ID ? DEFAULT_INSTITUTE_NAME : '');",
