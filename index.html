@@ -4793,5 +4793,79 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </script>
 
+
+<style id="student-service-control-polish">
+/* Consistent tactile controls and focus treatment across Student Service modules. */
+.service-main-nav .service-btn,
+.service-actions .service-btn,
+.service-action-row .service-btn,
+.service-page .service-btn,
+.service-hostel-module .service-btn,
+.service-more-nav > summary {
+  min-height: 44px;
+}
+.service-btn,
+.service-more-nav > summary,
+.setting-navigation-row {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.service-btn:focus-visible,
+.service-more-nav > summary:focus-visible,
+.setting-navigation-row:focus-visible,
+.service-page input:focus-visible,
+.service-page select:focus-visible,
+.service-page textarea:focus-visible,
+.service-hostel-module input:focus-visible,
+.service-hostel-module select:focus-visible,
+.service-hostel-module textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.service-page input:not([type="checkbox"]):not([type="radio"]),
+.service-page select,
+.service-hostel-module input:not([type="checkbox"]):not([type="radio"]),
+.service-hostel-module select {
+  min-height: 44px;
+  box-sizing: border-box;
+}
+.service-btn:disabled,
+.service-page button:disabled,
+.service-hostel-module button:disabled {
+  cursor: not-allowed;
+  opacity: .52;
+  box-shadow: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .service-main-nav .service-btn:not(:disabled):hover,
+  .service-actions .service-btn:not(:disabled):hover,
+  .service-action-row .service-btn:not(:disabled):hover,
+  .service-page .service-btn:not(:disabled):hover,
+  .service-hostel-module .service-btn:not(:disabled):hover,
+  .service-more-nav > summary:hover,
+  .setting-navigation-row:hover {
+    border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+    box-shadow: 0 5px 16px rgba(25, 45, 80, .09), inset 0 1px 0 rgba(255,255,255,.5);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .service-main-nav .service-btn,
+  .service-actions .service-btn,
+  .service-action-row .service-btn,
+  .service-page .service-btn,
+  .service-hostel-module .service-btn,
+  .service-more-nav > summary,
+  .setting-navigation-row {
+    transition: background-color .16s ease, border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+  }
+  .service-main-nav .service-btn:not(:disabled):active,
+  .service-actions .service-btn:not(:disabled):active,
+  .service-action-row .service-btn:not(:disabled):active,
+  .service-page .service-btn:not(:disabled):active,
+  .service-hostel-module .service-btn:not(:disabled):active {
+    transform: scale(.985);
+  }
+}
+</style>
 </body>
 </html>
