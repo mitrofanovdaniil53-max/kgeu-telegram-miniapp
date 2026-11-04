@@ -673,7 +673,7 @@ class StudentServiceImportBackupSafetyTest(unittest.TestCase):
             start = source.index("function serviceApplyCloudSnapshot(snapshot)")
             end = source.index("// Refresh only the visible Student Service screen", start)
             apply_function = source[start:end]
-            script = "\\n".join([
+            script = "\n".join([
                 "const assert = require('node:assert/strict');",
                 "const STUDENT_SERVICE_KEY = 'service-data';",
                 "const STUDENT_SERVICE_SYNC_KEY = 'service-sync';",
