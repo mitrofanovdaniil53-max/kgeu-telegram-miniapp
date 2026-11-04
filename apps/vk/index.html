@@ -1135,6 +1135,51 @@ function kgeuSetNote(subject, value) {
 }
 @media (prefers-reduced-motion: reduce) { .service-page .service-card, .service-page .service-btn { transition: none !important; } }
 
+
+/* Liquid Glass surface restoration — presentation only; keep all existing app flows intact. */
+:root {
+  --glass-surface: color-mix(in srgb, var(--card) 78%, transparent);
+  --glass-border: color-mix(in srgb, var(--border) 62%, white 38%);
+  --glass-shadow: 0 10px 28px rgba(16,24,40,.075), inset 0 1px 0 rgba(255,255,255,.62);
+}
+html.tg-dark, html.vk-dark {
+  --glass-border: rgba(255,255,255,.12);
+  --glass-shadow: 0 12px 30px rgba(0,0,0,.20), inset 0 1px 0 rgba(255,255,255,.10);
+}
+html.tg-light, html.vk-light {
+  --glass-border: rgba(255,255,255,.18);
+  --glass-shadow: 0 12px 30px rgba(16,24,40,.16), inset 0 1px 0 rgba(255,255,255,.12);
+}
+.hero, .next-mini, .lesson-card, .day-summary, .feature-box,
+.service-page .service-hero, .service-page .service-card,
+.service-page .service-agenda-section, .service-page .service-deadlines-section,
+.service-page .service-events-section {
+  background: var(--glass-surface);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: blur(20px) saturate(1.35);
+  backdrop-filter: blur(20px) saturate(1.35);
+}
+.tabs, .hostel-module-nav {
+  -webkit-backdrop-filter: blur(22px) saturate(1.45);
+  backdrop-filter: blur(22px) saturate(1.45);
+}
+.tabs .tab.active, .hostel-module-nav .service-btn.is-active {
+  box-shadow: 0 5px 16px rgba(16,24,40,.12), inset 0 1px 0 rgba(255,255,255,.72);
+}
+.date-nav button, .service-main-nav .service-btn, .service-actions .service-btn,
+.service-action-row .service-btn, .setting-navigation-row {
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  backdrop-filter: blur(16px) saturate(1.3);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero, .next-mini, .lesson-card, .day-summary, .feature-box,
+  .service-page .service-hero, .service-page .service-card {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
 </style>
 
 <script>

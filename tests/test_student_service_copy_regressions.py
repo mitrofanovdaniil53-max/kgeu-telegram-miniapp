@@ -738,3 +738,19 @@ class UXPrototypeRegressionTest(unittest.TestCase):
             check=False,
         )
         self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+
+
+class LiquidGlassVisualRegressionTest(unittest.TestCase):
+    def test_glass_surfaces_are_present_in_both_platform_frontends(self):
+        for relative, platform in (("index.html", "tg"), ("apps/vk/index.html", "vk")):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                for selector in (
+                    ".hero, .next-mini, .lesson-card, .day-summary, .feature-box",
+                    ".service-page .service-hero, .service-page .service-card",
+                    "backdrop-filter: blur(20px) saturate(1.35)",
+                    "prefers-reduced-motion: reduce",
+                ):
+                    self.assertIn(selector, source)
+                self.assertIn("html." + platform + "-dark", source)
+                self.assertIn("html." + platform + "-light", source)
