@@ -124,6 +124,7 @@ Repository issue/PR history inspected on 2026-10-25:
 - **PR #55**: isolated interactive UX prototype; demo data only, no Worker/API/real account sync.
 - **PR #56**: merged UX gap analysis; workflow #258 passed. Merge commit `85967990a7185c07aad9158789612275ad3ff763`.
 - **PR #57**: merged AI-readable handoff and manual-test template; documentation only.
+- **PR #58**: merged Liquid Glass visual restoration for Telegram and VK frontends; CSS-only changes plus a source-level regression test. Merge commit `5a12f088cb6813bbc13d4c4012daa3bc5a03c07c`; post-merge workflow #267 passed. This does not by itself verify appearance inside live Telegram/VK shells or establish deployment status.
 - **PR #56**: merged documentation audit of production UX against prototype; CI workflow #258 passed. Merge commit: `85967990a7185c07aad9158789612275ad3ff763`. This is documentation-only and does not establish live Telegram/VK behavior.
 - Legacy VK redirect PR #6 was merged in the legacy repository.
 
@@ -131,7 +132,7 @@ Do not assume that a closed PR means a feature has been manually verified in Tel
 
 ## 8. Known testing boundary and next action
 
-No independent real-shell usability run is evidenced in the latest repository notes. The current blocker is not lack of another speculative redesign; it is that real Telegram/VK access and test-account workflows are required to verify platform behavior. If the assistant cannot operate those clients directly, prepare a compact execution sheet for the owner rather than inventing results.
+The owner reported on 2026-11-04 that the platform works. Treat this as owner-reported confirmation, not independently reproduced shell evidence. The Liquid Glass restoration is merged in PR #58 and the post-merge validation workflow passed; deployment and final visual appearance in live Telegram/VK clients are not confirmed by CI. If shell access is unavailable, record owner-side checks rather than inventing results.
 
 Recommended next sequence:
 1. Keep issue #30 open while real Telegram/VK shell and test-account sync/recovery checks remain unverified.
