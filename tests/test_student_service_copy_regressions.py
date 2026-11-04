@@ -578,7 +578,7 @@ class StudentServiceNormalizationBehaviorTest(unittest.TestCase):
                 "assert.equal(malformedAuxiliary.reminders.taskDays, 1);",
                 "assert.equal(malformedAuxiliary.reminders.deadlineDays, 1);",
                 "assert.equal(malformedAuxiliary.reminders.eventDays, 7);",
-                "const zeroAuxiliary = serviceNormalizeData({events:[{points:0}],reminders:{taskDays:0,deadlineDays:'0',eventDays:0}});",
+                "const zeroAuxiliary = serviceNormalizeData({events:[{title:'Zero',points:0}],reminders:{taskDays:0,deadlineDays:'0',eventDays:0}});",
                 "assert.equal(zeroAuxiliary.events[0].points, 0);",
                 "assert.equal(zeroAuxiliary.reminders.taskDays, 0);",
                 "assert.equal(zeroAuxiliary.reminders.deadlineDays, 0);",
