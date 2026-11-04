@@ -614,15 +614,16 @@ class StudentServiceSurfaceStyleRegressionTest(unittest.TestCase):
             sections = re.search(
                 r"\.service-page \.service-agenda-section,\s*"
                 r"\.service-page \.service-deadlines-section,\s*"
-                r"\.service-page \.service-events-section\s*\{([^}]*)\}",
+                r"\.service-page \.service-events-section,\s*"
+                r"\.service-page \.service-tasks-section\s*\{([^}]*)\}",
                 css,
             )
-            self.assertIsNotNone(sections, msg=f"{relative}: dashboard section reset is missing")
+            self.assertIsNotNone(sections, msg=f"{relative}: dashboard section surface rule is missing")
             for declaration in (
-                "padding: 0;",
-                "border: 0;",
-                "border-radius: 0;",
-                "background: transparent;",
+                "padding: var(--ui-space-3);",
+                "border: 1px solid var(--ui-panel-outline);",
+                "border-radius: var(--ui-radius-lg);",
+                "background: var(--ui-panel-surface);",
                 "box-shadow: none;",
                 "backdrop-filter: none;",
             ):
@@ -827,7 +828,7 @@ class UnifiedDesignSystemRegressionTest(unittest.TestCase):
                     ".service-page .service-grid { gap: var(--ui-space-2) !important; }",
                     ".service-page { gap: var(--ui-space-3) !important; }",
                     ".service-list { gap: var(--ui-space-2) !important; }",
-                    "Dashboard sections are content groups, not nested cards: remove the extra backing layer.",
+                    "Student Service dashboard groups use one restrained card surface.",
                     "background: transparent;",
                     "box-shadow: none;",
                     "-webkit-backdrop-filter: none;",
