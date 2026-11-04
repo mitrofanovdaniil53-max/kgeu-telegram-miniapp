@@ -735,7 +735,7 @@ class StudentServiceImportBackupSafetyTest(unittest.TestCase):
             start = source.index("function serviceApplyImportedData(payload)")
             end = source.index("function serviceImportData(file)", start)
             apply_function = source[start:end]
-            script = "\\n".join([
+            script = "\n".join([
                 "const assert = require('node:assert/strict');",
                 "let serviceData, kgeuPersonalData, persisted, saveCalls, messages, rollbackSucceeds;",
                 "function serviceNormalizeData(value) { return value; }",
