@@ -866,3 +866,44 @@ class StudentServiceDashboardRedundancyTest(unittest.TestCase):
                 self.assertIn('data-service-action="task"', home)
                 self.assertIn('data-service-action="deadline"', home)
 
+
+
+
+class ScheduleAndServiceAccessibilityPolishRegressionTest(unittest.TestCase):
+    def test_schedule_mode_buttons_expose_selected_state_in_both_frontends(self):
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                self.assertIn('id="tabs" role="group" aria-label="Режим расписания"', source)
+                self.assertIn('data-mode="today" aria-pressed="true"', source)
+                self.assertIn("t.setAttribute('aria-pressed', selected ? 'true' : 'false')", source)
+
+    def test_student_service_controls_have_touch_and_focus_states(self):
+        blocks = []
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                start = source.index('<style id="student-service-control-polish">')
+                end = source.index("</style>", start) + len("</style>")
+                block = source[start:end]
+                blocks.append(block)
+                self.assertIn(".service-main-nav .service-btn", block)
+                self.assertIn("min-height: 44px;", block)
+                self.assertIn(".service-page textarea:focus-visible", block)
+                self.assertIn("@media (prefers-reduced-motion: no-preference)", block)
+        self.assertEqual(blocks[0], blocks[1])
+
+    def test_schedule_card_wrapping_is_scoped_and_consistent(self):
+        blocks = []
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                start = source.index('<style id="schedule-card-layout-polish">')
+                end = source.index("</style>", start) + len("</style>")
+                block = source[start:end]
+                blocks.append(block)
+                self.assertIn(".card-top .badge { flex-shrink:0; white-space:nowrap; }", block)
+                self.assertNotIn("\n.badge {", block)
+                self.assertIn(".card-subject { overflow-wrap:anywhere; hyphens:auto; }", block)
+                self.assertIn("@media (max-width: 380px)", block)
+        self.assertEqual(blocks[0], blocks[1])
