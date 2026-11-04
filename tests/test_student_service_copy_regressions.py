@@ -768,7 +768,7 @@ class UnifiedDesignSystemRegressionTest(unittest.TestCase):
                     "--ui-radius-md: 14px",
                     "--ui-radius-lg: 18px",
                     "--ui-control-height: 44px",
-                    ".service-page .service-grid { gap: var(--ui-space-2); }",
+                    ".service-page .service-grid { gap: var(--ui-space-2) !important; }",
                     ".service-page { gap: var(--ui-space-3) !important; }",
                     ".service-list { gap: var(--ui-space-2) !important; }",
                     ".service-btn:focus-visible",
