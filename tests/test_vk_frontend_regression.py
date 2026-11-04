@@ -61,7 +61,7 @@ class VkFrontendRegressionTest(unittest.TestCase):
             "function setActiveGroup(id, name) { activeGroupId = Number(id); GROUP_NAME = name; CACHE_KEY = 'kgeu_rasp_vk_v2_' + activeGroupId; updateGroupLabel(); }",
             "function saveActiveGroup() {} function rememberGroup() {} function updateStatusLine() {} function closeGroupModal() {} function renderSavedGroups() {} function toast() {}",
             "function isoDate() { return '2026-11-05'; } function escapeHtml(value) { return String(value); }",
-            "async function fetchRasp(args) { return { groupInfo: { name: 'Группа ' + args.idGroup } }; }",
+            "async function fetchRasp(args) { return { groupInfo: { name: args.idGroup === DEFAULT_GROUP_ID ? DEFAULT_GROUP_NAME : 'Группа ' + args.idGroup } }; }",
             "async function refresh() {}",
             "const document = { getElementById(id) { return id === 'tabs' ? { style: {} } : { innerHTML: '' }; } };",
             switch_function,
