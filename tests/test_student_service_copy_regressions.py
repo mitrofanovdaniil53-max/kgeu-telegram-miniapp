@@ -571,7 +571,7 @@ class StudentServiceNormalizationBehaviorTest(unittest.TestCase):
                 "assert.equal(malformed.hostel.totalGoal, 250);",
                 "assert.equal(malformed.hostel.adminGoal, 100);",
                 "assert.equal(malformed.hostel.socialGoal, 150);",
-                "const malformedAuxiliary = serviceNormalizeData({events:[{points:'bad'},{points:-5},{points:'12.8'}],reminders:{taskDays:'bad',deadlineDays:Infinity,eventDays:99}});",
+                "const malformedAuxiliary = serviceNormalizeData({events:[{title:'Invalid',points:'bad'},{title:'Negative',points:-5},{title:'Fractional',points:'12.8'}],reminders:{taskDays:'bad',deadlineDays:Infinity,eventDays:99}});",
                 "assert.equal(malformedAuxiliary.events[0].points, 0);",
                 "assert.equal(malformedAuxiliary.events[1].points, 0);",
                 "assert.equal(malformedAuxiliary.events[2].points, 12);",
