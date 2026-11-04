@@ -841,3 +841,28 @@ class UnifiedDesignSystemRegressionTest(unittest.TestCase):
                 end = source.index("</style>", start) + len("</style>")
                 sources.append(source[start:end])
         self.assertEqual(sources[0], sources[1])
+
+class StudentServiceDashboardRedundancyTest(unittest.TestCase):
+    def test_redundant_next_lesson_and_task_summary_cards_are_removed_in_both_frontends(self):
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                start = source.index("function serviceRenderToday()")
+                end = source.index("function serviceRenderHostel()", start)
+                home = source[start:end]
+
+                self.assertNotIn("Следующая пара", home)
+                self.assertNotIn("Мои дела", home)
+                self.assertNotIn('class="service-grid"', home)
+                self.assertNotIn("const taskOpen=", home)
+                self.assertNotIn("const dlOpen=", home)
+
+                # The underlying agenda and task/deadline views remain available.
+                self.assertIn("getLessonsForDate(isoDate(new Date()))", home)
+                self.assertIn("serviceData.tasks.filter", home)
+                self.assertIn("serviceData.deadlines.filter", home)
+                self.assertIn('class="service-deadlines-section"', home)
+                self.assertIn('class="service-tasks-section"', home)
+                self.assertIn('data-service-action="task"', home)
+                self.assertIn('data-service-action="deadline"', home)
+
