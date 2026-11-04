@@ -1703,6 +1703,9 @@ html.vk-light .service-pill {
 .top-shell::before { display: none !important; }
 .top-shell .brand h1 { color: var(--text) !important; }
 .top-shell .brand .sub { color: var(--muted) !important; }
+/* Keep native form controls aligned with the manually selected app theme. */
+html.vk-light { color-scheme: light; }
+html.vk-dark { color-scheme: dark; }
 /* Keep the selected institute and group readable beside the action buttons. */
 .topbar { min-width: 0; }
 .brand { min-width: 0; flex: 1 1 auto; }
