@@ -754,3 +754,26 @@ class LiquidGlassVisualRegressionTest(unittest.TestCase):
                     self.assertIn(selector, source)
                 self.assertIn("html." + platform + "-dark", source)
                 self.assertIn("html." + platform + "-light", source)
+
+
+class UnifiedDesignSystemRegressionTest(unittest.TestCase):
+    def test_both_frontends_share_the_same_design_system(self):
+        sources = []
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                self.assertIn('id="kgeu-unified-design-system-v1"', source)
+                for token in (
+                    "--ui-radius-sm: 10px",
+                    "--ui-radius-md: 14px",
+                    "--ui-radius-lg: 18px",
+                    "--ui-control-height: 44px",
+                    ".service-page .service-grid { gap: var(--ui-space-2); }",
+                    ".service-btn:focus-visible",
+                    "@media (prefers-reduced-motion: reduce)",
+                ):
+                    self.assertIn(token, source)
+                start = source.index('<style id="kgeu-unified-design-system-v1">')
+                end = source.index("</style>", start) + len("</style>")
+                sources.append(source[start:end])
+        self.assertEqual(sources[0], sources[1])
