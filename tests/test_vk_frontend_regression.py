@@ -52,7 +52,7 @@ class VkFrontendRegressionTest(unittest.TestCase):
         start = self.html.index("  async function switchGroup(id,name,meta) {")
         end = self.html.index("  window.kgeuApplySharedProfile = async function(profile)", start)
         switch_function = self.html[start:end]
-        script = "\\n".join([
+        script = "\n".join([
             "const assert = require('node:assert/strict');",
             "const DEFAULT_GROUP_ID = 14541, DEFAULT_GROUP_NAME = 'М-1-25', DEFAULT_INSTITUTE_NAME = 'ИЦТЭ';",
             "const FIRST_STUDY = new Date('2026-09-02T00:00:00');",
