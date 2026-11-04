@@ -771,6 +771,12 @@ class UnifiedDesignSystemRegressionTest(unittest.TestCase):
                     ".service-page .service-grid { gap: var(--ui-space-2) !important; }",
                     ".service-page { gap: var(--ui-space-3) !important; }",
                     ".service-list { gap: var(--ui-space-2) !important; }",
+                    "A day summary is a real card, not a highlighted text strip.",
+                    ".service-page .service-agenda-section,",
+                    ".service-page .service-deadlines-section,",
+                    ".service-page .service-events-section {",
+                    "--ui-panel-surface: color-mix(in srgb, var(--card) 96%, white 4%)",
+                    ".service-page .service-calendar-empty",
                     ".service-btn:focus-visible",
                     "@media (prefers-reduced-motion: reduce)",
                 ):
