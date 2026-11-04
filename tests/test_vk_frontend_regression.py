@@ -78,7 +78,7 @@ class VkFrontendRegressionTest(unittest.TestCase):
             "  console.log('VK group institute fallback assertions passed');",
             "})().catch(error => { console.error(error); process.exitCode = 1; });",
         ]);
-        const result = subprocess.run([node, "-e", script], capture_output=True, text=True, check=False)
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, check=False)
         self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
         self.assertIn("VK group institute fallback assertions passed", result.stdout)
 
