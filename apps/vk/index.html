@@ -5343,6 +5343,7 @@ document.addEventListener("DOMContentLoaded", () => {
   window.kgeuSharedSyncMarkDirty = function (kind, key) {
     const meta = readMeta();
     meta.dirty = true;
+    meta.localChangeVersion = Number(meta.localChangeVersion || 0) + 1;
     if (kind === 'profile') meta.dirtyProfile = true;
     if (kind === 'service') meta.dirtyService = true;
     if (kind === 'note' && key && meta.dirtyNotes.indexOf(key) < 0) meta.dirtyNotes.push(key);
@@ -5373,8 +5374,12 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      const meta = readMeta();
+      let meta = readMeta();
       const remote = await request('/api/sync', { method: 'GET' });
+      // Refresh metadata after the pull: edits made while the GET was in flight
+      // must be included in the snapshot that is about to be pushed.
+      meta = readMeta();
+      const localChangeVersionAtPayload = Number(meta.localChangeVersion || 0);
       const local = localPersonal();
       const localProfile = readProfile();
       let shouldPush = !!meta.dirty;
@@ -5440,13 +5445,23 @@ document.addEventListener("DOMContentLoaded", () => {
         if (merged.addedLocalNotes || merged.conflicts) shouldPush = true;
         if (!meta.initialized || Number(remote.revision || 0) > Number(meta.lastServerRevision || 0)) {
           const profileChanged = !meta.dirtyProfile && await applyProfile(profile);
-          applyPersonal(personal);
-          if (profileChanged) {
-            meta.lastServerRevision = Number(remote.revision || 0);
-            meta.lastSyncAt = Date.now();
-            meta.initialized = true;
-            writeMeta(meta);
-            setStatus('Получены общие данные. Выбранная группа и настройки обновлены.');
+          const latestMetaAfterProfile = readMeta();
+          if (Number(latestMetaAfterProfile.localChangeVersion || 0) !== localChangeVersionAtPayload) {
+            // A local edit arrived while profile hydration was awaiting completion.
+            // Keep the user's current notes/profile and send the latest state below.
+            meta = latestMetaAfterProfile;
+            personal = localPersonal();
+            profile = readProfile();
+            shouldPush = true;
+          } else {
+            applyPersonal(personal);
+            if (profileChanged) {
+              meta.lastServerRevision = Number(remote.revision || 0);
+              meta.lastSyncAt = Date.now();
+              meta.initialized = true;
+              writeMeta(meta);
+              setStatus('Получены общие данные. Выбранная группа и настройки обновлены.');
+            }
           }
         }
         if (merged.conflicts) setStatus('Синхронизация выполнена. Есть ' + merged.conflicts + ' заметок с разными версиями — локальная копия сохранена.');
@@ -5464,6 +5479,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (shouldPush) {
         const result = await request('/api/sync', { method: 'POST', body: JSON.stringify(payloadForSync(personal, profile, Number(remote && remote.revision || 0))) });
+        const latestMetaAfterPush = readMeta();
+        if (Number(latestMetaAfterPush.localChangeVersion || 0) !== localChangeVersionAtPayload) {
+          // Do not apply the stale request payload over edits made while POST was in flight.
+          // The server revision is advanced, but the newer local changes remain dirty for a follow-up push.
+          latestMetaAfterPush.lastServerRevision = Number(result.revision || latestMetaAfterPush.lastServerRevision || 0);
+          latestMetaAfterPush.lastSyncAt = Date.now();
+          latestMetaAfterPush.initialized = true;
+          latestMetaAfterPush.dirty = true;
+          writeMeta(latestMetaAfterPush);
+          scheduleSync();
+          renderSharedServiceView();
+          setStatus('Во время синхронизации появились новые изменения. Сохранённую версию отправлю следом.');
+          return;
+        }
         meta.lastServerRevision = Number(result.revision || meta.lastServerRevision || 0);
         meta.lastSyncAt = Date.now();
         meta.initialized = true;
@@ -5479,6 +5508,18 @@ document.addEventListener("DOMContentLoaded", () => {
         renderSharedServiceView();
         setStatus('Данные VK и Telegram синхронизированы.');
       } else {
+        const latestMetaAfterPull = readMeta();
+        if (Number(latestMetaAfterPull.localChangeVersion || 0) !== localChangeVersionAtPayload) {
+          latestMetaAfterPull.lastServerRevision = Number(remote && remote.revision || latestMetaAfterPull.lastServerRevision || 0);
+          latestMetaAfterPull.lastSyncAt = Date.now();
+          latestMetaAfterPull.initialized = true;
+          latestMetaAfterPull.dirty = true;
+          writeMeta(latestMetaAfterPull);
+          scheduleSync();
+          renderSharedServiceView();
+          setStatus('Во время синхронизации появились новые изменения. Повторю отправку.');
+          return;
+        }
         meta.lastServerRevision = Number(remote && remote.revision || meta.lastServerRevision || 0);
         meta.lastSyncAt = Date.now();
         meta.initialized = true;
