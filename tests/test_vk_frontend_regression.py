@@ -62,7 +62,8 @@ class VkFrontendRegressionTest(unittest.TestCase):
             )
 
         rules = [
-            "html.vk-light .hero-kicker.live,",
+            "html.vk-light .hero-kicker.live { color:#15803d; }",
+            "html.vk-light .status-dot { background:#15803d; }",
             "html.vk-light .hero-kicker.soon,",
             "html.vk-light .next-mini .nm-label",
             "html.vk-light .badge.pr { color:#0f766e; }",
@@ -88,12 +89,21 @@ class VkFrontendRegressionTest(unittest.TestCase):
             ("#166534", composite("#35c98a", "#ffffff", 0.13)),
             ("#475569", "#eef2f7"),
             ("#667085", "#ffffff"),
+            ("#475569", composite("#94a3b8", "#ffffff", 0.15)),
         ]
         for foreground, background in text_pairs:
             self.assertGreaterEqual(
                 contrast(foreground, background),
                 4.5,
                 msg=f"{foreground} on {background} must meet WCAG AA for normal text",
+            )
+
+
+        for foreground in ("#15803d", "#92400e", "#b91c1c"):
+            self.assertGreaterEqual(
+                contrast(foreground, "#ffffff"),
+                3.0,
+                msg=f"{foreground} status dot must meet 3:1 non-text contrast",
             )
 
 
