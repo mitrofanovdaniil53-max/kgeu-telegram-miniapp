@@ -597,12 +597,12 @@ class StudentServiceSurfaceStyleRegressionTest(unittest.TestCase):
         style_blocks = []
         for relative, platform in (("index.html", "tg"), ("apps/vk/index.html", "vk")):
             source = (ROOT / relative).read_text(encoding="utf-8")
-            match = re.search(r'<style id="kgeu-unified-design-system-v1">([\\s\\S]*?)</style>', source)
+            match = re.search(r'<style id="kgeu-unified-design-system-v1">([\s\S]*?)</style>', source)
             self.assertIsNotNone(match, msg=f"{relative}: unified design system style block is missing")
             css = match.group(1)
             style_blocks.append(match.group(0))
 
-            summary = re.search(r"\\.day-summary\\s*\\{([^}]*)\\}", css)
+            summary = re.search(r"\.day-summary\s*\{([^}]*)\}", css)
             self.assertIsNotNone(summary, msg=f"{relative}: day summary rule is missing")
             for declaration in (
                 "border-radius: var(--ui-radius-lg);",
@@ -612,10 +612,10 @@ class StudentServiceSurfaceStyleRegressionTest(unittest.TestCase):
                 self.assertIn(declaration, summary.group(1))
 
             sections = re.search(
-                r"\\.service-page \\.service-agenda-section,\\s*"
-                r"\\.service-page \\.service-deadlines-section,\\s*"
-                r"\\.service-page \\.service-events-section,\\s*"
-                r"\\.service-page \\.service-tasks-section\\s*\\{([^}]*)\\}",
+                r"\.service-page \.service-agenda-section,\s*"
+                r"\.service-page \.service-deadlines-section,\s*"
+                r"\.service-page \.service-events-section,\s*"
+                r"\.service-page \.service-tasks-section\s*\{([^}]*)\}",
                 css,
             )
             self.assertIsNotNone(sections, msg=f"{relative}: dashboard section surface rule is missing")
@@ -630,8 +630,8 @@ class StudentServiceSurfaceStyleRegressionTest(unittest.TestCase):
                 self.assertIn(declaration, sections.group(1))
 
             empty_states = re.search(
-                r"\\.service-page \\.service-empty,\\s*"
-                r"\\.service-page \\.service-calendar-empty\\s*\\{([^}]*)\\}",
+                r"\.service-page \.service-empty,\s*"
+                r"\.service-page \.service-calendar-empty\s*\{([^}]*)\}",
                 css,
             )
             self.assertIsNotNone(empty_states, msg=f"{relative}: empty-state reset is missing")
