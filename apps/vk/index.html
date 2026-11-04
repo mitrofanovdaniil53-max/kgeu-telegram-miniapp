@@ -4342,9 +4342,11 @@ html.vk-light .service-pill {
         const importedPersonalData={version:1,notes:(pd.notes&&typeof pd.notes==='object')?pd.notes:{},updatedAt:Date.now()};
         if(!kgeuSavePersonalData(importedPersonalData)){
           serviceData=previousServiceData;
-          serviceSave();
+          const rollbackSaved=serviceSave();
           kgeuPersonalData=previousPersonalData;
-          toast('Не удалось сохранить заметки. Восстановление отменено; текущая копия сохранена.');
+          toast(rollbackSaved
+            ? 'Не удалось сохранить заметки. Восстановление отменено; текущая копия сохранена.'
+            : 'Не удалось сохранить заметки и откатить данные сервиса. Предварительная резервная копия создана; проверьте данные перед продолжением.');
           return;
         }
         kgeuPersonalData=importedPersonalData;
