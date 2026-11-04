@@ -5806,6 +5806,67 @@ document.addEventListener("DOMContentLoaded", () => {
     --ui-shadow: var(--glass-shadow, var(--shadow));
   }
 
+  /* Opaque-enough layered surfaces for light and dark themes. */
+  :root {
+    --ui-panel-surface: color-mix(in srgb, var(--card) 92%, transparent);
+    --ui-panel-inset: color-mix(in srgb, var(--bg2) 88%, transparent);
+    --ui-panel-outline: color-mix(in srgb, var(--border) 82%, white 18%);
+  }
+  html.tg-dark, html.vk-dark {
+    --ui-panel-surface: color-mix(in srgb, var(--card) 96%, white 4%);
+    --ui-panel-inset: color-mix(in srgb, var(--bg2) 94%, white 6%);
+    --ui-panel-outline: rgba(255,255,255,.14);
+  }
+  html.tg-light, html.vk-light {
+    --ui-panel-surface: color-mix(in srgb, var(--card) 96%, white 4%);
+    --ui-panel-inset: color-mix(in srgb, var(--bg2) 94%, white 6%);
+    --ui-panel-outline: color-mix(in srgb, var(--border) 72%, white 28%);
+  }
+
+  /* A day summary is a real card, not a highlighted text strip. */
+  .day-summary {
+    display: block;
+    width: 100%;
+    padding: 12px 14px;
+    margin: 0 0 var(--ui-space-3);
+    border: 1px solid var(--ui-panel-outline);
+    border-radius: var(--ui-radius-lg);
+    background: var(--ui-panel-surface);
+    box-shadow: var(--ui-shadow);
+    -webkit-backdrop-filter: blur(18px) saturate(1.25);
+    backdrop-filter: blur(18px) saturate(1.25);
+    line-height: 1.45;
+  }
+
+  /* Dashboard sections need their own continuous rounded surface. */
+  .service-page .service-agenda-section,
+  .service-page .service-deadlines-section,
+  .service-page .service-events-section {
+    min-width: 0;
+    padding: var(--ui-space-3);
+    border: 1px solid var(--ui-panel-outline);
+    border-radius: var(--ui-radius-lg);
+    background: var(--ui-panel-surface);
+    box-shadow: var(--ui-shadow);
+    -webkit-backdrop-filter: blur(18px) saturate(1.25);
+    backdrop-filter: blur(18px) saturate(1.25);
+  }
+  .service-page .service-agenda-section .service-section-title,
+  .service-page .service-deadlines-section .service-section-title,
+  .service-page .service-events-section .service-section-title {
+    margin: 0 0 var(--ui-space-2);
+  }
+
+  /* Empty states and inner rows remain visually distinct without square edges. */
+  .service-page .service-empty,
+  .service-page .service-calendar-empty {
+    min-width: 0;
+    border: 1px dashed var(--ui-panel-outline);
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-panel-inset);
+    overflow-wrap: anywhere;
+  }
+
   /* Shared geometry for primary cards, secondary panels and modal surfaces. */
   .hero, .next-mini, .lesson-card, .day-summary, .feature-box, .card,
   .service-page .service-hero, .service-page .service-card,
