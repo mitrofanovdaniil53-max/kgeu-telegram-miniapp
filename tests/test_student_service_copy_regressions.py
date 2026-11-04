@@ -620,10 +620,10 @@ class StudentServiceDateInputRegressionTest(unittest.TestCase):
         for relative in ("index.html", "apps/vk/index.html"):
             source = (ROOT / relative).read_text(encoding="utf-8")
             date_start = source.index("function serviceDateKey(s)")
-            date_end = source.index("\\n", date_start)
+            date_end = source.index("\n", date_start)
             event_start = source.index("function servicePromptEvent()")
             event_end = source.index("function serviceCompressImage(file)", event_start)
-            script = "\\n".join([
+            script = "\n".join([
                 "const assert = require('node:assert/strict');",
                 "let answers = ['Test event', '2026-02-30'];",
                 "const messages = [];",
