@@ -735,43 +735,49 @@ class StudentServiceImportBackupSafetyTest(unittest.TestCase):
             start = source.index("function serviceApplyImportedData(payload)")
             end = source.index("function serviceImportData(file)", start)
             apply_function = source[start:end]
-            script = "\n".join([
+            script = "\\n".join([
                 "const assert = require('node:assert/strict');",
-                "let serviceData, kgeuPersonalData, persisted, saveCalls, messages, rollbackSucceeds;",
+                "const STUDENT_SERVICE_KEY = 'service-key';",
+                "let serviceData, kgeuPersonalData, persisted, saveCalls, messages, rollbackMode;",
+                "const localStorage = { getItem() { return persisted; } };",
                 "function serviceNormalizeData(value) { return value; }",
                 "function serviceBackupCurrent() { return true; }",
                 "function serviceSave() {",
-                "  saveCalls++;",
-                "  if (saveCalls === 1) { persisted = 'imported'; return true; }",
-                "  if (rollbackSucceeds) { persisted = 'current'; return true; }",
+                "  saveCalls++; serviceData.updatedAt = saveCalls;",
+                "  if (saveCalls === 1 || rollbackMode === 'write-then-fail' || rollbackMode === 'success') {",
+                "    persisted = JSON.stringify(serviceData);",
+                "    return saveCalls === 1 || rollbackMode === 'success';",
+                "  }",
                 "  return false;",
                 "}",
                 "function kgeuSavePersonalData() { return false; }",
                 "function toast(message) { messages.push(message); }",
-                "function runCase(rollbackResult) {",
+                "function runCase(mode) {",
                 "  serviceData = { id: 'current' };",
                 "  kgeuPersonalData = { notes: { current: 'note' } };",
-                "  persisted = 'current'; saveCalls = 0; messages = []; rollbackSucceeds = rollbackResult;",
+                "  persisted = JSON.stringify(serviceData); saveCalls = 0; messages = []; rollbackMode = mode;",
                 "  serviceApplyImportedData({ serviceData: { id: 'imported' }, personalData: { notes: { imported: 'note' } } });",
                 "  assert.equal(serviceData.id, 'current');",
                 "  assert.equal(saveCalls, 2);",
-                "  return { persisted, message: messages.at(-1) };",
+                "  return { persisted: JSON.parse(persisted), message: messages.at(-1) };",
                 "}",
                 apply_function,
-                "const failedRollback = runCase(false);",
-                "assert.equal(failedRollback.persisted, 'imported');",
+                "const failedRollback = runCase('fail-before-write');",
+                "assert.equal(failedRollback.persisted.id, 'imported');",
                 "assert.match(failedRollback.message, /откатить данные сервиса/);",
                 "assert.doesNotMatch(failedRollback.message, /текущая копия сохранена/);",
-                "const successfulRollback = runCase(true);",
-                "assert.equal(successfulRollback.persisted, 'current');",
+                "const successfulRollback = runCase('success');",
+                "assert.equal(successfulRollback.persisted.id, 'current');",
                 "assert.match(successfulRollback.message, /текущая копия сохранена/);",
+                "const persistedDespiteSideEffectError = runCase('write-then-fail');",
+                "assert.equal(persistedDespiteSideEffectError.persisted.id, 'current');",
+                "assert.match(persistedDespiteSideEffectError.message, /текущая копия сохранена/);",
                 "console.log('restore rollback status assertions passed');",
             ])
             with self.subTest(frontend=relative):
                 result = subprocess.run([node, "-e", script], capture_output=True, text=True, check=False)
                 self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
                 self.assertIn("restore rollback status assertions passed", result.stdout)
-
 
 class WordReportKeyboardBehaviorTest(unittest.TestCase):
     def test_iframe_tab_wraps_to_expected_controls_in_both_frontends(self):
