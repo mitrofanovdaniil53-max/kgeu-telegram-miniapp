@@ -3742,7 +3742,7 @@ html.vk-light .service-pill {
   };
   function serviceEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
   function serviceDate(s){if(!s)return '';const d=new Date(s+'T00:00:00');return isNaN(d)?s:d.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'});}
-  function serviceDateKey(s){return /^\d{4}-\d{2}-\d{2}$/.test(String(s||''))?String(s):'';}
+  function serviceDateKey(s){const value=String(s||'');if(!/^\d{4}-\d{2}-\d{2}$/.test(value))return '';const parsed=new Date(value+'T00:00:00Z');return Number.isFinite(parsed.getTime())&&parsed.toISOString().slice(0,10)===value?value:'';}
   function serviceTaskStatus(item){
     if(item.done)return {cls:'done',label:'Готово'};
     const d=serviceDateKey(item.dueDate);
@@ -4023,7 +4023,7 @@ html.vk-light .service-pill {
   function servicePromptTask(){
     const title=prompt('Название задачи:');if(!title)return;
     const due=prompt('Срок YYYY-MM-DD (необязательно):','');
-    if(due && !/^\d{4}-\d{2}-\d{2}$/.test(due)){toast('Срок должен быть в формате YYYY-MM-DD');return;}
+    if(due && !serviceDateKey(due)){toast('Укажи корректную дату в формате YYYY-MM-DD');return;}
     const subject=servicePromptSubject();
     const note=prompt('Комментарий (необязательно):')||'';
     serviceData.tasks.push({id:'t_'+Date.now(),title:title.trim(),dueDate:due||'',subject:subject,note:note.trim(),done:false,createdAt:Date.now()});serviceSave();render();
@@ -4031,7 +4031,7 @@ html.vk-light .service-pill {
   function servicePromptDeadline(){
     const title=prompt('Название дедлайна:');if(!title)return;
     const date=prompt('Дата YYYY-MM-DD:',isoDate(new Date()));if(!date)return;
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){toast('Дата должна быть в формате YYYY-MM-DD');return;}
+    if(!serviceDateKey(date)){toast('Укажи корректную дату в формате YYYY-MM-DD');return;}
     const subject=servicePromptSubject();
     const note=prompt('Комментарий (необязательно):')||'';
     serviceData.deadlines.push({id:'d_'+Date.now(),title:title.trim(),date:date,subject:subject,note:note.trim(),done:false});serviceSave();render();
@@ -4039,6 +4039,7 @@ html.vk-light .service-pill {
   function servicePromptEvent(){
     const title=prompt('Название мероприятия:'); if(!title)return;
     const date=prompt('Дата в формате ГГГГ-ММ-ДД:',isoDate(new Date())); if(!date)return;
+    if(!serviceDateKey(date)){toast('Укажи корректную дату в формате YYYY-MM-DD');return;}
     const points=Number(prompt('Сколько социальных баллов?', '10')||0);
     serviceData.events.push({id:'e_'+Date.now(),title:title.trim(),date:date,points:points});
     // Also create a social record, so one input immediately participates in the report.
