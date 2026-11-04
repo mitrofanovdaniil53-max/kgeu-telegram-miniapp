@@ -30,6 +30,8 @@ class VkFrontendRegressionTest(unittest.TestCase):
         self.assertIn("background: var(--card) !important;", self.html)
         self.assertIn("color: var(--text) !important;", self.html)
         self.assertIn("overflow-wrap: anywhere;", self.html)
+        self.assertIn(".current-group-box > div { min-width:0; }", self.html)
+        self.assertIn(".current-group-name { overflow-wrap:anywhere; line-height:1.25; }", self.html)
         self.assertIn("white-space: normal;", self.html)
         self.assertIn("html.vk-light { color-scheme: light; }", self.html)
         self.assertIn("html.vk-dark { color-scheme: dark; }", self.html)
