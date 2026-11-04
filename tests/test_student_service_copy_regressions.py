@@ -548,6 +548,9 @@ class StudentServiceNormalizationBehaviorTest(unittest.TestCase):
             source = (ROOT / relative).read_text(encoding="utf-8")
             helper_start = source.index("function serviceNonNegativeNumber(value,fallback)")
             helper_end = source.index("\n", helper_start)
+            date_helper_start = source.index("function serviceDateKey(s)")
+            date_helper_end = source.index("\n", date_helper_start)
+            date_helper = source[date_helper_start:date_helper_end]
             normalize_start = source.index("function serviceNormalizeData(x)")
             normalize_end = source.index("function serviceLoad()", normalize_start)
             helper = source[helper_start:helper_end]
@@ -557,7 +560,7 @@ class StudentServiceNormalizationBehaviorTest(unittest.TestCase):
                 "const STUDENT_SERVICE_SCHEMA = 19;",
                 "function serviceRecordArray(value) { return Array.isArray(value) ? value : []; }",
                 "function serviceNormalizeRecord(record, prefix) { return Object.assign({id: prefix + '_test'}, record || {}); }",
-                "function serviceDateKey(value) { return typeof value === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(value); }",
+                date_helper,
                 helper,
                 normalizer,
                 "const zeros = serviceNormalizeData({hostel:{totalGoal:0,adminGoal:0,socialGoal:0,work:[{minutes:'',points:'bad'}],social:[{points:true}]}});",
@@ -583,6 +586,14 @@ class StudentServiceNormalizationBehaviorTest(unittest.TestCase):
                 "assert.equal(zeroAuxiliary.reminders.taskDays, 0);",
                 "assert.equal(zeroAuxiliary.reminders.deadlineDays, 0);",
                 "assert.equal(zeroAuxiliary.reminders.eventDays, 0);",
+                "assert.equal(serviceDateKey('2024-02-29'), '2024-02-29');",
+                "assert.equal(serviceDateKey('2025-02-29'), '');",
+                "assert.equal(serviceDateKey('2026-02-30'), '');",
+                "assert.equal(serviceDateKey('2026-13-01'), '');",
+                "const malformedDates = serviceNormalizeData({tasks:[{title:'Bad task',dueDate:'2026-02-30'}],deadlines:[{title:'Bad deadline',date:'2025-02-29'}],events:[{title:'Bad event',date:'2026-13-01'}]});",
+                "assert.equal(malformedDates.tasks[0].dueDate, '');",
+                "assert.equal(malformedDates.deadlines[0].date, '');",
+                "assert.equal(malformedDates.events[0].date, '');",
                 "console.log('real serviceNormalizeData assertions passed');",
             ])
             with self.subTest(frontend=relative):
@@ -591,6 +602,56 @@ class StudentServiceNormalizationBehaviorTest(unittest.TestCase):
                 self.assertIn("real serviceNormalizeData assertions passed", result.stdout)
 
 
+
+
+class StudentServiceDateInputRegressionTest(unittest.TestCase):
+    def test_task_deadline_and_event_prompts_reject_invalid_calendar_dates(self):
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            with self.subTest(frontend=relative):
+                self.assertIn("if(due && !serviceDateKey(due))", source)
+                self.assertGreaterEqual(source.count("if(!serviceDateKey(date))"), 2)
+                self.assertIn("function serviceDateKey(s){const value=String(s||'');", source)
+
+    def test_real_event_prompt_rejects_impossible_date_before_writing(self):
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("Node.js is required to execute the real event prompt")
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            date_start = source.index("function serviceDateKey(s)")
+            date_end = source.index("\\n", date_start)
+            event_start = source.index("function servicePromptEvent()")
+            event_end = source.index("function serviceCompressImage(file)", event_start)
+            script = "\\n".join([
+                "const assert = require('node:assert/strict');",
+                "let answers = ['Test event', '2026-02-30'];",
+                "const messages = [];",
+                "let saves = 0;",
+                "const serviceData = {events:[],hostel:{social:[]}};",
+                "function prompt(){return answers.shift();}",
+                "function toast(message){messages.push(message);}",
+                "function serviceSave(){saves++;}",
+                "function render(){}",
+                "function isoDate(){return '2026-11-04';}",
+                source[date_start:date_end],
+                source[event_start:event_end],
+                "servicePromptEvent();",
+                "assert.equal(saves, 0);",
+                "assert.equal(serviceData.events.length, 0);",
+                "assert.equal(serviceData.hostel.social.length, 0);",
+                "assert.equal(messages.length, 1);",
+                "answers = ['Valid event', '2024-02-29', '8'];",
+                "servicePromptEvent();",
+                "assert.equal(saves, 1);",
+                "assert.equal(serviceData.events[0].date, '2024-02-29');",
+                "assert.equal(serviceData.hostel.social[0].date, '2024-02-29');",
+                "console.log('event date validation passed');",
+            ]);
+            with self.subTest(frontend=relative):
+                result = subprocess.run([node, "-e", script], capture_output=True, text=True, check=False)
+                self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+                self.assertIn("event date validation passed", result.stdout)
 
 
 class StudentServiceHostelInputRegressionTest(unittest.TestCase):
