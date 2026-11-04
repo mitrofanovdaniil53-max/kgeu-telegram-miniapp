@@ -726,6 +726,78 @@ class StudentServiceImportBackupSafetyTest(unittest.TestCase):
                 self.assertIn("service and personal backup helper assertions passed", result.stdout)
 
 
+class VkSyncInFlightEditRegressionTest(unittest.TestCase):
+    def test_vk_sync_does_not_overwrite_edits_made_during_pending_push(self):
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("Node.js is required to execute VK sync")
+        source = (ROOT / "apps/vk/index.html").read_text(encoding="utf-8")
+        dirty_start = source.index("window.kgeuSharedSyncMarkDirty = function")
+        dirty_end = source.index("\n  kgeuFlushMigratedNoteSync();", dirty_start)
+        dirty_function = source[dirty_start:dirty_end]
+        sync_start = source.index("async function syncNow(reason)")
+        sync_end = source.index("\n  async function linkAccount()", sync_start)
+        sync_function = source[sync_start:sync_end]
+        script = "\\n".join([
+            "const assert = require('node:assert/strict');",
+            "let busy = false, scheduled = 0, resolvePost, postedPayload = null;",
+            "let kgeuPersonalData = { version: 1, notes: { keep: 'old value' } };",
+            "let metaStore = { deviceId: 'vk-test', lastServerRevision: 1, lastSyncAt: 1, initialized: true, dirty: true, dirtyNotes: [], dirtyProfile: false, dirtyService: true, localChangeVersion: 0 };",
+            "const serviceCache = { tasks: [], deadlines: [], events: [], hostel: { work: [], social: [] } };",
+            "const remote = { found: true, revision: 1, updatedAt: 1000, serviceData: serviceCache, personalData: { version: 1, notes: { keep: 'old value' } }, profileData: {} };",
+            "const snapshot = {};",
+            "const window = { kgeuMarkStudentServiceSynced() {} };",
+            "const navigator = { onLine: true };",
+            "const document = { visibilityState: 'visible' };",
+            "const localStorage = { setItem() {}, getItem() { return null; } };",
+            "function readMeta() { return JSON.parse(JSON.stringify(metaStore)); }",
+            "function writeMeta(value) { metaStore = JSON.parse(JSON.stringify(value)); }",
+            "function scheduleSync() { scheduled++; }",
+            "function setLinkUiState() {}",
+            "function setStatus() {}",
+            "function localPersonal() { return JSON.parse(JSON.stringify(kgeuPersonalData)); }",
+            "function readProfile() { return {}; }",
+            "function readCachedService() { return serviceCache; }",
+            "function hasMeaningfulServiceData() { return false; }",
+            "function sameServiceContent() { return true; }",
+            "function mergeNotes(cloud, local) { return { personalData: local, addedLocalNotes: false, conflicts: 0 }; }",
+            "async function applyProfile() { return false; }",
+            "function applyPersonal(personal) { kgeuPersonalData = JSON.parse(JSON.stringify(personal)); }",
+            "function payloadForSync(personal, profile, revision) { return { personalData: JSON.parse(JSON.stringify(personal)), profileData: profile, expectedRevision: revision }; }",
+            "function renderSharedServiceView() {}",
+            "function request(path, options) {",
+            "  if (path === '/api/account/me') return Promise.resolve({ linkedProviders: ['telegram', 'vk'] });",
+            "  if (path === '/api/sync' && options.method === 'GET') return Promise.resolve(remote);",
+            "  if (path === '/api/sync' && options.method === 'POST') {",
+            "    postedPayload = JSON.parse(options.body);",
+            "    return new Promise(resolve => { resolvePost = () => resolve({ revision: 2, updatedAt: 2000 }); });",
+            "  }",
+            "  throw new Error('unexpected request ' + path);",
+            "}",
+            dirty_function,
+            sync_function,
+            "(async () => {",
+            "  const pending = syncNow('regression-test');",
+            "  for (let i = 0; i < 20 && !resolvePost; i++) await Promise.resolve();",
+            "  assert.equal(typeof resolvePost, 'function', 'sync should reach the pending POST');",
+            "  assert.deepEqual(postedPayload.personalData.notes, { keep: 'old value' });",
+            "  kgeuPersonalData = { version: 1, notes: { keep: 'old value', during: 'edited while POST is pending' } };",
+            "  window.kgeuSharedSyncMarkDirty('note', 'during');",
+            "  resolvePost();",
+            "  await pending;",
+            "  assert.equal(kgeuPersonalData.notes.during, 'edited while POST is pending', 'in-flight edit must not be overwritten by stale payload');",
+            "  assert.equal(metaStore.dirty, true, 'new edit must remain queued');",
+            "  assert.ok(metaStore.dirtyNotes.includes('during'), 'new note key must remain dirty');",
+            "  assert.equal(metaStore.lastServerRevision, 2, 'follow-up push must use the revision returned by the completed request');",
+            "  assert.ok(scheduled >= 2, 'a follow-up sync must be scheduled after the in-flight edit');",
+            "  console.log('VK in-flight edit assertions passed');",
+            "})().catch(error => { console.error(error); process.exitCode = 1; });",
+        ])
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        self.assertIn("VK in-flight edit assertions passed", result.stdout)
+
+
 class WordReportKeyboardBehaviorTest(unittest.TestCase):
     def test_iframe_tab_wraps_to_expected_controls_in_both_frontends(self):
         node = shutil.which("node")
