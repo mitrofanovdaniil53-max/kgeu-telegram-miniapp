@@ -1701,13 +1701,13 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     <span id="status-text">Загрузка…</span>
   </div>
 
-  <div class="tabs" id="tabs">
-    <button class="tab" data-mode="service">Мой сервис</button>
-    <button class="tab active" data-mode="today">Сегодня</button>
-    <button class="tab" data-mode="tomorrow">Завтра</button>
-    <button class="tab" data-mode="week">Неделя</button>
-    <button class="tab" data-mode="month">Месяц</button>
-    <button class="tab" data-mode="teachers">Преподаватели</button>
+  <div class="tabs" id="tabs" role="group" aria-label="Режим расписания">
+    <button class="tab" data-mode="service" aria-pressed="false">Мой сервис</button>
+    <button class="tab active" data-mode="today" aria-pressed="true">Сегодня</button>
+    <button class="tab" data-mode="tomorrow" aria-pressed="false">Завтра</button>
+    <button class="tab" data-mode="week" aria-pressed="false">Неделя</button>
+    <button class="tab" data-mode="month" aria-pressed="false">Месяц</button>
+    <button class="tab" data-mode="teachers" aria-pressed="false">Преподаватели</button>
   </div>
   </div>
   <div class="schedule-shell">
@@ -4459,7 +4459,9 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
   function switchTab(mode) {
     currentMode = mode;
     document.querySelectorAll('.tab').forEach(function (t) {
-      t.classList.toggle('active', t.getAttribute('data-mode') === mode);
+      const selected = t.getAttribute('data-mode') === mode;
+      t.classList.toggle('active', selected);
+      t.setAttribute('aria-pressed', selected ? 'true' : 'false');
     });
     if (mode === 'month') {
       const now = new Date();
