@@ -4842,18 +4842,18 @@ document.addEventListener("DOMContentLoaded", () => {
     line-height: 1.45;
   }
 
-  /* Dashboard sections need their own continuous rounded surface. */
+  /* Dashboard sections are content groups, not nested cards: remove the extra backing layer. */
   .service-page .service-agenda-section,
   .service-page .service-deadlines-section,
   .service-page .service-events-section {
     min-width: 0;
-    padding: var(--ui-space-3);
-    border: 1px solid var(--ui-panel-outline);
-    border-radius: var(--ui-radius-lg);
-    background: var(--ui-panel-surface);
-    box-shadow: var(--ui-shadow);
-    -webkit-backdrop-filter: blur(18px) saturate(1.25);
-    backdrop-filter: blur(18px) saturate(1.25);
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
   .service-page .service-agenda-section .service-section-title,
   .service-page .service-deadlines-section .service-section-title,
@@ -4861,13 +4861,14 @@ document.addEventListener("DOMContentLoaded", () => {
     margin: 0 0 var(--ui-space-2);
   }
 
-  /* Empty states and inner rows remain visually distinct without square edges. */
+  /* Empty messages sit directly on the page; no secondary plate or shadow. */
   .service-page .service-empty,
   .service-page .service-calendar-empty {
     min-width: 0;
-    border: 1px dashed var(--ui-panel-outline);
-    border-radius: var(--ui-radius-md);
-    background: var(--ui-panel-inset);
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
     overflow-wrap: anywhere;
   }
 
