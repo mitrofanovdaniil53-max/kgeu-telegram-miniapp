@@ -4343,8 +4343,12 @@ html.vk-light .service-pill {
         if(!kgeuSavePersonalData(importedPersonalData)){
           serviceData=previousServiceData;
           const rollbackSaved=serviceSave();
+          let rollbackPersisted=rollbackSaved;
+          if(!rollbackPersisted){
+            try{rollbackPersisted=localStorage.getItem(STUDENT_SERVICE_KEY)===JSON.stringify(serviceData);}catch(e){}
+          }
           kgeuPersonalData=previousPersonalData;
-          toast(rollbackSaved
+          toast(rollbackPersisted
             ? 'Не удалось сохранить заметки. Восстановление отменено; текущая копия сохранена.'
             : 'Не удалось сохранить заметки и откатить данные сервиса. Предварительная резервная копия создана; проверьте данные перед продолжением.');
           return;
