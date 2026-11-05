@@ -276,7 +276,7 @@ test('cloud restore rolls back service and personal data when sync metadata cann
     'function applyTheme() {}',
     cloudApplySource,
     'return { serviceApplyCloudSnapshot, getState() { return { serviceData, kgeuPersonalData, store: state.store }; } };'
-  ].join('\\n');
+  ].join(String.fromCharCode(10));
   const api = new Function('state', factorySource)(state);
   assert.throws(
     () => api.serviceApplyCloudSnapshot({
@@ -300,5 +300,5 @@ test('VK restore handler explains persistence and rollback failures in Russian',
   assert.match(restoreHandlerSource, /cloud_snapshot_personal_save_failed/);
   assert.match(restoreHandlerSource, /cloud_snapshot_metadata_save_failed/);
   assert.match(restoreHandlerSource, /cloud_snapshot_rollback_failed/);
-  assert.match(restoreHandlerSource, /Резервная копия сохранена/);
+  assert.match(restoreHandlerSource, /резервная копия сохранена/);
 });
