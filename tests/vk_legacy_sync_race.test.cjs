@@ -196,6 +196,7 @@ test('cloud snapshot restore rolls back service state if personal notes cannot b
   const factorySource = [
     'const STUDENT_SERVICE_KEY = "service-data";',
     'const STUDENT_SERVICE_SYNC_KEY = "service-sync";',
+    'const KGEU_PERSONAL_DATA_KEY = "personal-data";',
     'const ACTIVE_GROUP_KEY = "active-group";',
     'const window = { KGEU_VK_PLATFORM: true, __kgeuApplyingSharedProfile: false };',
     'const hasExplicitGroupFromLaunch = false;',
