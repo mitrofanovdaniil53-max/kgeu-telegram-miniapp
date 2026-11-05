@@ -259,33 +259,6 @@ function kgeuSetNote(subject, value) {
     }
     .top-shell > * { position: relative; z-index: 1; }
 
-    /* Theme-aware Liquid Glass header: dark in light mode, light in dark mode. */
-    .vk-light .top-shell {
-      background: rgba(17,24,39,.90); color:#fff; border-color:rgba(255,255,255,.10);
-      box-shadow:0 14px 34px rgba(16,24,40,.18), inset 0 1px 0 rgba(255,255,255,.10);
-    }
-    .vk-light .top-shell::before {
-      background:radial-gradient(circle at 12% 0%, rgba(59,130,246,.22), transparent 32%), linear-gradient(135deg, rgba(255,255,255,.06), rgba(15,23,42,.10));
-    }
-    .vk-light .top-shell .brand h1 { color:#fff; }
-    .vk-light .top-shell .brand .sub { color:#aeb8c8; }
-    .vk-light .top-shell .icon-btn { color:#fff; background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.12); }
-    .vk-light .tabs { background:rgba(255,255,255,.07); border-color:rgba(255,255,255,.10); box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 4px 16px rgba(0,0,0,.12); }
-    .vk-light .tab { color:#aeb8c8; }
-    .vk-light .tab.active { background:rgba(255,255,255,.16); border-color:rgba(255,255,255,.18); color:#fff; box-shadow:0 4px 12px rgba(0,0,0,.14), inset 0 1px 0 rgba(255,255,255,.12); }
-    .vk-dark .top-shell {
-      background:rgba(255,255,255,.78); color:#101828; border-color:rgba(255,255,255,.82);
-      box-shadow:0 14px 34px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.96);
-    }
-    .vk-dark .top-shell::before {
-      background:radial-gradient(circle at 12% 0%, rgba(255,255,255,.96), transparent 32%), linear-gradient(135deg, rgba(255,255,255,.32), rgba(230,237,248,.18));
-    }
-    .vk-dark .top-shell .brand h1 { color:#101828; }
-    .vk-dark .top-shell .brand .sub { color:#667085; }
-    .vk-dark .top-shell .icon-btn { color:#101828; background:rgba(255,255,255,.44); border-color:rgba(255,255,255,.62); }
-    .vk-dark .tabs { background:rgba(255,255,255,.38); border-color:rgba(255,255,255,.74); }
-    .vk-dark .tab { color:#667085; }
-    .vk-dark .tab.active { background:rgba(255,255,255,.88); border-color:rgba(255,255,255,.92); color:#101828; }
 
 
     /* v6: subtle motion + explicit offline state */
@@ -490,6 +463,7 @@ function kgeuSetNote(subject, value) {
     .hero-type.pr { background: rgba(22,160,133,.13); color: var(--pr); }
     .hero-type.lab { background: rgba(124,58,237,.12); color: var(--lab); }
     .hero-type.other { background: rgba(148,163,184,.15); color: var(--muted); }
+    .hero-type.replace { background: rgba(234,88,12,.12); color: var(--replace); }
     .hero-row {
       font-size: 13px; color: var(--muted);
       margin-top: 3px; display: flex; align-items: center; gap: 6px;
@@ -883,43 +857,6 @@ function kgeuSetNote(subject, value) {
       text-overflow:ellipsis;
     }
     .top-actions { flex-shrink:0; }
-    /* Liquid Glass upper shell stays light in every theme. */
-    .top-shell .icon-btn {
-      color:#344054;
-      background:rgba(255,255,255,.46);
-      border-color:rgba(255,255,255,.82);
-    }
-    html.vk-dark .top-shell,
-    html.vk-light .top-shell {
-      background:rgba(255,255,255,.72);
-      color:#101828;
-      box-shadow:
-        0 14px 34px rgba(16,24,40,.10),
-        inset 0 1px 0 rgba(255,255,255,.95);
-    }
-    html.vk-dark .top-shell .brand h1,
-    html.vk-light .top-shell .brand h1 { color:#101828; }
-    html.vk-dark .top-shell .brand .sub,
-    html.vk-dark .top-shell .status-line,
-    html.vk-light .top-shell .brand .sub,
-    html.vk-light .top-shell .status-line { color:#667085; }
-    html.vk-dark .top-shell .icon-btn,
-    html.vk-light .top-shell .icon-btn {
-      color:#344054;
-      background:rgba(255,255,255,.46);
-      border-color:rgba(255,255,255,.82);
-    }
-    html.vk-dark .top-shell .tab,
-    html.vk-light .top-shell .tab {
-      background:transparent;
-      color:#667085;
-    }
-    html.vk-dark .top-shell .tab.active,
-    html.vk-light .top-shell .tab.active {
-      background:rgba(255,255,255,.88);
-      color:#101828;
-      border-color:rgba(255,255,255,.92);
-    }
     .kgeu-logo-img {
       width:48px; height:48px; object-fit:contain; flex:0 0 48px;
     }
@@ -1767,6 +1704,20 @@ html.vk-light .service-pill {
 .top-shell::before { display: none !important; }
 .top-shell .brand h1 { color: var(--text) !important; }
 .top-shell .brand .sub { color: var(--muted) !important; }
+/* Keep native form controls aligned with the manually selected app theme. */
+html.vk-light { color-scheme: light; }
+html.vk-dark { color-scheme: dark; }
+/* Keep the selected institute and group readable beside the action buttons. */
+.topbar { min-width: 0; }
+.brand { min-width: 0; flex: 1 1 auto; }
+.brand > div:last-child { min-width: 0; flex: 1 1 auto; }
+.brand .sub {
+  display: block;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
 .top-actions { gap: 6px !important; }
 .top-shell .icon-btn {
   width: 40px !important;
@@ -1879,6 +1830,34 @@ html.vk-light .service-pill {
 }
 
 
+</style>
+<style id="vk-light-theme-contrast">
+/* Improve contrast for small semantic labels and state indicators in light mode. */
+html.vk-light { --muted:#475569; }
+html.vk-light .offline-banner { color:#92400e; }
+.current-group-box > div { min-width:0; }
+.current-group-name { overflow-wrap:anywhere; line-height:1.25; }
+html.vk-light .hero-kicker.live { color:#15803d; }
+html.vk-light .status-dot { background:#15803d; }
+html.vk-light .hero-kicker.soon,
+html.vk-light .next-mini .nm-label { color:#92400e; }
+html.vk-light .status-dot.warn { background:#92400e; }
+html.vk-light .status-dot.err { background:#b91c1c; }
+html.vk-light .hero-type.pr,
+html.vk-light .badge.pr { color:#0f766e; }
+html.vk-light .hero-type.lab,
+html.vk-light .badge.lab { color:#6d28d9; }
+html.vk-light .hero-type.replace { color:#9a3412 !important; }
+html.vk-light .hero-type.other,
+html.vk-light .badge.other,
+html.vk-light .service-status.upcoming,
+html.vk-light .service-chip { color:#475569; }
+html.vk-light .badge.replace { color:#9a3412; }
+html.vk-light .service-status.overdue { color:#b91c1c; }
+html.vk-light .service-status.today { color:#92400e; }
+html.vk-light .service-status.done { color:#166534; }
+html.vk-light .service-pill { color:#475569 !important; }
+html.vk-light .kgeu-note-icon { color:#667085; }
 </style>
 </head>
 <body>
@@ -2621,7 +2600,7 @@ html.vk-light .service-pill {
         '<div class="hero-time">' + current.start + ' — ' + current.end + '</div>' +
         '<div class="hero-subject">' + escapeHtml(current.subject) + '</div>' +
         (tl ? '<div class="hero-type ' + current.type + '">' + tl + '</div>' : '') +
-        (current.replacement ? '<div class="hero-type" style="color:var(--replace);background:rgba(234,88,12,.12)">↻ Замена</div>' : '') +
+        (current.replacement ? '<div class="hero-type replace">↻ Замена</div>' : '') +
         (current.teacher ? '<div class="hero-row"><span class="t-link" data-tid="' + (current.teacherId || '') + '" data-tname="' + escapeHtml(formatTeacherFullName(current.teacher)) + '">' + escapeHtml(formatTeacherFullName(current.teacher)) + '</span></div>' : '') +
         '<div class="hero-row">⌖ ' + escapeHtml(roomText(current.room)) + '</div>' +
         '<div class="hero-progress"><div class="hero-progress-fill" style="width:' + progress + '%"></div></div>' +
@@ -3179,7 +3158,7 @@ html.vk-light .service-pill {
         '';
 
       setActiveGroup(id, resolvedName);
-      INSTITUTE_NAME = resolvedInstitute || INSTITUTE_NAME || '';
+      INSTITUTE_NAME = resolvedInstitute || (id === DEFAULT_GROUP_ID ? DEFAULT_INSTITUTE_NAME : '');
       updateGroupLabel();
       saveActiveGroup();
 
