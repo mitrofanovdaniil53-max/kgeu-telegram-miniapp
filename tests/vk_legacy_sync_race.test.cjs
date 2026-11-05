@@ -258,7 +258,7 @@ test('cloud restore rolls back service and personal data when sync metadata cann
     'let kgeuPersonalData = state.personalData;',
     'const localStorage = {',
     '  getItem(key) { return Object.prototype.hasOwnProperty.call(state.store, key) ? state.store[key] : null; },',
-    '  setItem(key, value) { if (state.failSyncMetaWrite && key === STUDENT_SERVICE_SYNC_KEY) throw new Error("quota"); state.store[key] = String(value); },',
+    '  setItem(key, value) { if (state.failSyncMetaWrite && key === STUDENT_SERVICE_SYNC_KEY && String(value) !== state.store[key]) throw new Error("quota"); state.store[key] = String(value); },',
     '  removeItem(key) { delete state.store[key]; }',
     '};',
     'function readMeta() { return state.meta; }',
