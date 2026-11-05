@@ -68,7 +68,7 @@ function createHarness() {
     'function isoDate() { return "2026-11-05"; }',
     'function fetchRasp(args) { state.pendingGroups.push(Number(args.idGroup)); const gate = state.gates.get(Number(args.idGroup)); return gate ? gate.promise : Promise.resolve({ groupInfo: { name: "Группа " + args.idGroup } }); }',
     'function setActiveGroup(id, name) { activeGroupId = Number(id); GROUP_NAME = String(name || "Группа " + id); CACHE_KEY = "kgeu_rasp_vk_v2_" + id; }',
-    'function updateStatusLine() {} function closeGroupModal() {} function renderSavedGroups() {} function applyTheme() {} function syncAppearanceControls() {} function render() {}',
+    'function updateStatusLine() {} function closeGroupModal() {} function renderSavedGroups() {} function applyTheme() {} function syncAppearanceControls() {} function render() {} function escapeHtml(value) { return String(value); }',
     'const document = { getElementById(id) { if (id === "tabs") return { style: {} }; return { innerHTML: "" }; } };',
     'async function refresh() {}',
     saveSettingsSource,
@@ -78,7 +78,7 @@ function createHarness() {
     switchGroupSource,
     sharedProfileSource,
     applyProfileSource,
-    'return { applyProfile, switchGroup, saveSettings, getState() { return { activeGroupId, GROUP_NAME, INSTITUTE_NAME, settings, meta: state.meta, groupKey: state.groupKey, settingsKey: localStorage.getItem(SETTINGS_KEY), applying: window.kgeuSharedSyncApplyingProfile }; } };'
+    'return { applyProfile, switchGroup, saveSettings, setTheme(value) { settings.theme = value; saveSettings(); }, getState() { return { activeGroupId, GROUP_NAME, INSTITUTE_NAME, settings, meta: state.meta, groupKey: state.groupKey, settingsKey: localStorage.getItem(SETTINGS_KEY), applying: window.kgeuSharedSyncApplyingProfile }; } };'
   ].join('\n');
   const factory = new Function('state', factorySource);
   const api = factory(state);
@@ -126,8 +126,7 @@ test('user setting changes remain dirty while remote group metadata is loading',
 
   const whileLoading = h.getState();
   assert.equal(whileLoading.applying, false);
-  h.state.settings.theme = 'light';
-  h.saveSettings();
+  h.setTheme('light');
   assert.equal(h.state.meta.dirtyProfile, true);
   assert.equal(h.state.meta.localGroupChangeVersion, 0);
 
