@@ -2151,12 +2151,12 @@ html.vk-light .service-pill {
     updateGroupLabel();
   }
 
-  function saveActiveGroup() {
+  function saveActiveGroup(suppressSyncMark) {
     try {
       const next = JSON.stringify({ id: activeGroupId, name: GROUP_NAME, institute: INSTITUTE_NAME || '' });
       const previous = localStorage.getItem(ACTIVE_GROUP_KEY);
       localStorage.setItem(ACTIVE_GROUP_KEY, next);
-      if (previous && previous !== next && !window.kgeuSharedSyncApplyingProfile && typeof window.kgeuSharedSyncMarkDirty === 'function') window.kgeuSharedSyncMarkDirty('profile');
+      if (previous && previous !== next && !suppressSyncMark && !window.kgeuSharedSyncApplyingProfile && typeof window.kgeuSharedSyncMarkDirty === 'function') window.kgeuSharedSyncMarkDirty('group');
     } catch (e) {}
   }
   if (!activeGroupId) setActiveGroup(DEFAULT_GROUP_ID, DEFAULT_GROUP_NAME);
@@ -3172,6 +3172,10 @@ html.vk-light .service-pill {
       // An empty schedule for one date does not mean the group is invalid.
       // Accept a successful API response; the normal refresh will load the selected period.
 
+      if (meta && meta.sharedProfileApply && Number(readMeta().localGroupChangeVersion || 0) !== Number(meta.expectedLocalGroupChangeVersion || 0)) {
+        throw new Error('shared_profile_apply_superseded');
+      }
+
       const resolvedName = (meta && meta.name) || (probe.groupInfo && probe.groupInfo.name) || name || ('Группа ' + id);
       const resolvedInstitute =
         (meta && meta.institute) ||
@@ -3179,9 +3183,9 @@ html.vk-light .service-pill {
         '';
 
       setActiveGroup(id, resolvedName);
-      INSTITUTE_NAME = resolvedInstitute || INSTITUTE_NAME || '';
+      INSTITUTE_NAME = resolvedInstitute || (id === DEFAULT_GROUP_ID ? DEFAULT_INSTITUTE_NAME : '');
       updateGroupLabel();
-      saveActiveGroup();
+      saveActiveGroup(!!(meta && meta.sharedProfileApply));
 
       rememberGroup(id, resolvedName);
 
@@ -3193,6 +3197,16 @@ html.vk-light .service-pill {
 
       await refresh(false);
     } catch (e) {
+      // A newer local group choice wins over a remote profile switch still waiting on the API.
+      const sharedApplySuperseded = meta && meta.sharedProfileApply &&
+        Number(readMeta().localGroupChangeVersion || 0) !== Number(meta.expectedLocalGroupChangeVersion || 0);
+      if (sharedApplySuperseded) {
+        saveActiveGroup();
+        updateGroupLabel();
+        renderSavedGroups();
+        toast('Локально выбранная группа сохранена. Облачная группа не применена.');
+        throw e;
+      }
       // Critical: failed group switch must not destroy the currently working group/history.
       activeGroupId = previous.id;
       GROUP_NAME = previous.name;
@@ -3211,21 +3225,35 @@ html.vk-light .service-pill {
       throw e;
     }
   }
-  window.kgeuApplySharedProfile = async function(profile) {
+  window.kgeuApplySharedProfile = async function(profile, expectedLocalGroupChangeVersion) {
     if (!profile || typeof profile !== 'object') return;
     const previousFlag = !!window.kgeuSharedSyncApplyingProfile;
-    window.kgeuSharedSyncApplyingProfile = true;
     try {
       if (profile.settings && typeof profile.settings === 'object') {
-        settings = Object.assign({}, settings, profile.settings);
-        saveSettings();
+        window.kgeuSharedSyncApplyingProfile = true;
+        try {
+          settings = Object.assign({}, settings, profile.settings);
+          saveSettings();
+        } finally {
+          // Suppress only the remote write itself. Keep the flag off while group
+          // metadata is fetched so real user changes are still marked dirty.
+          window.kgeuSharedSyncApplyingProfile = false;
+        }
         applyTheme();
         syncAppearanceControls();
         render();
       }
       const group = profile.activeGroup;
       if (!hasExplicitGroupFromLaunch && group && Number(group.id) && (Number(group.id) !== Number(activeGroupId) || String(group.name || '') !== String(GROUP_NAME || '') || String(group.institute || '') !== String(INSTITUTE_NAME || ''))) {
-        await switchGroup(Number(group.id), String(group.name || ''), { name: String(group.name || ''), institute: String(group.institute || '') });
+        const expectedVersion = expectedLocalGroupChangeVersion == null
+          ? Number(readMeta().localGroupChangeVersion || 0)
+          : Number(expectedLocalGroupChangeVersion || 0);
+        await switchGroup(Number(group.id), String(group.name || ''), {
+          name: String(group.name || ''),
+          institute: String(group.institute || ''),
+          sharedProfileApply: true,
+          expectedLocalGroupChangeVersion: expectedVersion
+        });
       }
     } finally {
       window.kgeuSharedSyncApplyingProfile = previousFlag;
@@ -5002,9 +5030,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function readMeta() {
     try {
-      return Object.assign({ deviceId: '', lastServerRevision: 0, lastSyncAt: 0, initialized: false, dirty: false, dirtyNotes: [], dirtyProfile: false, dirtyService: false }, JSON.parse(localStorage.getItem(META_KEY) || '{}'));
+      return Object.assign({ deviceId: '', lastServerRevision: 0, lastSyncAt: 0, initialized: false, dirty: false, dirtyNotes: [], dirtyProfile: false, dirtyService: false, localGroupChangeVersion: 0 }, JSON.parse(localStorage.getItem(META_KEY) || '{}'));
     } catch (e) {
-      return { deviceId: '', lastServerRevision: 0, lastSyncAt: 0, initialized: false, dirty: false, dirtyNotes: [], dirtyProfile: false, dirtyService: false };
+      return { deviceId: '', lastServerRevision: 0, lastSyncAt: 0, initialized: false, dirty: false, dirtyNotes: [], dirtyProfile: false, dirtyService: false, localGroupChangeVersion: 0 };
     }
   }
   function writeMeta(meta) { try { localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch (e) {} }
@@ -5085,11 +5113,13 @@ document.addEventListener("DOMContentLoaded", () => {
   async function applyProfile(profile) {
     if (!profile || typeof profile !== 'object') return false;
     let changed = false;
+    let nextGroupText = null;
+    const expectedLocalGroupChangeVersion = Number(readMeta().localGroupChangeVersion || 0);
     if (profile.activeGroup && Number(profile.activeGroup.id)) {
       const nextGroup = { id: Number(profile.activeGroup.id), name: String(profile.activeGroup.name || ''), institute: String(profile.activeGroup.institute || '') };
       const currentGroup = localStorage.getItem(PROFILE_KEY);
-      const nextGroupText = JSON.stringify(nextGroup);
-      if (currentGroup !== nextGroupText) { localStorage.setItem(PROFILE_KEY, nextGroupText); changed = true; }
+      nextGroupText = JSON.stringify(nextGroup);
+      if (currentGroup !== nextGroupText) changed = true;
     }
     if (profile.settings && typeof profile.settings === 'object') {
       let current = {};
@@ -5099,8 +5129,11 @@ document.addEventListener("DOMContentLoaded", () => {
       if (JSON.stringify(current) !== nextText) { localStorage.setItem(SETTINGS_KEY, nextText); changed = true; }
     }
     if (changed && typeof window.kgeuApplySharedProfile === 'function') {
-      await window.kgeuApplySharedProfile(profile);
+      await window.kgeuApplySharedProfile(profile, expectedLocalGroupChangeVersion);
     }
+    // Commit the group key only after the asynchronous UI/group switch succeeds.
+    // A rejected or superseded cloud profile must not leave storage ahead of the UI.
+    if (nextGroupText) localStorage.setItem(PROFILE_KEY, nextGroupText);
     return changed;
   }
   function localPersonal() {
@@ -5344,7 +5377,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const meta = readMeta();
     meta.dirty = true;
     meta.localChangeVersion = Number(meta.localChangeVersion || 0) + 1;
-    if (kind === 'profile') meta.dirtyProfile = true;
+    if (kind === 'profile' || kind === 'group') meta.dirtyProfile = true;
+    if (kind === 'group') meta.localGroupChangeVersion = Number(meta.localGroupChangeVersion || 0) + 1;
     if (kind === 'service') meta.dirtyService = true;
     if (kind === 'note' && key && meta.dirtyNotes.indexOf(key) < 0) meta.dirtyNotes.push(key);
     writeMeta(meta);
