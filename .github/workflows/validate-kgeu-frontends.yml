@@ -75,3 +75,5 @@ jobs:
         run: node --test tests/vk_manual_sync_race.test.cjs
       - name: Test VK shared profile apply race protection
         run: node --test tests/vk_profile_apply_race.test.cjs
+      - name: Test VK legacy service sync CAS and restore guards
+        run: node --test tests/vk_legacy_sync_race.test.cjs
