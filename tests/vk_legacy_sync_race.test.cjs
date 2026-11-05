@@ -144,3 +144,49 @@ test('VK pull-cloud action captures the generation before GET and passes it to r
   assert.match(restoreHandlerSource, /Number\(readMeta\(\)\.localChangeVersion\|\|0\)!==localChangeVersionAtPullStart/);
   assert.match(restoreHandlerSource, /serviceApplyCloudSnapshot\(snapshot,localChangeVersionAtPullStart\)/);
 });
+
+
+test('cloud snapshot restore rolls back service state if personal notes cannot be saved', () => {
+  const state = {
+    meta: { localChangeVersion: 4 },
+    serviceData: { tasks: [{ id: 'local' }] },
+    personalData: { version: 1, notes: { local: 'saved locally' } },
+    failRollbackWrite: false,
+    store: {}
+  };
+  const factorySource = [
+    'const STUDENT_SERVICE_KEY = "service-data";',
+    'const STUDENT_SERVICE_SYNC_KEY = "service-sync";',
+    'const ACTIVE_GROUP_KEY = "active-group";',
+    'const window = { KGEU_VK_PLATFORM: true, __kgeuApplyingSharedProfile: false };',
+    'const hasExplicitGroupFromLaunch = false;',
+    'let serviceData = state.serviceData;',
+    'let kgeuPersonalData = state.personalData;',
+    'const previousPersonalData = kgeuPersonalData;',
+    'const localStorage = {',
+    '  getItem(key) { return Object.prototype.hasOwnProperty.call(state.store, key) ? state.store[key] : null; },',
+    '  setItem(key, value) { if (state.failRollbackWrite && key === STUDENT_SERVICE_KEY && value === JSON.stringify(state.serviceData)) throw new Error("quota"); state.store[key] = String(value); }',
+    '};',
+    'function readMeta() { return state.meta; }',
+    'function serviceBackupBeforeCloudRestore() {}',
+    'function serviceNormalizeData(value) { return value; }',
+    'function kgeuSavePersonalData() { return false; }',
+    'function kgeuMigrateLegacyNotesForActiveGroup() { throw new Error("must not migrate after failed save"); }',
+    'function serviceSyncMeta() { return {}; }',
+    'function kgeuFlushMigratedNoteSync() {}',
+    cloudApplySource,
+    'return { serviceApplyCloudSnapshot, getState() { return { serviceData, kgeuPersonalData, previousPersonalData, store: state.store }; } };'
+  ].join('\n');
+  const api = new Function('state', factorySource)(state);
+  const snapshot = { found: true, serviceData: { tasks: [{ id: 'cloud' }] }, personalData: { notes: { cloud: 'cloud note' } } };
+  assert.throws(() => api.serviceApplyCloudSnapshot(snapshot, 4), /cloud_snapshot_personal_save_failed/);
+  let current = api.getState();
+  assert.deepEqual(current.serviceData, { tasks: [{ id: 'local' }] });
+  assert.equal(current.kgeuPersonalData, current.previousPersonalData);
+  assert.equal(current.store['service-data'], undefined);
+  state.failRollbackWrite = true;
+  assert.throws(() => api.serviceApplyCloudSnapshot(snapshot, 4), /cloud_snapshot_rollback_failed/);
+  current = api.getState();
+  assert.deepEqual(current.serviceData, { tasks: [{ id: 'local' }] });
+  assert.equal(current.kgeuPersonalData, current.previousPersonalData);
+});
