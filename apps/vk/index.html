@@ -3469,9 +3469,21 @@ html.vk-light .service-pill {
     const notes=(typeof kgeuPersonalData!=='undefined'&&kgeuPersonalData.notes&&typeof kgeuPersonalData.notes==='object')?Object.keys(kgeuPersonalData.notes).length:0;
     return serviceData.tasks.length+serviceData.deadlines.length+serviceData.events.length+serviceData.hostel.work.length+serviceData.hostel.social.length+notes>0;
   }
-  function serviceBackupBeforeCloudRestore(){
-    try{localStorage.setItem(STUDENT_SERVICE_BACKUP_KEY,JSON.stringify(serviceData));}catch(e){}
-    try{localStorage.setItem('kgeu_student_personal_backup_before_cloud_restore_v1',JSON.stringify(kgeuPersonalData||{version:1,notes:{}}));}catch(e){}
+  function serviceBackupBeforeCloudRestore(requireBackup){
+    try{
+      const serviceBackup=JSON.stringify(serviceData);
+      const personalBackup=JSON.stringify(kgeuPersonalData||{version:1,notes:{}});
+      const personalBackupKey='kgeu_student_personal_backup_before_cloud_restore_v1';
+      localStorage.setItem(STUDENT_SERVICE_BACKUP_KEY,serviceBackup);
+      localStorage.setItem(personalBackupKey,personalBackup);
+      const persisted=localStorage.getItem(STUDENT_SERVICE_BACKUP_KEY)===serviceBackup
+        && localStorage.getItem(personalBackupKey)===personalBackup;
+      if(requireBackup&&!persisted)throw new Error('backup_not_persisted');
+      return persisted;
+    }catch(e){
+      if(requireBackup)throw new Error('cloud_restore_backup_failed');
+      return false;
+    }
   }
   function serviceApplyCloudSnapshot(snapshot, expectedLocalChangeVersion){
     if(!snapshot||!snapshot.found||!snapshot.serviceData||typeof snapshot.serviceData!=='object')throw new Error('cloud_data_not_found');
@@ -3479,7 +3491,7 @@ html.vk-light .service-pill {
         && Number(readMeta().localChangeVersion || 0) !== Number(expectedLocalChangeVersion)) {
       throw new Error('local_changes_during_cloud_restore');
     }
-    serviceBackupBeforeCloudRestore();
+    serviceBackupBeforeCloudRestore(true);
     const previousServiceData=serviceData;
     const previousPersonalData=kgeuPersonalData;
     const nextServiceData=serviceNormalizeData(snapshot.serviceData);
@@ -4644,7 +4656,7 @@ html.vk-light .service-pill {
           toast('Данные получены из облака');
           document.getElementById('app').innerHTML=serviceRenderSync();serviceBind();
         }catch(e){
-          const message=e.message==='cloud_data_not_found'?'В облаке пока нет сохранённых данных. Сначала отправь их с устройства, где они есть.':e.message==='local_changes_during_cloud_restore'?'Во время загрузки появились локальные изменения. Они сохранены; повтори получение после синхронизации.':(e.message||'неизвестная ошибка');
+          const message=e.message==='cloud_data_not_found'?'В облаке пока нет сохранённых данных. Сначала отправь их с устройства, где они есть.':e.message==='local_changes_during_cloud_restore'?'Во время загрузки появились локальные изменения. Они сохранены; повтори получение после синхронизации.':e.message==='cloud_restore_backup_failed'?'Не удалось подтвердить резервную копию локальных данных. Облачная версия не применена. Проверь доступность хранилища и повтори попытку.':(e.message||'неизвестная ошибка');
           if(feedback)feedback.textContent='Ошибка получения: '+serviceEsc(message);toast('Не удалось получить данные из облака');
         }
         return;
