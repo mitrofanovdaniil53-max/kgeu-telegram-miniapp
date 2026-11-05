@@ -73,3 +73,5 @@ jobs:
         run: node --test tests/worker_vk_launch_auth.test.cjs
       - name: Test VK manual sync edit-race protection
         run: node --test tests/vk_manual_sync_race.test.cjs
+      - name: Test VK shared profile apply race protection
+        run: node --test tests/vk_profile_apply_race.test.cjs
