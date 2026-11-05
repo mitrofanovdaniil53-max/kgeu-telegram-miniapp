@@ -3505,10 +3505,20 @@ html.vk-light .service-pill {
       : null;
     let restorePhase='service';
     try{
-      localStorage.setItem(STUDENT_SERVICE_KEY,JSON.stringify(nextServiceData));
+      const nextServiceRaw=JSON.stringify(nextServiceData);
+      localStorage.setItem(STUDENT_SERVICE_KEY,nextServiceRaw);
+      if(localStorage.getItem(STUDENT_SERVICE_KEY)!==nextServiceRaw){
+        throw new Error('cloud_snapshot_service_save_failed');
+      }
       if(hasPersonalSnapshot){
         restorePhase='personal';
         if(typeof kgeuSavePersonalData!=='function'||!kgeuSavePersonalData(nextPersonalData)){
+          throw new Error('cloud_snapshot_personal_save_failed');
+        }
+        let savedPersonal=null;
+        try{savedPersonal=JSON.parse(localStorage.getItem(KGEU_PERSONAL_DATA_KEY)||'null');}catch(e){}
+        if(!savedPersonal||Number(savedPersonal.version)!==1
+            || JSON.stringify(savedPersonal.notes||{})!==JSON.stringify(nextPersonalData.notes)){
           throw new Error('cloud_snapshot_personal_save_failed');
         }
       }
@@ -3517,7 +3527,11 @@ html.vk-light .service-pill {
       m.dirty=false;
       m.lastLocalSave=Number(nextServiceData.updatedAt||Date.now());
       m.lastServerSync=Number(snapshot.updatedAt||Date.now());
-      localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(m));
+      const nextSyncMetaRaw=JSON.stringify(m);
+      localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,nextSyncMetaRaw);
+      if(localStorage.getItem(STUDENT_SERVICE_SYNC_KEY)!==nextSyncMetaRaw){
+        throw new Error('cloud_snapshot_metadata_save_failed');
+      }
     }catch(restoreError){
       serviceData=previousServiceData;
       kgeuPersonalData=previousPersonalData;
