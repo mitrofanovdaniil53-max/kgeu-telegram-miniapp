@@ -3458,8 +3458,8 @@ html.vk-light .service-pill {
     const data=await serviceSyncRequest('/api/health',{method:'GET'});
     return data;
   }
-  async function servicePushToBackend(){
-    const payload=serviceSyncPackage();
+  async function servicePushToBackend(expectedRevision){
+    const payload=serviceSyncPackage(expectedRevision);
     return await serviceSyncRequest('/api/sync',{method:'POST',body:JSON.stringify(payload)});
   }
   async function servicePullFromBackend(){
@@ -3473,8 +3473,12 @@ html.vk-light .service-pill {
     try{localStorage.setItem(STUDENT_SERVICE_BACKUP_KEY,JSON.stringify(serviceData));}catch(e){}
     try{localStorage.setItem('kgeu_student_personal_backup_before_cloud_restore_v1',JSON.stringify(kgeuPersonalData||{version:1,notes:{}}));}catch(e){}
   }
-  function serviceApplyCloudSnapshot(snapshot){
+  function serviceApplyCloudSnapshot(snapshot, expectedLocalChangeVersion){
     if(!snapshot||!snapshot.found||!snapshot.serviceData||typeof snapshot.serviceData!=='object')throw new Error('cloud_data_not_found');
+    if(window.KGEU_VK_PLATFORM && expectedLocalChangeVersion != null
+        && Number(readMeta().localChangeVersion || 0) !== Number(expectedLocalChangeVersion)) {
+      throw new Error('local_changes_during_cloud_restore');
+    }
     serviceBackupBeforeCloudRestore();
     serviceData=serviceNormalizeData(snapshot.serviceData);
     localStorage.setItem(STUDENT_SERVICE_KEY,JSON.stringify(serviceData));
@@ -3696,9 +3700,14 @@ html.vk-light .service-pill {
     },5000);
     setTimeout(function(){serviceAutoSync('startup');},1400);
   }
-  function serviceSyncPackage(){
+  function serviceSyncPackage(expectedRevision){
     const meta=serviceSyncMeta();
-    return {format:'kgeu-student-service-sync',formatVersion:1,schemaVersion:STUDENT_SERVICE_SCHEMA,deviceId:meta.deviceId,exportedAt:new Date().toISOString(),serviceData:serviceNormalizeData(serviceData),personalData:(typeof kgeuPersonalData!=='undefined'?kgeuPersonalData:{version:1,notes:{}}),profileData:{activeGroup:{id:Number(activeGroupId)||DEFAULT_GROUP_ID,name:String(GROUP_NAME||DEFAULT_GROUP_NAME),institute:String(INSTITUTE_NAME||DEFAULT_INSTITUTE_NAME)},settings:Object.assign({},settings)}};
+    const payload={format:'kgeu-student-service-sync',formatVersion:1,schemaVersion:STUDENT_SERVICE_SCHEMA,deviceId:meta.deviceId,exportedAt:new Date().toISOString(),serviceData:serviceNormalizeData(serviceData),personalData:(typeof kgeuPersonalData!=='undefined'?kgeuPersonalData:{version:1,notes:{}}),profileData:{activeGroup:{id:Number(activeGroupId)||DEFAULT_GROUP_ID,name:String(GROUP_NAME||DEFAULT_GROUP_NAME),institute:String(INSTITUTE_NAME||DEFAULT_INSTITUTE_NAME)},settings:Object.assign({},settings)}};
+    const revision=Number.isSafeInteger(expectedRevision)&&expectedRevision>=0
+      ? expectedRevision
+      : (window.KGEU_VK_PLATFORM&&typeof readMeta==='function'?Number(readMeta().lastServerRevision||0):null);
+    if(revision!=null)payload.expectedRevision=revision;
+    return payload;
   }
   function serviceExportSyncPackage(){
     try{
@@ -3768,6 +3777,53 @@ html.vk-light .service-pill {
   window.kgeuMarkStudentServiceSynced=function(updatedAt){
     try{const meta=serviceSyncMeta();meta.dirty=false;meta.lastServerSync=Number(updatedAt||Date.now());meta.lastLocalSave=Number(serviceData.updatedAt||Date.now());localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(meta));}catch(e){}
   };
+  async function serviceManualSyncPush(){
+    let meta=serviceSyncMeta();
+    const remote=await servicePullFromBackend();
+    meta=serviceSyncMeta();
+    if(remote&&remote.found&&meta.lastServerSync&&Number(remote.updatedAt||0)>Number(meta.lastServerSync||0)){
+      throw new Error('cloud_is_newer_pull_first');
+    }
+    if(remote&&remote.found&&!meta.lastServerSync){
+      const localHasContent=serviceHasLocalContent();
+      const warning=localHasContent?'В облаке уже есть данные. Отправка заменит их текущими локальными данными. Продолжить?':'В облаке уже есть данные. Сначала лучше получить их, чтобы не затереть чужие данные. Всё равно перезаписать облако?';
+      if(!window.confirm(warning))return {cancelled:true};
+    }
+    const isVk=!!window.KGEU_VK_PLATFORM;
+    const localChangeVersionAtPayload=isVk?Number(readMeta().localChangeVersion||0):null;
+    const serviceLocalRevisionAtPayload=serviceLocalRevision;
+    const result=await servicePushToBackend(isVk?Number(remote&&remote.revision||0):undefined);
+    if(isVk&&Number(readMeta().localChangeVersion||0)!==localChangeVersionAtPayload){
+      const latestMeta=readMeta();
+      latestMeta.lastServerRevision=Number(result.revision||latestMeta.lastServerRevision||0);
+      latestMeta.lastSyncAt=Date.now();
+      latestMeta.initialized=true;
+      latestMeta.dirty=true;
+      writeMeta(latestMeta);
+      scheduleSync();
+      const pendingMeta=serviceSyncMeta();
+      pendingMeta.dirty=true;
+      pendingMeta.lastServerSync=Number(result.updatedAt||Date.now());
+      try{localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(pendingMeta));}catch(e){}
+      return {result:result,localChangesPending:true};
+    }
+    if(!isVk&&serviceLocalRevision!==serviceLocalRevisionAtPayload){
+      const pendingMeta=serviceSyncMeta();
+      pendingMeta.dirty=true;
+      pendingMeta.lastServerSync=Number(result.updatedAt||Date.now());
+      try{localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(pendingMeta));}catch(e){}
+      serviceScheduleAutoSync();
+      return {result:result,localChangesPending:true};
+    }
+    if(isVk&&typeof window.kgeuSharedSyncMarkClean==='function')window.kgeuSharedSyncMarkClean(result);
+    const savedMeta=serviceSyncMeta();
+    savedMeta.dirty=false;
+    savedMeta.lastServerSync=Number(result&&result.updatedAt||Date.now());
+    savedMeta.lastLocalSave=Number(serviceData.updatedAt||Date.now());
+    try{localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(savedMeta));}catch(e){}
+    return {result:result,localChangesPending:false};
+  }
+
   function serviceEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
   function serviceDate(s){if(!s)return '';const d=new Date(s+'T00:00:00');return isNaN(d)?s:d.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'});}
   function serviceDateKey(s){return /^\d{4}-\d{2}-\d{2}$/.test(String(s||''))?String(s):'';}
@@ -4542,23 +4598,21 @@ html.vk-light .service-pill {
       if(a==='sync-now'){
         const feedback=document.getElementById('service-sync-feedback');if(feedback)feedback.textContent='Проверяю облачную версию…';
         try{
-          const meta=serviceSyncMeta();
-          const remote=await servicePullFromBackend();
-          if(remote&&remote.found&&meta.lastServerSync&&Number(remote.updatedAt||0)>Number(meta.lastServerSync||0)){
-            throw new Error('cloud_is_newer_pull_first');
+          const outcome=await serviceManualSyncPush();
+          if(outcome.cancelled){
+            if(feedback)feedback.textContent='Отправка отменена. Можно сначала получить данные из облака.';
+            return;
           }
-          if(remote&&remote.found&&!meta.lastServerSync){
-            const localHasContent=serviceHasLocalContent();
-            const warning=localHasContent?'В облаке уже есть данные. Отправка заменит их текущими локальными данными. Продолжить?':'В облаке уже есть данные. Сначала лучше получить их, чтобы не затереть чужие данные. Всё равно перезаписать облако?';
-            if(!window.confirm(warning)){if(feedback)feedback.textContent='Отправка отменена. Можно сначала получить данные из облака.';return;}
+          if(outcome.localChangesPending){
+            if(feedback)feedback.textContent='Сохранённая версия отправлена. Новые изменения остались в очереди синхронизации.';
+            toast('Новые изменения ожидают синхронизации');
+          }else{
+            if(feedback)feedback.textContent='Отправка завершена: '+serviceEsc(outcome.result&&outcome.result.status?outcome.result.status:'OK');
+            toast('Данные отправлены в облако');
           }
-          const result=await servicePushToBackend();
-          const m=serviceSyncMeta();m.dirty=false;m.lastServerSync=Number(result&&result.updatedAt||Date.now());try{localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(m));}catch(e){}
-          if(feedback)feedback.textContent='Отправка завершена: '+serviceEsc(result&&result.status?result.status:'OK');
-          toast('Данные отправлены в облако');
           document.getElementById('app').innerHTML=serviceRenderSync();serviceBind();
         }catch(e){
-          const message=e.message==='cloud_is_newer_pull_first'?'В облаке есть более новая версия. Сначала нажми «Получить из облака».':(e.message||'неизвестная ошибка');
+          const message=e.message==='cloud_is_newer_pull_first'?'В облаке есть более новая версия. Сначала нажми «Получить из облака».':e.message==='sync_revision_conflict'?'Облако изменилось после проверки. Локальные данные сохранены; повтори синхронизацию.':(e.message||'неизвестная ошибка');
           if(feedback)feedback.textContent='Ошибка отправки: '+serviceEsc(message);toast('Данные не отправлены');
         }
         return;
@@ -4566,17 +4620,21 @@ html.vk-light .service-pill {
       if(a==='pull-cloud'){
         const feedback=document.getElementById('service-sync-feedback');if(feedback)feedback.textContent='Получаю данные из облака…';
         try{
+          const localChangeVersionAtPullStart=window.KGEU_VK_PLATFORM?Number(readMeta().localChangeVersion||0):null;
           const snapshot=await servicePullFromBackend();
           if(!snapshot||!snapshot.found){throw new Error('cloud_data_not_found');}
+          if(window.KGEU_VK_PLATFORM&&Number(readMeta().localChangeVersion||0)!==localChangeVersionAtPullStart){
+            throw new Error('local_changes_during_cloud_restore');
+          }
           if((serviceHasLocalContent()||serviceSyncMeta().dirty)&&!window.confirm('Данные на этом устройстве будут заменены облачной версией. Перед заменой текущие данные сохранятся в резервную копию. Продолжить?')){
             if(feedback)feedback.textContent='Восстановление отменено. Локальные данные не изменены.';return;
           }
-          serviceApplyCloudSnapshot(snapshot);
+          serviceApplyCloudSnapshot(snapshot,localChangeVersionAtPullStart);
           if(window.KGEU_VK_PLATFORM&&typeof window.kgeuSharedSyncMarkClean==='function')window.kgeuSharedSyncMarkClean(snapshot);
           toast('Данные получены из облака');
           document.getElementById('app').innerHTML=serviceRenderSync();serviceBind();
         }catch(e){
-          const message=e.message==='cloud_data_not_found'?'В облаке пока нет сохранённых данных. Сначала отправь их с устройства, где они есть.':(e.message||'неизвестная ошибка');
+          const message=e.message==='cloud_data_not_found'?'В облаке пока нет сохранённых данных. Сначала отправь их с устройства, где они есть.':e.message==='local_changes_during_cloud_restore'?'Во время загрузки появились локальные изменения. Они сохранены; повтори получение после синхронизации.':(e.message||'неизвестная ошибка');
           if(feedback)feedback.textContent='Ошибка получения: '+serviceEsc(message);toast('Не удалось получить данные из облака');
         }
         return;
