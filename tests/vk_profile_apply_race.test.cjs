@@ -62,7 +62,7 @@ function createHarness() {
     'function readMeta() { return state.meta; }',
     'function writeMeta(meta) { state.meta = Object.assign({}, meta, { dirtyNotes: [...(meta.dirtyNotes || [])] }); }',
     'function scheduleSync() {}',
-    'function updateGroupLabel() {}',
+    'function updateGroupLabel() { state.groupLabel = (INSTITUTE_NAME || (activeGroupId === DEFAULT_GROUP_ID ? DEFAULT_INSTITUTE_NAME : \'КГЭУ\')) + \' · \' + GROUP_NAME; }',
     'function toast(message) { state.toasts.push(String(message)); }',
     'function rememberGroup() {}',
     'function isoDate() { return "2026-11-05"; }',
@@ -78,7 +78,7 @@ function createHarness() {
     switchGroupSource,
     sharedProfileSource,
     applyProfileSource,
-    'return { applyProfile, switchGroup, saveSettings, setTheme(value) { settings.theme = value; saveSettings(); }, getState() { return { activeGroupId, GROUP_NAME, INSTITUTE_NAME, settings, meta: state.meta, groupKey: state.groupKey, settingsKey: localStorage.getItem(SETTINGS_KEY), applying: window.kgeuSharedSyncApplyingProfile }; } };'
+    'return { applyProfile, switchGroup, saveSettings, setTheme(value) { settings.theme = value; saveSettings(); }, getState() { return { activeGroupId, GROUP_NAME, INSTITUTE_NAME, settings, meta: state.meta, groupKey: state.groupKey, groupLabel: state.groupLabel, settingsKey: localStorage.getItem(SETTINGS_KEY), applying: window.kgeuSharedSyncApplyingProfile }; } };'
   ].join('\n');
   const factory = new Function('state', factorySource);
   const api = factory(state);
@@ -138,6 +138,22 @@ test('user setting changes remain dirty while remote group metadata is loading',
   assert.equal(JSON.parse(current.settingsKey).theme, 'light');
   assert.equal(current.meta.dirtyProfile, true);
   assert.equal(current.meta.localGroupChangeVersion, 0);
+});
+
+test('switching groups resets stale institute metadata and restores the default institute label', async () => {
+  const h = createHarness();
+  await h.switchGroup(222, 'Other group', null);
+  let current = h.getState();
+  assert.equal(current.INSTITUTE_NAME, '');
+  assert.equal(current.groupLabel, 'КГЭУ · Other group');
+
+  h.state.instituteName = 'Another institute';
+  const hDefault = createHarness();
+  hDefault.state.instituteName = 'Another institute';
+  await hDefault.switchGroup(14541, 'М-1-25', null);
+  current = hDefault.getState();
+  assert.equal(current.INSTITUTE_NAME, 'ИЦТЭ');
+  assert.equal(current.groupLabel, 'ИЦТЭ · М-1-25');
 });
 
 test('failed cloud group lookup does not leave the profile storage ahead of the active group', async () => {
