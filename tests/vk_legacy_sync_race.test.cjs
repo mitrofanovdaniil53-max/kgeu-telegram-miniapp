@@ -156,6 +156,7 @@ test('cloud restore aborts before replacing local data when both backups cannot 
     store: { 'service-data': JSON.stringify({ tasks: [{ id: 'local' }] }) }
   };
   const factorySource = [
+    'const window = { KGEU_VK_PLATFORM: true };',
     'const STUDENT_SERVICE_BACKUP_KEY = "service-backup";',
     'const STUDENT_SERVICE_KEY = "service-data";',
     'const PERSONAL_BACKUP_KEY = "kgeu_student_personal_backup_before_cloud_restore_v1";',
