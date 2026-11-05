@@ -142,7 +142,7 @@ test('user setting changes remain dirty while remote group metadata is loading',
 
 test('switching groups resets stale institute metadata and restores the default institute label', async () => {
   const h = createHarness();
-  await h.switchGroup(222, 'Other group', null);
+  await h.switchGroup(222, 'Other group', { name: 'Other group' });
   let current = h.getState();
   assert.equal(current.INSTITUTE_NAME, '');
   assert.equal(current.groupLabel, 'КГЭУ · Other group');
@@ -150,7 +150,7 @@ test('switching groups resets stale institute metadata and restores the default 
   h.state.instituteName = 'Another institute';
   const hDefault = createHarness();
   hDefault.state.instituteName = 'Another institute';
-  await hDefault.switchGroup(14541, 'М-1-25', null);
+  await hDefault.switchGroup(14541, 'М-1-25', { name: 'М-1-25' });
   current = hDefault.getState();
   assert.equal(current.INSTITUTE_NAME, 'ИЦТЭ');
   assert.equal(current.groupLabel, 'ИЦТЭ · М-1-25');
