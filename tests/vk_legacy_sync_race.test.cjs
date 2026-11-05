@@ -418,3 +418,73 @@ test('cloud restore detects a silently dropped personal-data write', () => {
   assert.equal(current.store['service-data'], JSON.stringify(originalService));
   assert.equal(current.store['personal-data'], JSON.stringify(originalPersonal));
 });
+
+test('cloud restore reports rollback failure when a rollback write is silently dropped', () => {
+  const originalService = { tasks: [{ id: 'local-service' }] };
+  const originalPersonal = { version: 1, notes: { local: 'keep this note' }, updatedAt: 11 };
+  const originalMetaRaw = JSON.stringify({ deviceId: 'vk-device', dirty: true, lastLocalSave: 11, lastServerSync: 7 });
+  const originalServiceRaw = JSON.stringify(originalService);
+  const state = {
+    meta: { localChangeVersion: 4 },
+    serviceData: originalService,
+    personalData: originalPersonal,
+    store: {
+      'service-data': originalServiceRaw,
+      'personal-data': JSON.stringify(originalPersonal),
+      'service-sync': originalMetaRaw
+    },
+    failSyncMetaWrite: true,
+    dropServiceRollback: true
+  };
+  const factorySource = [
+    'const window = { KGEU_VK_PLATFORM: true, __kgeuApplyingSharedProfile: false };',
+    'const STUDENT_SERVICE_BACKUP_KEY = "service-backup";',
+    'const STUDENT_SERVICE_KEY = "service-data";',
+    'const STUDENT_SERVICE_SYNC_KEY = "service-sync";',
+    'const KGEU_PERSONAL_DATA_KEY = "personal-data";',
+    'const ACTIVE_GROUP_KEY = "active-group";',
+    'const hasExplicitGroupFromLaunch = false;',
+    'let serviceData = state.serviceData;',
+    'let kgeuPersonalData = state.personalData;',
+    'const localStorage = {',
+    '  getItem(key) { return Object.prototype.hasOwnProperty.call(state.store, key) ? state.store[key] : null; },',
+    '  setItem(key, value) {',
+    '    if (state.failSyncMetaWrite && key === STUDENT_SERVICE_SYNC_KEY && String(value) !== state.store[key]) throw new Error("quota");',
+    '    if (state.dropServiceRollback && key === STUDENT_SERVICE_KEY && String(value) === state.originalServiceRaw && state.store[key] !== state.originalServiceRaw) return;',
+    '    state.store[key] = String(value);',
+    '  },',
+    '  removeItem(key) { delete state.store[key]; }',
+    '};',
+    'function readMeta() { return state.meta; }',
+    'function serviceNormalizeData(value) { return value; }',
+    'function serviceBackupBeforeCloudRestore() { state.store["service-backup"] = JSON.stringify(serviceData); state.store["personal-backup"] = JSON.stringify(kgeuPersonalData); }',
+    'function serviceSyncMeta() { return { deviceId: "vk-device", dirty: true }; }',
+    'function kgeuSavePersonalData(data) { localStorage.setItem(KGEU_PERSONAL_DATA_KEY, JSON.stringify(data)); return true; }',
+    'function kgeuMigrateLegacyNotesForActiveGroup() {}',
+    'function kgeuFlushMigratedNoteSync() {}',
+    'function setActiveGroup() {}',
+    'function saveActiveGroup() {}',
+    'function rememberGroup() {}',
+    'function updateGroupLabel() {}',
+    'function saveSettings() {}',
+    'function applyTheme() {}',
+    cloudApplySource,
+    'return { serviceApplyCloudSnapshot, getState() { return { serviceData, kgeuPersonalData, store: state.store }; } };'
+  ].join(String.fromCharCode(10));
+  state.originalServiceRaw = originalServiceRaw;
+  const api = new Function('state', factorySource)(state);
+  assert.throws(
+    () => api.serviceApplyCloudSnapshot({
+      found: true,
+      serviceData: { tasks: [{ id: 'cloud-service' }] },
+      personalData: { notes: { cloud: 'cloud note' } },
+      updatedAt: 99
+    }, 4),
+    /cloud_snapshot_rollback_failed/
+  );
+  const current = api.getState();
+  assert.equal(current.store['service-data'], JSON.stringify({ tasks: [{ id: 'cloud-service' }] }), 'silent rollback failure leaves the cloud write in place');
+  assert.equal(current.store['service-backup'], originalServiceRaw, 'verified pre-restore backup remains available');
+  assert.ok(current.store['personal-backup'], 'personal backup remains available');
+  assert.equal(current.store['service-sync'], originalMetaRaw, 'the original sync metadata was not overwritten');
+});

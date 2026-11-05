@@ -3536,12 +3536,14 @@ html.vk-light .service-pill {
       serviceData=previousServiceData;
       kgeuPersonalData=previousPersonalData;
       try{
-        if(previousServiceRaw===null)localStorage.removeItem(STUDENT_SERVICE_KEY);
-        else localStorage.setItem(STUDENT_SERVICE_KEY,previousServiceRaw);
-        if(previousPersonalRaw===null)localStorage.removeItem(KGEU_PERSONAL_DATA_KEY);
-        else localStorage.setItem(KGEU_PERSONAL_DATA_KEY,previousPersonalRaw);
-        if(previousSyncMetaRaw===null)localStorage.removeItem(STUDENT_SERVICE_SYNC_KEY);
-        else localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,previousSyncMetaRaw);
+        const restoreStorageValue=function(key,previousRaw){
+          if(previousRaw===null)localStorage.removeItem(key);
+          else localStorage.setItem(key,previousRaw);
+          if(localStorage.getItem(key)!==previousRaw)throw new Error('rollback_not_persisted');
+        };
+        restoreStorageValue(STUDENT_SERVICE_KEY,previousServiceRaw);
+        restoreStorageValue(KGEU_PERSONAL_DATA_KEY,previousPersonalRaw);
+        restoreStorageValue(STUDENT_SERVICE_SYNC_KEY,previousSyncMetaRaw);
       }catch(rollbackError){
         throw new Error('cloud_snapshot_rollback_failed');
       }
