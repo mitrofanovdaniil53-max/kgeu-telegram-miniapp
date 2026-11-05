@@ -3548,7 +3548,9 @@ html.vk-light .service-pill {
       if(restoreError&&restoreError.message==='cloud_snapshot_personal_save_failed')throw restoreError;
       throw new Error(restorePhase==='service'
         ? 'cloud_snapshot_service_save_failed'
-        : 'cloud_snapshot_metadata_save_failed');
+        : restorePhase==='personal'
+          ? 'cloud_snapshot_personal_save_failed'
+          : 'cloud_snapshot_metadata_save_failed');
     }
     serviceData=nextServiceData;
     if(hasPersonalSnapshot){
