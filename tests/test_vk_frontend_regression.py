@@ -72,6 +72,7 @@ class VkFrontendRegressionTest(unittest.TestCase):
             "html.vk-light .status-dot.err { background:#b91c1c; }",
             "html.vk-light .hero-type.pr,",
             "html.vk-light .badge.pr { color:#0f766e; }",
+            "html.vk-light .hero-type.replace { color:#9a3412 !important; }",
             "html.vk-light .hero-type.lab,",
             "html.vk-light .badge.lab { color:#6d28d9; }",
             "html.vk-light .hero-type.other,",
@@ -91,6 +92,8 @@ class VkFrontendRegressionTest(unittest.TestCase):
         ]
         for rule in rules:
             self.assertIn(rule, self.html)
+
+        self.assertIn('class="hero-type replace">↻ Замена</div>', self.html)
 
         text_pairs = [
             ("#15803d", "#ffffff"),
