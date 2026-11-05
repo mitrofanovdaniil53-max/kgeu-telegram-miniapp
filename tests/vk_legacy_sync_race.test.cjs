@@ -15,6 +15,7 @@ function extract(start, end) {
 
 const packageSource = extract('  function serviceSyncPackage(expectedRevision)', '\n  function serviceExportSyncPackage()');
 const manualPushSource = extract('  async function serviceManualSyncPush()', '\n  function serviceEsc(s)');
+const backupSource = extract('  function serviceBackupBeforeCloudRestore(requireBackup)', '\n  function serviceApplyCloudSnapshot');
 const cloudApplySource = extract('  function serviceApplyCloudSnapshot(snapshot, expectedLocalChangeVersion)', '\n\n  // Refresh only the visible Student Service screen');
 const restoreHandlerSource = html.slice(html.indexOf("if(a==='pull-cloud'){"), html.indexOf("if(a==='create-vk-link-code'){"));
 
@@ -145,6 +146,43 @@ test('VK pull-cloud action captures the generation before GET and passes it to r
   assert.match(restoreHandlerSource, /serviceApplyCloudSnapshot\(snapshot,localChangeVersionAtPullStart\)/);
 });
 
+
+test('cloud restore aborts before replacing local data when both backups cannot be verified', () => {
+  const state = {
+    meta: { localChangeVersion: 4 },
+    serviceData: { tasks: [{ id: 'local' }] },
+    personalData: { version: 1, notes: { local: 'keep this note' } },
+    dropPersonalBackup: true,
+    store: { 'service-data': JSON.stringify({ tasks: [{ id: 'local' }] }) }
+  };
+  const factorySource = [
+    'const STUDENT_SERVICE_BACKUP_KEY = "service-backup";',
+    'const STUDENT_SERVICE_KEY = "service-data";',
+    'const PERSONAL_BACKUP_KEY = "kgeu_student_personal_backup_before_cloud_restore_v1";',
+    'let serviceData = state.serviceData;',
+    'let kgeuPersonalData = state.personalData;',
+    'const localStorage = {',
+    '  getItem(key) { return Object.prototype.hasOwnProperty.call(state.store, key) ? state.store[key] : null; },',
+    '  setItem(key, value) { if (state.dropPersonalBackup && key === PERSONAL_BACKUP_KEY) return; state.store[key] = String(value); }',
+    '};',
+    'function readMeta() { return state.meta; }',
+    'function serviceNormalizeData(value) { return value; }',
+    backupSource,
+    cloudApplySource,
+    'return { serviceApplyCloudSnapshot, getState() { return { serviceData, kgeuPersonalData, store: state.store }; } };'
+  ].join('\\n');
+  const api = new Function('state', factorySource)(state);
+  assert.throws(
+    () => api.serviceApplyCloudSnapshot({ found: true, serviceData: { tasks: [{ id: 'cloud' }] }, personalData: { notes: {} } }, 4),
+    /cloud_restore_backup_failed/
+  );
+  const current = api.getState();
+  assert.deepEqual(current.serviceData, { tasks: [{ id: 'local' }] });
+  assert.deepEqual(current.kgeuPersonalData, { version: 1, notes: { local: 'keep this note' } });
+  assert.equal(current.store['service-data'], JSON.stringify({ tasks: [{ id: 'local' }] }));
+  assert.ok(current.store['service-backup'], 'service backup should be written before restore');
+  assert.equal(current.store[PERSONAL_BACKUP_KEY], undefined, 'missing personal backup must prevent restore');
+});
 
 test('cloud snapshot restore rolls back service state if personal notes cannot be saved', () => {
   const state = {
