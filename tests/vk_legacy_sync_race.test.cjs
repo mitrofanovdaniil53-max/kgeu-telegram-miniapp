@@ -171,7 +171,7 @@ test('cloud restore aborts before replacing local data when both backups cannot 
     backupSource,
     cloudApplySource,
     'return { serviceApplyCloudSnapshot, getState() { return { serviceData, kgeuPersonalData, store: state.store }; } };'
-  ].join('\\n');
+  ].join('\n');
   const api = new Function('state', factorySource)(state);
   assert.throws(
     () => api.serviceApplyCloudSnapshot({ found: true, serviceData: { tasks: [{ id: 'cloud' }] }, personalData: { notes: {} } }, 4),
@@ -182,7 +182,7 @@ test('cloud restore aborts before replacing local data when both backups cannot 
   assert.deepEqual(current.kgeuPersonalData, { version: 1, notes: { local: 'keep this note' } });
   assert.equal(current.store['service-data'], JSON.stringify({ tasks: [{ id: 'local' }] }));
   assert.ok(current.store['service-backup'], 'service backup should be written before restore');
-  assert.equal(current.store[PERSONAL_BACKUP_KEY], undefined, 'missing personal backup must prevent restore');
+  assert.equal(current.store['kgeu_student_personal_backup_before_cloud_restore_v1'], undefined, 'missing personal backup must prevent restore');
 });
 
 test('cloud snapshot restore rolls back service state if personal notes cannot be saved', () => {
