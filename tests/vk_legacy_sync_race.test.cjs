@@ -152,7 +152,7 @@ test('cloud snapshot restore rolls back service state if personal notes cannot b
     serviceData: { tasks: [{ id: 'local' }] },
     personalData: { version: 1, notes: { local: 'saved locally' } },
     failRollbackWrite: false,
-    store: {}
+    store: { 'service-data': JSON.stringify({ tasks: [{ id: 'local' }] }) }
   };
   const factorySource = [
     'const STUDENT_SERVICE_KEY = "service-data";',
@@ -183,7 +183,7 @@ test('cloud snapshot restore rolls back service state if personal notes cannot b
   let current = api.getState();
   assert.deepEqual(current.serviceData, { tasks: [{ id: 'local' }] });
   assert.equal(current.kgeuPersonalData, current.previousPersonalData);
-  assert.equal(current.store['service-data'], undefined);
+  assert.equal(current.store['service-data'], JSON.stringify({ tasks: [{ id: 'local' }] }));
   state.failRollbackWrite = true;
   assert.throws(() => api.serviceApplyCloudSnapshot(snapshot, 4), /cloud_snapshot_rollback_failed/);
   current = api.getState();
