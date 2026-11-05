@@ -71,3 +71,5 @@ jobs:
         run: node --test tests/worker_legacy_field_preservation.test.cjs
       - name: Test VK launch signature validation
         run: node --test tests/worker_vk_launch_auth.test.cjs
+      - name: Test VK manual sync edit-race protection
+        run: node --test tests/vk_manual_sync_race.test.cjs
