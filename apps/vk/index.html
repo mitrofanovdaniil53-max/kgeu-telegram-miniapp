@@ -5651,17 +5651,41 @@ document.addEventListener("DOMContentLoaded", () => {
       if (changed) saveSharedServiceData(data);
     });
   }
+  function guardManualSyncLocalChanges(expectedVersion, result, statusMessage) {
+    const latestMeta = readMeta();
+    if (Number(latestMeta.localChangeVersion || 0) === expectedVersion) return false;
+    if (result) {
+      latestMeta.lastServerRevision = Number(result.revision || latestMeta.lastServerRevision || 0);
+      latestMeta.lastSyncAt = Date.now();
+      latestMeta.initialized = true;
+    }
+    latestMeta.dirty = true;
+    writeMeta(latestMeta);
+    scheduleSync();
+    renderSharedServiceView();
+    setStatus(statusMessage);
+    return true;
+  }
+
   async function mergeBothVersions() {
     if (busy) return;
     if (!window.confirm('Объединить записи VK и Telegram? Существующие записи с одинаковыми ID, но разным содержимым, будут сохранены обеими отдельными записями. Перед изменением будут сохранены резервные копии локальной и облачной версий. Удаления записей автоматически не переносятся.')) return;
     busy = true;
     try {
-      const meta = readMeta();
+      let meta = readMeta();
       if (meta.dirtyProfile) {
         throw new Error('Есть несохранённые изменения настроек профиля. Сначала разреши конфликт профиля отдельно.');
       }
+      const localChangeVersionBeforePull = Number(meta.localChangeVersion || 0);
       const remote = await request('/api/sync', { method: 'GET' });
+      if (guardManualSyncLocalChanges(
+        localChangeVersionBeforePull,
+        null,
+        'Во время загрузки облачной версии появились новые локальные изменения. Они сохранены; повтори объединение.'
+      )) return;
       if (!remote || !remote.found) throw new Error('В облаке пока нет версии, которую можно объединить.');
+      meta = readMeta();
+      const localChangeVersionAtPayload = Number(meta.localChangeVersion || 0);
       const localService = localSharedService();
       const localPersonalData = localPersonal();
       const localProfile = readProfile();
@@ -5685,12 +5709,23 @@ document.addEventListener("DOMContentLoaded", () => {
           mergedService
         ))
       });
+      if (guardManualSyncLocalChanges(
+        localChangeVersionAtPayload,
+        result,
+        'Во время объединения появились новые локальные изменения. Они сохранены и будут отправлены следующей синхронизацией.'
+      )) return;
 
       snapshot.serviceData = mergedService;
       snapshot.personalData = mergedNotes.personalData;
       snapshot.profileData = remote.profileData || localProfile;
-      applyPersonal(mergedNotes.personalData);
       await applyProfile(snapshot.profileData);
+      if (guardManualSyncLocalChanges(
+        localChangeVersionAtPayload,
+        result,
+        'Во время применения объединённой версии появились новые локальные изменения. Они сохранены и будут отправлены следующей синхронизацией.'
+      )) return;
+      applyPersonal(mergedNotes.personalData);
+      meta = readMeta();
       meta.lastServerRevision = Number(result.revision || remote.revision || 0);
       meta.lastSyncAt = Date.now();
       meta.initialized = true;
@@ -5720,16 +5755,28 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!window.confirm('Отправить текущую локальную версию VK в облако? Данные Student Service в облаке будут заменены, а перед этим сохранены в резервную копию.')) return;
     busy = true;
     try {
+      const localChangeVersionBeforePull = Number(readMeta().localChangeVersion || 0);
       const remote = await request('/api/sync', { method: 'GET' });
+      if (guardManualSyncLocalChanges(
+        localChangeVersionBeforePull,
+        null,
+        'Во время загрузки облачной версии появились новые локальные изменения. Они сохранены; повтори отправку.'
+      )) return;
       if (!remote || !remote.found) throw new Error('В облаке пока нет версии, которую можно безопасно сравнить. Сначала синхронизируй данные в Telegram.');
       localStorage.setItem('kgeu_vk_cloud_before_force_push_v1', JSON.stringify(remote));
       const meta = readMeta();
+      const localChangeVersionAtPayload = Number(meta.localChangeVersion || 0);
       const local = localPersonal();
       const allLocalNoteKeys = Object.keys(local.notes && typeof local.notes === 'object' ? local.notes : {});
       const merged = mergeNotes(remote.personalData, local, allLocalNoteKeys);
       snapshot.serviceData = localSharedService();
       const profile = readProfile();
       const result = await request('/api/sync', { method: 'POST', body: JSON.stringify(payloadForSync(merged.personalData, profile, Number(remote.revision || 0))) });
+      if (guardManualSyncLocalChanges(
+        localChangeVersionAtPayload,
+        result,
+        'Во время отправки появились новые локальные изменения. Они сохранены и будут отправлены следующей синхронизацией.'
+      )) return;
       meta.lastServerRevision = Number(result.revision || meta.lastServerRevision || 0);
       meta.lastSyncAt = Date.now();
       meta.initialized = true;
@@ -5759,7 +5806,13 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!window.confirm('Заменить локальные данные VK текущей облачной версией? Локальная копия будет сохранена.')) return;
     busy = true;
     try {
+      const localChangeVersionBeforePull = Number(readMeta().localChangeVersion || 0);
       const remote = await request('/api/sync', { method: 'GET' });
+      if (guardManualSyncLocalChanges(
+        localChangeVersionBeforePull,
+        null,
+        'Во время загрузки облачной версии появились новые локальные изменения. Локальная версия сохранена; повтори загрузку после синхронизации.'
+      )) return;
       if (!remote || !remote.found) throw new Error('В облаке пока нет данных. Сначала синхронизируй их в Telegram.');
       localStorage.setItem('kgeu_vk_local_before_force_pull_v1', JSON.stringify({
         savedAt: Date.now(),
@@ -5773,6 +5826,11 @@ document.addEventListener("DOMContentLoaded", () => {
       snapshot.personalData = remote.personalData || { version: 1, notes: {} };
       snapshot.profileData = remote.profileData || {};
       await applyProfile(snapshot.profileData);
+      if (guardManualSyncLocalChanges(
+        localChangeVersionBeforePull,
+        { revision: remote.revision },
+        'Во время применения облачной версии появились новые локальные изменения. Они сохранены; повторная синхронизация поставлена в очередь.'
+      )) return;
       const meta = readMeta();
       meta.lastServerRevision = Number(remote.revision || 0);
       meta.lastSyncAt = Date.now();
