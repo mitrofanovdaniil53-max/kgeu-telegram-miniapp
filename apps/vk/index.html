@@ -3183,7 +3183,7 @@ html.vk-light .service-pill {
         '';
 
       setActiveGroup(id, resolvedName);
-      INSTITUTE_NAME = resolvedInstitute || INSTITUTE_NAME || '';
+      INSTITUTE_NAME = resolvedInstitute || (id === DEFAULT_GROUP_ID ? DEFAULT_INSTITUTE_NAME : '');
       updateGroupLabel();
       saveActiveGroup(!!(meta && meta.sharedProfileApply));
 
