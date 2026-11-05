@@ -463,6 +463,7 @@ function kgeuSetNote(subject, value) {
     .hero-type.pr { background: rgba(22,160,133,.13); color: var(--pr); }
     .hero-type.lab { background: rgba(124,58,237,.12); color: var(--lab); }
     .hero-type.other { background: rgba(148,163,184,.15); color: var(--muted); }
+    .hero-type.replace { background: rgba(234,88,12,.12); color: var(--replace); }
     .hero-row {
       font-size: 13px; color: var(--muted);
       margin-top: 3px; display: flex; align-items: center; gap: 6px;
@@ -1846,6 +1847,7 @@ html.vk-light .hero-type.pr,
 html.vk-light .badge.pr { color:#0f766e; }
 html.vk-light .hero-type.lab,
 html.vk-light .badge.lab { color:#6d28d9; }
+html.vk-light .hero-type.replace { color:#9a3412 !important; }
 html.vk-light .hero-type.other,
 html.vk-light .badge.other,
 html.vk-light .service-status.upcoming,
@@ -2598,7 +2600,7 @@ html.vk-light .kgeu-note-icon { color:#667085; }
         '<div class="hero-time">' + current.start + ' — ' + current.end + '</div>' +
         '<div class="hero-subject">' + escapeHtml(current.subject) + '</div>' +
         (tl ? '<div class="hero-type ' + current.type + '">' + tl + '</div>' : '') +
-        (current.replacement ? '<div class="hero-type" style="color:var(--replace);background:rgba(234,88,12,.12)">↻ Замена</div>' : '') +
+        (current.replacement ? '<div class="hero-type replace">↻ Замена</div>' : '') +
         (current.teacher ? '<div class="hero-row"><span class="t-link" data-tid="' + (current.teacherId || '') + '" data-tname="' + escapeHtml(formatTeacherFullName(current.teacher)) + '">' + escapeHtml(formatTeacherFullName(current.teacher)) + '</span></div>' : '') +
         '<div class="hero-row">⌖ ' + escapeHtml(roomText(current.room)) + '</div>' +
         '<div class="hero-progress"><div class="hero-progress-fill" style="width:' + progress + '%"></div></div>' +
