@@ -726,6 +726,82 @@ class StudentServiceImportBackupSafetyTest(unittest.TestCase):
                 self.assertIn("service and personal backup helper assertions passed", result.stdout)
 
 
+
+class StudentServiceTransactionalRestoreRegressionTest(unittest.TestCase):
+    def test_json_restore_rolls_back_persisted_state_after_partial_write_failures(self):
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("Node.js is required to execute restore transactions")
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            start = source.index("function serviceApplyImportedData(payload)")
+            end = source.index("function serviceImportData(file)", start)
+            apply_function = source[start:end]
+            script = "\\n".join([
+                "const assert = require('node:assert/strict');",
+                "const STUDENT_SERVICE_KEY='service'; const KGEU_PERSONAL_DATA_KEY='personal'; const STUDENT_SERVICE_SYNC_KEY='sync';",
+                "let serviceData={id:'local'}, kgeuPersonalData={version:1,notes:{local:'note'}};",
+                "const store={service:JSON.stringify(serviceData),personal:JSON.stringify(kgeuPersonalData),sync:JSON.stringify({dirty:false})};",
+                "let mode='personal-write-then-fail', messages=[];",
+                "const localStorage={getItem(k){return Object.prototype.hasOwnProperty.call(store,k)?store[k]:null;},setItem(k,v){store[k]=String(v);},removeItem(k){delete store[k];}};",
+                "function serviceBackupCurrent(){return true;} function serviceNormalizeData(v){return {...v};}",
+                "function serviceSave(){serviceData.updatedAt=123;store.service=JSON.stringify(serviceData);return mode!=='service-write-then-fail';}",
+                "function kgeuSavePersonalData(v){store.personal=JSON.stringify({...v,version:1});return mode!=='personal-write-then-fail';}",
+                "function toast(m){messages.push(m);} function serviceRenderData(){return '';} function serviceBind(){} const document={getElementById(){return {innerHTML:''};}};",
+                apply_function,
+                "const oldService=store.service, oldPersonal=store.personal, oldSync=store.sync;",
+                "serviceApplyImportedData({serviceData:{id:'cloud'},personalData:{notes:{cloud:'note'}}});",
+                "assert.equal(store.service,oldService); assert.equal(store.personal,oldPersonal); assert.equal(store.sync,oldSync);",
+                "assert.equal(serviceData.id,'local'); assert.equal(kgeuPersonalData.notes.local,'note');",
+                "assert.match(messages.at(-1),/предыдущие данные восстановлены/);",
+                "mode='service-write-then-fail'; messages=[];",
+                "serviceApplyImportedData({serviceData:{id:'cloud'}});",
+                "assert.equal(store.service,oldService); assert.equal(serviceData.id,'local');",
+                "assert.match(messages.at(-1),/Предыдущие данные восстановлены/);",
+                "console.log('JSON restore transaction assertions passed');"
+            ])
+            with self.subTest(frontend=relative):
+                result = subprocess.run([node, "-e", script], capture_output=True, text=True, check=False)
+                self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+                self.assertIn("JSON restore transaction assertions passed", result.stdout)
+
+    def test_cloud_snapshot_restore_rolls_back_service_personal_and_sync_metadata(self):
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("Node.js is required to execute cloud restore transactions")
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            start = source.index("function serviceApplyCloudSnapshot(")
+            end = source.index("// Refresh only the visible Student Service screen", start)
+            apply_function = source[start:end]
+            script = "\\n".join([
+                "const assert = require('node:assert/strict');",
+                "const STUDENT_SERVICE_KEY='service'; const KGEU_PERSONAL_DATA_KEY='personal'; const STUDENT_SERVICE_SYNC_KEY='sync';",
+                "let serviceData={id:'local'}, kgeuPersonalData={version:1,notes:{local:'note'}};",
+                "const oldService=JSON.stringify(serviceData), oldPersonal=JSON.stringify(kgeuPersonalData), oldSync=JSON.stringify({dirty:true,lastServerRevision:4});",
+                "const store={service:oldService,personal:oldPersonal,sync:oldSync}; let mode='personal-write-then-fail';",
+                "const localStorage={getItem(k){return Object.prototype.hasOwnProperty.call(store,k)?store[k]:null;},setItem(k,v){store[k]=String(v);if(k==='personal'&&mode==='personal-write-then-fail')return;if(k==='sync'&&mode==='metadata-fail'&&String(v)!==oldSync)throw new Error('quota');},removeItem(k){delete store[k];}};",
+                "const window={KGEU_VK_PLATFORM:false,kgeuApplySharedProfile(){return Promise.resolve();}}; const hasExplicitGroupFromLaunch=false;",
+                "function serviceBackupBeforeCloudRestore(){} function serviceNormalizeData(v){return {...v};}",
+                "function serviceSyncMeta(){return JSON.parse(store.sync||'{}');} function kgeuSavePersonalData(v){localStorage.setItem('personal',JSON.stringify({...v,version:1}));return mode!=='personal-write-then-fail';}",
+                "function kgeuMigrateLegacyNotesForActiveGroup(){} function kgeuFlushLegacyNoteMigrationSync(){} function kgeuFlushMigratedNoteSync(){}",
+                "function readMeta(){return {};} function saveSettings(){} function applyTheme(){} function setActiveGroup(){} function saveActiveGroup(){} function rememberGroup(){} function updateGroupLabel(){}",
+                apply_function,
+                "const snapshot={found:true,serviceData:{id:'cloud'},personalData:{notes:{cloud:'note'}},updatedAt:2000,revision:5};",
+                "assert.throws(()=>serviceApplyCloudSnapshot(snapshot),/cloud_snapshot_personal_save_failed/);",
+                "assert.equal(store.service,oldService);assert.equal(store.personal,oldPersonal);assert.equal(store.sync,oldSync);",
+                "assert.equal(serviceData.id,'local');assert.equal(kgeuPersonalData.notes.local,'note');",
+                "mode='metadata-fail';",
+                "assert.throws(()=>serviceApplyCloudSnapshot(snapshot),/cloud_snapshot_metadata_save_failed/);",
+                "assert.equal(store.service,oldService);assert.equal(store.personal,oldPersonal);assert.equal(store.sync,oldSync);",
+                "console.log('cloud snapshot transaction assertions passed');"
+            ])
+            with self.subTest(frontend=relative):
+                result = subprocess.run([node, "-e", script], capture_output=True, text=True, check=False)
+                self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+                self.assertIn("cloud snapshot transaction assertions passed", result.stdout)
+
+
 class VkSyncInFlightEditRegressionTest(unittest.TestCase):
     def test_vk_sync_does_not_overwrite_edits_made_during_pending_push(self):
         node = shutil.which("node")
