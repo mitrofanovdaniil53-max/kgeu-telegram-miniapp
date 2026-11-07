@@ -1880,6 +1880,101 @@ html.vk-light .service-pill {
 
 
 </style>
+<style id="vk-dark-glass-contrast-fix-v1">
+  /* VK dark mode: keep the deliberately light glass controls readable instead of
+     inheriting dark --bg2/--card surfaces from the page theme. */
+  html.vk-dark .settings-sheet {
+    color: #101828;
+    background: rgba(255,255,255,.94);
+    border-color: rgba(255,255,255,.88);
+    box-shadow: 0 18px 48px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.96);
+  }
+  html.vk-dark .settings-sheet .settings-section,
+  html.vk-dark .settings-sheet .current-group-box,
+  html.vk-dark .settings-sheet .saved-group,
+  html.vk-dark .settings-sheet .group-result,
+  html.vk-dark .settings-sheet .service-study-tools,
+  html.vk-dark .settings-sheet .service-data-box,
+  html.vk-dark .settings-sheet .service-analytics-box {
+    color: #101828;
+    background: rgba(255,255,255,.82);
+    border-color: rgba(16,24,40,.12);
+    box-shadow: 0 5px 18px rgba(16,24,40,.055), inset 0 1px 0 rgba(255,255,255,.96);
+  }
+  html.vk-dark .settings-sheet .field,
+  html.vk-dark .settings-sheet .setting-row select,
+  html.vk-dark .settings-sheet .service-study-search,
+  html.vk-dark .settings-sheet .service-form input,
+  html.vk-dark .settings-sheet .service-form select,
+  html.vk-dark .settings-sheet .service-form textarea {
+    color: #101828;
+    background: rgba(248,250,252,.96);
+    border-color: #d7dee8;
+  }
+  html.vk-dark .settings-sheet .settings-section-title,
+  html.vk-dark .settings-sheet .current-group-label,
+  html.vk-dark .settings-sheet .saved-title,
+  html.vk-dark .settings-sheet .saved-group-id,
+  html.vk-dark .settings-sheet .group-result-meta,
+  html.vk-dark .settings-sheet .mini-note,
+  html.vk-dark .settings-sheet .field-label,
+  html.vk-dark .settings-sheet .switch-row,
+  html.vk-dark .settings-sheet .advanced-settings summary {
+    color: #667085;
+  }
+  html.vk-dark .settings-sheet .current-group-name,
+  html.vk-dark .settings-sheet .saved-group-name,
+  html.vk-dark .settings-sheet .group-result-name,
+  html.vk-dark .settings-sheet .setting-copy,
+  html.vk-dark .settings-sheet .setting-copy strong {
+    color: #101828;
+  }
+  html.vk-dark .settings-sheet .switch-row { border-color: #e4e7ec; }
+
+  /* Schedule mode selector and header actions use the same light glass language. */
+  html.vk-dark .top-shell .tabs {
+    background: rgba(255,255,255,.42);
+    border-color: rgba(255,255,255,.76);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.92), 0 4px 16px rgba(16,24,40,.08);
+  }
+  html.vk-dark .top-shell .tabs .tab { color: #667085; }
+  html.vk-dark .top-shell .tabs .tab.active {
+    color: #101828;
+    background: rgba(255,255,255,.94);
+    border-color: rgba(255,255,255,.98);
+    box-shadow: 0 4px 12px rgba(16,24,40,.10), inset 0 1px 0 #fff;
+  }
+  html.vk-dark .top-shell .top-actions .icon-btn {
+    color: #101828;
+    background: rgba(255,255,255,.76);
+    border-color: rgba(255,255,255,.88);
+    box-shadow: 0 4px 14px rgba(16,24,40,.10), inset 0 1px 0 rgba(255,255,255,.98);
+  }
+
+  /* Student Service navigation and neutral deadline/task labels stay light. */
+  html.vk-dark .service-main-nav .service-btn,
+  html.vk-dark .service-page .service-btn:not(.primary):not(.danger),
+  html.vk-dark .service-actions .service-btn:not(.primary):not(.danger),
+  html.vk-dark .service-action-row .service-btn:not(.primary):not(.danger),
+  html.vk-dark .setting-navigation-row {
+    color: #344054;
+    background: rgba(255,255,255,.82);
+    border-color: rgba(255,255,255,.88);
+    box-shadow: 0 4px 14px rgba(0,0,0,.10), inset 0 1px 0 rgba(255,255,255,.96);
+  }
+  html.vk-dark .service-page .service-row-meta { color: #667085; }
+  html.vk-dark .service-page .service-status.upcoming {
+    color: #475467;
+    background: rgba(255,255,255,.88);
+    border: 1px solid rgba(16,24,40,.10);
+  }
+  html.vk-dark .service-page .service-pill {
+    color: #475467;
+    background: rgba(255,255,255,.82);
+    border: 1px solid rgba(16,24,40,.08);
+  }
+</style>
+
 </head>
 <body>
 <div class="wrap">
@@ -2081,10 +2176,26 @@ html.vk-light .service-pill {
   const SETTINGS_KEY = 'kgeu_vk_settings_v1';
   const CACHE_TTL = 30 * 60 * 1000;
 
+  // URLSearchParams decodes a query value once. Some VK launch links arrive
+  // double-encoded, so normalize percent-encoded text without changing plain labels.
+  function normalizeGroupText(value) {
+    let result = String(value == null ? '' : value);
+    for (let pass = 0; pass < 3 && /%[0-9a-f]{2}/i.test(result); pass += 1) {
+      try {
+        const decoded = decodeURIComponent(result);
+        if (decoded === result) break;
+        result = decoded;
+      } catch (error) {
+        break;
+      }
+    }
+    return result.trim();
+  }
+
   const hasExplicitGroupFromLaunch = Boolean(Number(params.get('groupId')) || Number(hashParams.get('groupId')));
   let activeGroupId = Number(params.get('groupId')) || Number(hashParams.get('groupId')) || 0;
-  let GROUP_NAME = params.get('groupName') || hashParams.get('groupName') || '';
-  let INSTITUTE_NAME = params.get('institute') || hashParams.get('institute') || '';
+  let GROUP_NAME = normalizeGroupText(params.get('groupName') || hashParams.get('groupName') || '');
+  let INSTITUTE_NAME = normalizeGroupText(params.get('institute') || hashParams.get('institute') || '');
 
   // Restore the last explicitly selected group when the Mini App is reopened.
   // A group passed in the URL has priority (e.g. shared/deep-linked schedule).
@@ -2093,8 +2204,8 @@ html.vk-light .service-pill {
       const savedActive = JSON.parse(localStorage.getItem(ACTIVE_GROUP_KEY) || 'null');
       if (savedActive && Number(savedActive.id)) {
         activeGroupId = Number(savedActive.id);
-        GROUP_NAME = String(savedActive.name || '');
-        INSTITUTE_NAME = String(savedActive.institute || '');
+        GROUP_NAME = normalizeGroupText(savedActive.name || '');
+        INSTITUTE_NAME = normalizeGroupText(savedActive.institute || '');
       }
     } catch (e) {}
   }
@@ -2146,7 +2257,7 @@ html.vk-light .service-pill {
   }
   function setActiveGroup(id, name) {
     activeGroupId = Number(id) || DEFAULT_GROUP_ID;
-    GROUP_NAME = String(name || '').trim() || (activeGroupId === DEFAULT_GROUP_ID ? DEFAULT_GROUP_NAME : 'Группа ' + activeGroupId);
+    GROUP_NAME = normalizeGroupText(name || '') || (activeGroupId === DEFAULT_GROUP_ID ? DEFAULT_GROUP_NAME : 'Группа ' + activeGroupId);
     CACHE_KEY = 'kgeu_rasp_vk_v2_' + activeGroupId;
     updateGroupLabel();
   }
@@ -2168,6 +2279,8 @@ html.vk-light .service-pill {
   kgeuMigrateLegacyNotesForActiveGroup();
 
   function updateGroupLabel() {
+    GROUP_NAME = normalizeGroupText(GROUP_NAME);
+    INSTITUTE_NAME = normalizeGroupText(INSTITUTE_NAME);
     const sub = document.getElementById('group-sub');
     if (sub) sub.textContent = (INSTITUTE_NAME || (activeGroupId === DEFAULT_GROUP_ID ? DEFAULT_INSTITUTE_NAME : 'КГЭУ')) + ' · ' + GROUP_NAME;
     const cg = document.getElementById('settings-current-group');
