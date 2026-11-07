@@ -1176,3 +1176,48 @@ class StudentServiceAttachmentSyncBudgetRegressionTest(unittest.TestCase):
                 result = subprocess.run([node, "-e", script], capture_output=True, text=True, check=False)
                 self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
                 self.assertIn("attachment sync budget assertions passed", result.stdout)
+
+
+class StudentServiceEventHostelPointsParityTest(unittest.TestCase):
+    def test_event_prompt_keeps_calendar_and_hostel_points_equal_after_save(self):
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("Node.js is required to execute the real event prompt")
+
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            date_start = source.index("function serviceDateKey(s)")
+            date_end = source.index("\\n", date_start)
+            number_start = source.index("function serviceNonNegativeNumber(value,fallback)")
+            number_end = source.index("\\n", number_start)
+            normalize_start = source.index("function serviceNormalizeData(x)")
+            normalize_end = source.index("function serviceLoad()", normalize_start)
+            event_start = source.index("function servicePromptEvent()")
+            event_end = source.index("function serviceCompressImage(file)", event_start)
+            script = "\\n".join([
+                "const assert = require('node:assert/strict');",
+                "const STUDENT_SERVICE_SCHEMA = 19;",
+                "let answers = ['Example event', '2026-11-07', '2.8'];",
+                "function prompt() { return answers.shift(); }",
+                "function toast() {}",
+                "function render() {}",
+                "function isoDate() { return '2026-11-07'; }",
+                "function serviceRecordArray(value) { return Array.isArray(value) ? value : []; }",
+                "function serviceNormalizeRecord(record, prefix) { return Object.assign({id: prefix + '_test'}, record || {}); }",
+                source.slice(date_start, date_end),
+                source.slice(number_start, number_end),
+                source.slice(normalize_start, normalize_end),
+                source.slice(event_start, event_end),
+                "let serviceData = { events: [], hostel: { social: [] } };",
+                "function serviceSave() { serviceData = serviceNormalizeData(serviceData); }",
+                "servicePromptEvent();",
+                "assert.equal(serviceData.events.length, 1);",
+                "assert.equal(serviceData.hostel.social.length, 1);",
+                "assert.equal(serviceData.events[0].points, 2);",
+                "assert.equal(serviceData.hostel.social[0].points, 2);",
+                "console.log('event and hostel points parity assertions passed');",
+            ])
+            with self.subTest(frontend=relative):
+                result = subprocess.run([node, "-e", script], capture_output=True, text=True, check=False)
+                self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+                self.assertIn("event and hostel points parity assertions passed", result.stdout)
