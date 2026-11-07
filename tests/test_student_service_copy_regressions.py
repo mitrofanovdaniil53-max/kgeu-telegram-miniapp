@@ -496,7 +496,7 @@ class StudentServiceHostelGoalNormalizationRegressionTest(unittest.TestCase):
                 self.assertIn("socialGoal:serviceNonNegativeNumber(h.socialGoal!=null?h.socialGoal:150,150)", source)
                 self.assertNotIn("Number(h.socialGoal||150)", source)
                 self.assertIn("function serviceNonNegativeNumber(value,fallback)", source)
-                self.assertIn("minutes:serviceNonNegativeNumber(x.minutes,0),points:serviceNonNegativeNumber(x.points,0)", source)
+                self.assertIn("minutes:Math.floor(serviceNonNegativeNumber(x.minutes,0)),points:Math.floor(serviceNonNegativeNumber(x.points,0))", source)
                 self.assertIn("totalGoal:serviceNonNegativeNumber(h.totalGoal!=null?h.totalGoal:250,250)", source)
 
 
@@ -570,6 +570,11 @@ class StudentServiceNormalizationBehaviorTest(unittest.TestCase):
                 "assert.equal(zeros.hostel.work[0].minutes, 0);",
                 "assert.equal(zeros.hostel.work[0].points, 0);",
                 "assert.equal(zeros.hostel.social[0].points, 0);",
+                "const fractional = serviceNormalizeData({events:[{title:'Event',points:2.8}],hostel:{work:[{minutes:19.8,points:1.9}],social:[{points:2.8}]}});",
+                "assert.equal(fractional.events[0].points, 2);",
+                "assert.equal(fractional.hostel.work[0].minutes, 19);",
+                "assert.equal(fractional.hostel.work[0].points, 1);",
+                "assert.equal(fractional.hostel.social[0].points, 2);",
                 "const malformed = serviceNormalizeData({hostel:{totalGoal:'',adminGoal:'bad',socialGoal:null}});",
                 "assert.equal(malformed.hostel.totalGoal, 250);",
                 "assert.equal(malformed.hostel.adminGoal, 100);",
