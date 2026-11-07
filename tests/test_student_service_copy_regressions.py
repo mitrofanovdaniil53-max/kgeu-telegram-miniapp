@@ -1134,3 +1134,40 @@ class ScheduleAndServiceAccessibilityPolishRegressionTest(unittest.TestCase):
                 self.assertIn(".card-subject { overflow-wrap:anywhere; hyphens:auto; }", block)
                 self.assertIn("@media (max-width: 380px)", block)
         self.assertEqual(blocks[0], blocks[1])
+
+
+class StudentServiceAttachmentSyncBudgetRegressionTest(unittest.TestCase):
+    def test_attachment_budget_matches_worker_envelope_limit_on_both_frontends(self):
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("Node.js is required to execute the real attachment-size helper")
+
+        for relative in ("index.html", "apps/vk/index.html"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            marker = "function serviceAttachmentFitsSyncLimit(nextServiceData)"
+            start = source.index(marker)
+            end = source.index("\\n  function serviceReadFile(file)", start)
+            helper = source[start:end]
+            handler_start = source.index("if(a==='add-social')")
+            handler_end = source.index("if(a==='export-word')", handler_start)
+            handler = source[handler_start:handler_end]
+            self.assertIn("serviceAttachmentFitsSyncLimit(candidate)", handler)
+            self.assertIn("rec.fileData=''", handler)
+            self.assertIn("Название файла сохранено", handler)
+
+            script = "\\n".join([
+                "const assert = require('node:assert/strict');",
+                "let payload = { personalData: { version: 1, notes: {} }, profileData: {} };",
+                "function serviceSyncPackage() { return payload; }",
+                "function serviceNormalizeData(value) { return value; }",
+                helper,
+                "assert.equal(serviceAttachmentFitsSyncLimit({ attachment: 'x'.repeat(800000) }), true);",
+                "assert.equal(serviceAttachmentFitsSyncLimit({ attachment: 'x'.repeat(860000) }), false);",
+                "payload.personalData = { notes: { large: 'y'.repeat(840000) } };",
+                "assert.equal(serviceAttachmentFitsSyncLimit({ attachment: 'small' }), false);",
+                "console.log('attachment sync budget assertions passed');",
+            ])
+            with self.subTest(frontend=relative):
+                result = subprocess.run([node, "-e", script], capture_output=True, text=True, check=False)
+                self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+                self.assertIn("attachment sync budget assertions passed", result.stdout)
