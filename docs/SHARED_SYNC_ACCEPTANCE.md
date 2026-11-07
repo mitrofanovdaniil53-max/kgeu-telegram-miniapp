@@ -30,6 +30,8 @@ Run only after the additive D1 migration is backed up and applied, VK_APP_SECRET
 - [ ] Verify no request from an unrelated web origin receives an Access-Control-Allow-Origin header.
 - [ ] Verify existing student_services rows and data remain intact after migration.
 - [ ] Verify Telegram-only bot notification identifiers/preferences remain platform-specific.
+- [ ] Attach a small image/document in one platform; verify filename and content arrive in the other platform and remain available after relaunch.
+- [ ] With disposable records, exceed the 850,000-byte client envelope budget; verify the new attachment content is omitted, its filename/record remain, and the user-facing warning is clear. Confirm no oversized request is repeatedly retried.
 
 ## Rollback
 
