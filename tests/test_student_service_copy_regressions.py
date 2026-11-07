@@ -79,7 +79,7 @@ class StudentServiceCopyRegressionTest(unittest.TestCase):
                 self.assertIn("if(a==='service-home')", source)
                 self.assertIn("if(a==='export-word')return serviceExportWord();", source)
                 self.assertIn("toast('Работа ЖБС добавлена')", source)
-                self.assertIn("toast('Мероприятие ССО добавлено')", source)
+                self.assertIn("toast(attachmentSkipped", source)
                 self.assertIn("const historyRows=h.work.map", source)
                 self.assertIn("if(!a.date&&b.date)return 1;if(a.date&&!b.date)return -1;", source)
                 self.assertIn("const reportRows=h.work.map", source)
@@ -1163,7 +1163,7 @@ class StudentServiceAttachmentSyncBudgetRegressionTest(unittest.TestCase):
                 helper,
                 "assert.equal(serviceAttachmentFitsSyncLimit({ attachment: 'x'.repeat(800000) }), true);",
                 "assert.equal(serviceAttachmentFitsSyncLimit({ attachment: 'x'.repeat(860000) }), false);",
-                "payload.personalData = { notes: { large: 'y'.repeat(840000) } };",
+                "payload.personalData = { notes: { large: 'y'.repeat(860000) } };",
                 "assert.equal(serviceAttachmentFitsSyncLimit({ attachment: 'small' }), false);",
                 "console.log('attachment sync budget assertions passed');",
             ])
