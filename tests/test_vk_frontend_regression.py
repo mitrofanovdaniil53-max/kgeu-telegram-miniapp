@@ -142,7 +142,7 @@ class VkFrontendRegressionTest(unittest.TestCase):
         if not node:
             self.skipTest("Node.js is required to execute the VK group switch")
         start = self.html.index("  async function switchGroup(id,name,meta) {")
-        end = self.html.index("  window.kgeuApplySharedProfile = async function(profile)", start)
+        end = self.html.index("  window.kgeuApplySharedProfile = async function(", start)
         switch_function = self.html[start:end]
         script = "\n".join([
             "const assert = require('node:assert/strict');",
