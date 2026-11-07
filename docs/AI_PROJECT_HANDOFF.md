@@ -1,28 +1,30 @@
 ## Current repository snapshot — 2026-11-07
 
-> **Verified repository state:** 2026-11-07, after merging PR #89.
+> **Verified repository state:** 2026-11-07, after merging PR #91.
 >
 > - **Repository:** https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp
-> - **main base for this documentation update:** c9793dd1822b748d3df0acbd13c424366c2fb4de.
+> - **main base for this documentation update:** fd263d7b162722365a92470fbcb0bda31620db13.
 > - **PR #83 — schedule proxy calendar-date validation:** merged. Merge commit 6cf7c59ecf4c799b061410a4c6c1464641dd5674.
 > - **PR #84 — Student Service date/numeric validation:** merged. Merge commit d461d2f6989f136d5d3f3837d40f7d5f1f6c0056.
 > - **PR #85 — transactional JSON/cloud restore safety:** merged. Merge commit 9fd0488c22b3adc96f24e8878604fcd8e63e56e6.
 > - **PR #86 — VK light-theme contrast and group-label wrapping:** merged. Merge commit 690e99896d9b63363c11af27cc827e4ff4abece7.
 > - **PR #88 — refreshed project handoff:** merged. Merge commit 3f40f3234c117cfa4411a36f58c6eb5deabd24ea.
-> - **PR #89 — attachment payload-size guard:** merged. Merge commit c9793dd1822b748d3df0acbd13c424366c2fb4de. Both Telegram and VK now measure the prospective complete shared-sync envelope before retaining a new attachment; if it would exceed 850,000 bytes, the file content is omitted while its filename is retained. This stays 50,000 bytes below the Worker’s 900,000-byte envelope limit.
+> - **PR #89 — attachment payload-size guard:** merged. Merge commit c9793dd1822b748d3df0acbd13c424366c2fb4de. Both Telegram and VK measure the prospective complete shared-sync envelope before retaining new attachment content. If the envelope would exceed 850,000 bytes, the content is omitted and the filename is retained; the Worker limit is 900,000 bytes.
+> - **PR #91 — integer normalization for hostel records:** merged. Merge commit fd263d7b162722365a92470fbcb0bda31620db13. ЖБС minutes/points and ССО points are normalized to non-negative integers in both frontends; zero and existing malformed-value fallback behavior are preserved.
 > - [PR #72](https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp/pull/72) was closed as superseded by #86; its branch was 43 commits behind the then-current main. The institute fallback logic was already present in main.
 > - [Issue #30](https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp/issues/30) remains open. Real Telegram/VK WebView acceptance and test-account sync/recovery checks remain outstanding.
 > - The manual test record template is docs/ux-manual-test-results-template.md; the shared sync checklist is docs/SHARED_SYNC_ACCEPTANCE.md. Do not create duplicate checklists.
-> - PR #89 head `0bcb15fa6c06e7b8fed2dc639bca2938fe507381` passed GitHub Actions run [#394](https://github.com/mitrofanovdani53-max/kgeu-telegram-miniapp/actions/runs/42392399338). The run parsed both frontends and Worker and passed the full Python regression suite, D1 migration tests, shared-state merge/revision, schedule proxy validation, legacy preservation, VK launch auth, sync race/restore and theme/group-label tests. The initial run #393 failed because the new tests used an incorrect expected threshold and retained an outdated toast assertion; both were corrected before the successful run.
-> - The PR-head CI result is confirmed; a separate push-triggered post-merge run for the merge commit was not returned by the available commit-run query. Do not describe that as post-merge CI.
-> - PRs #83–#86, #88 and #89 are merged. These changes did not modify production D1 data or secrets. Worker deployment is separate from frontend GitHub Pages publication; verify each deployment independently.
+> - PR #89 head `0bcb15fa6c06e7b8fed2dc639bca2938fe507381` passed GitHub Actions run [#394](https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp/actions/runs/42392399338). PR #90 documentation head passed run #396. PR #91 head `a58f7792522a1185198285608ec651d6a3989535` passed run [#398](https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp/actions/runs/42392661244). These runs parsed both frontends and Worker and passed the full regression suite, D1 migration tests, shared-state merge/revision, schedule proxy validation, legacy preservation, VK launch auth, sync race/restore and theme/group-label tests. These are PR-head CI results, not live shell tests.
+> - A separate push-triggered post-merge CI run for the current main commit was not returned by the available commit-run query. Do not describe that as post-merge CI.
+> - PRs #83–#86, #88, #89 and #91 are merged. These changes did not modify production D1 data or secrets. Worker deployment is separate from frontend GitHub Pages publication; verify each deployment independently.
 >
 > **Next sequence**
 > 1. Complete real Telegram and VK Mini App WebView acceptance using disposable accounts/data. Record results in docs/ux-manual-test-results-template.md.
 > 2. Verify cross-platform linking/sync, offline retry, conflicts, backup/restore and rollback using docs/SHARED_SYNC_ACCEPTANCE.md.
 > 3. Verify the attachment boundary in both shells: small attachment retained and synced; aggregate payload over 850,000 bytes omits new content but preserves filename and displays the combined warning.
-> 4. Verify public Pages and Worker endpoints from a normal network. Do not infer publication from PR merge or preview upload.
-> 5. Fix only reproducible issues. Keep issue #30 open until evidence is recorded or remaining checks are explicitly descoped.
+> 4. Verify fractional imported/legacy values are floored consistently in both clients, and confirm the event prompt's calendar and SSO records show the same integer points.
+> 5. Verify public Pages and Worker endpoints from a normal network. Do not infer publication from PR merge or preview upload.
+> 6. Fix only reproducible issues. Keep issue #30 open until evidence is recorded or remaining checks are explicitly descoped.
 >
 > **Evidence labels:** source reviewed ≠ automated test passed ≠ owner-reported ≠ manual shell verified.
 
