@@ -1187,14 +1187,14 @@ class StudentServiceEventHostelPointsParityTest(unittest.TestCase):
         for relative in ("index.html", "apps/vk/index.html"):
             source = (ROOT / relative).read_text(encoding="utf-8")
             date_start = source.index("function serviceDateKey(s)")
-            date_end = source.index("\\n", date_start)
+            date_end = source.index("\n", date_start)
             number_start = source.index("function serviceNonNegativeNumber(value,fallback)")
-            number_end = source.index("\\n", number_start)
+            number_end = source.index("\n", number_start)
             normalize_start = source.index("function serviceNormalizeData(x)")
             normalize_end = source.index("function serviceLoad()", normalize_start)
             event_start = source.index("function servicePromptEvent()")
             event_end = source.index("function serviceCompressImage(file)", event_start)
-            script = "\\n".join([
+            script = "\n".join([
                 "const assert = require('node:assert/strict');",
                 "const STUDENT_SERVICE_SCHEMA = 19;",
                 "let answers = ['Example event', '2026-11-07', '2.8'];",
