@@ -1884,13 +1884,13 @@ html.vk-light .service-pill {
 
 </style>
 <style id="vk-dark-glass-contrast-fix-v1">
-  /* VK dark mode: keep the deliberately light glass controls readable instead of
-     inheriting dark --bg2/--card surfaces from the page theme. */
+  /* Dark theme must use dark palette surfaces throughout the settings sheet.
+     Earlier light-glass overrides caused the settings panel to remain white. */
   html.vk-dark .settings-sheet {
-    color: #101828;
-    background: rgba(255,255,255,.94);
-    border-color: rgba(255,255,255,.88);
-    box-shadow: 0 18px 48px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.96);
+    color: var(--text) !important;
+    background: var(--bg) !important;
+    border-color: var(--border) !important;
+    box-shadow: 0 18px 48px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.04) !important;
   }
   html.vk-dark .settings-sheet .settings-section,
   html.vk-dark .settings-sheet .current-group-box,
@@ -1898,11 +1898,12 @@ html.vk-light .service-pill {
   html.vk-dark .settings-sheet .group-result,
   html.vk-dark .settings-sheet .service-study-tools,
   html.vk-dark .settings-sheet .service-data-box,
-  html.vk-dark .settings-sheet .service-analytics-box {
-    color: #101828;
-    background: rgba(255,255,255,.82);
-    border-color: rgba(16,24,40,.12);
-    box-shadow: 0 5px 18px rgba(16,24,40,.055), inset 0 1px 0 rgba(255,255,255,.96);
+  html.vk-dark .settings-sheet .service-analytics-box,
+  html.vk-dark .settings-sheet .density-segmented {
+    color: var(--text) !important;
+    background: var(--card) !important;
+    border-color: var(--border) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.035), 0 4px 14px rgba(0,0,0,.16) !important;
   }
   html.vk-dark .settings-sheet .field,
   html.vk-dark .settings-sheet .setting-row select,
@@ -1910,9 +1911,14 @@ html.vk-light .service-pill {
   html.vk-dark .settings-sheet .service-form input,
   html.vk-dark .settings-sheet .service-form select,
   html.vk-dark .settings-sheet .service-form textarea {
-    color: #101828;
-    background: rgba(248,250,252,.96);
-    border-color: #d7dee8;
+    color: var(--text) !important;
+    background: var(--bg2) !important;
+    border-color: var(--border) !important;
+  }
+  html.vk-dark .settings-sheet .field::placeholder,
+  html.vk-dark .settings-sheet .service-study-search::placeholder {
+    color: var(--muted) !important;
+    opacity: .85;
   }
   html.vk-dark .settings-sheet .settings-section-title,
   html.vk-dark .settings-sheet .current-group-label,
@@ -1923,58 +1929,48 @@ html.vk-light .service-pill {
   html.vk-dark .settings-sheet .field-label,
   html.vk-dark .settings-sheet .switch-row,
   html.vk-dark .settings-sheet .advanced-settings summary {
-    color: #667085;
+    color: var(--muted) !important;
   }
   html.vk-dark .settings-sheet .current-group-name,
   html.vk-dark .settings-sheet .saved-group-name,
   html.vk-dark .settings-sheet .group-result-name,
   html.vk-dark .settings-sheet .setting-copy,
   html.vk-dark .settings-sheet .setting-copy strong {
-    color: #101828;
+    color: var(--text) !important;
   }
-  html.vk-dark .settings-sheet .switch-row { border-color: #e4e7ec; }
-
-  /* Schedule mode selector and header actions use the same light glass language. */
+  html.vk-dark .settings-sheet .switch-row { border-color: var(--border) !important; }
+  html.vk-dark .settings-sheet .density-segmented button {
+    color: var(--muted) !important;
+    background: transparent !important;
+  }
+  html.vk-dark .settings-sheet .density-segmented button.active {
+    color: var(--text) !important;
+    background: var(--bg2) !important;
+  }
   html.vk-dark .top-shell .tabs {
-    background: rgba(255,255,255,.42);
-    border-color: rgba(255,255,255,.76);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.92), 0 4px 16px rgba(16,24,40,.08);
+    background: var(--bg2) !important;
+    border-color: var(--border) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 4px 14px rgba(0,0,0,.2) !important;
   }
-  html.vk-dark .top-shell .tabs .tab { color: #667085; }
+  html.vk-dark .top-shell .tabs .tab { color: var(--muted) !important; }
   html.vk-dark .top-shell .tabs .tab.active {
-    color: #101828;
-    background: rgba(255,255,255,.94);
-    border-color: rgba(255,255,255,.98);
-    box-shadow: 0 4px 12px rgba(16,24,40,.10), inset 0 1px 0 #fff;
+    color: var(--text) !important;
+    background: var(--card) !important;
+    border-color: var(--border) !important;
+    box-shadow: 0 3px 10px rgba(0,0,0,.2) !important;
   }
   html.vk-dark .top-shell .top-actions .icon-btn {
-    color: #101828;
-    background: rgba(255,255,255,.76);
-    border-color: rgba(255,255,255,.88);
-    box-shadow: 0 4px 14px rgba(16,24,40,.10), inset 0 1px 0 rgba(255,255,255,.98);
+    color: var(--text) !important;
+    background: var(--bg2) !important;
+    border-color: var(--border) !important;
+    box-shadow: 0 3px 10px rgba(0,0,0,.2) !important;
   }
-
-  /* Student Service navigation and neutral deadline/task labels stay light. */
-  html.vk-dark .service-main-nav .service-btn,
-  html.vk-dark .service-page .service-btn:not(.primary):not(.danger),
-  html.vk-dark .service-actions .service-btn:not(.primary):not(.danger),
-  html.vk-dark .service-action-row .service-btn:not(.primary):not(.danger),
-  html.vk-dark .setting-navigation-row {
-    color: #344054;
-    background: rgba(255,255,255,.82);
-    border-color: rgba(255,255,255,.88);
-    box-shadow: 0 4px 14px rgba(0,0,0,.10), inset 0 1px 0 rgba(255,255,255,.96);
-  }
-  html.vk-dark .service-page .service-row-meta { color: #667085; }
-  html.vk-dark .service-page .service-status.upcoming {
-    color: #475467;
-    background: rgba(255,255,255,.88);
-    border: 1px solid rgba(16,24,40,.10);
-  }
+  html.vk-dark .service-page .service-row-meta { color: var(--muted) !important; }
+  html.vk-dark .service-page .service-status.upcoming,
   html.vk-dark .service-page .service-pill {
-    color: #475467;
-    background: rgba(255,255,255,.82);
-    border: 1px solid rgba(16,24,40,.08);
+    color: var(--muted) !important;
+    background: var(--bg2) !important;
+    border: 1px solid var(--border) !important;
   }
 </style>
 
