@@ -691,7 +691,8 @@ class StudentServiceImportBackupSafetyTest(unittest.TestCase):
                 apply_end = source.index("function serviceImportData(file)", apply_start)
                 apply = source[apply_start:apply_end]
                 self.assertIn("if(!serviceBackupCurrent())", apply)
-                self.assertIn("if(!serviceSave())", apply)
+                self.assertIn("const serviceSaved=serviceSave()", apply)
+                self.assertIn("serviceRaw!==JSON.stringify(serviceData)", apply)
                 self.assertIn("const personalSaved=typeof kgeuSavePersonalData==='function'&&kgeuSavePersonalData(importedPersonalData)", apply)
                 self.assertIn("persistedPersonal.notes", apply)
                 self.assertIn("serviceData=previousServiceData", apply)
