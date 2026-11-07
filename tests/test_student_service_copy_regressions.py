@@ -782,7 +782,7 @@ class StudentServiceTransactionalRestoreRegressionTest(unittest.TestCase):
                 "let serviceData={id:'local'}, kgeuPersonalData={version:1,notes:{local:'note'}};",
                 "const oldService=JSON.stringify(serviceData), oldPersonal=JSON.stringify(kgeuPersonalData), oldSync=JSON.stringify({dirty:true,lastServerRevision:4});",
                 "const store={service:oldService,personal:oldPersonal,sync:oldSync}; let mode='personal-write-then-fail';",
-                "const localStorage={getItem(k){return Object.prototype.hasOwnProperty.call(store,k)?store[k]:null;},setItem(k,v){store[k]=String(v);if(k==='personal'&&mode==='personal-write-then-fail')return;if(k==='sync'&&mode==='metadata-fail'&&String(v)!==oldSync)throw new Error('quota');},removeItem(k){delete store[k];}};",
+                "const localStorage={getItem(k){return Object.prototype.hasOwnProperty.call(store,k)?store[k]:null;},setItem(k,v){if(k==='service'&&mode==='rollback-service-fail'&&String(v)===oldService)throw new Error('service rollback quota');store[k]=String(v);if(k==='personal'&&mode==='personal-write-then-fail')return;if(k==='sync'&&(mode==='metadata-fail'||mode==='rollback-service-fail')&&String(v)!==oldSync)throw new Error('quota');},removeItem(k){delete store[k];}};",
                 "const window={KGEU_VK_PLATFORM:false,kgeuApplySharedProfile(){return Promise.resolve();}}; const hasExplicitGroupFromLaunch=false;",
                 "function serviceBackupBeforeCloudRestore(){} function serviceNormalizeData(v){return {...v};}",
                 "function serviceSyncMeta(){return JSON.parse(store.sync||'{}');} function kgeuSavePersonalData(v){localStorage.setItem('personal',JSON.stringify({...v,version:1}));return mode!=='personal-write-then-fail';}",
@@ -796,6 +796,11 @@ class StudentServiceTransactionalRestoreRegressionTest(unittest.TestCase):
                 "mode='metadata-fail';",
                 "assert.throws(()=>serviceApplyCloudSnapshot(snapshot),/cloud_snapshot_metadata_save_failed/);",
                 "assert.equal(store.service,oldService);assert.equal(store.personal,oldPersonal);assert.equal(store.sync,oldSync);",
+                "mode='rollback-service-fail';",
+                "assert.throws(()=>serviceApplyCloudSnapshot(snapshot),/cloud_snapshot_rollback_failed/);",
+                "assert.notEqual(store.service,oldService,'failed service rollback must be reported');",
+                "assert.equal(store.personal,oldPersonal,'personal rollback must still be attempted');",
+                "assert.equal(store.sync,oldSync,'metadata rollback must still be attempted');",
                 "console.log('cloud snapshot transaction assertions passed');"
             ])
             with self.subTest(frontend=relative):
