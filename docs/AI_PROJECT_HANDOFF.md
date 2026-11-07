@@ -1,9 +1,9 @@
 ## Current repository snapshot — 2026-11-07
 
-> **Verified repository state:** 2026-11-07, after merging PR #96.
+> **Verified repository state:** 2026-11-07, after merging PR #97.
 >
 > - **Repository:** https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp
-> - **main base for this documentation update:** 4b96d65dbb734adf7d7f25d9e5af20fd32fbd784.
+> - **main base for this documentation update:** fec92575aa231d41b73bc341dad6ce974e62f3d6.
 > - **PR #83 — schedule proxy calendar-date validation:** merged. Merge commit 6cf7c59ecf4c799b061410a4c6c1464641dd5674.
 > - **PR #84 — Student Service date/numeric validation:** merged. Merge commit d461d2f6989f136d5d3f3837d40f7d5f1f6c0056.
 > - **PR #85 — transactional JSON/cloud restore safety:** merged. Merge commit 9fd0488c22b3adc96f24e8878604fcd8e63e56e6.
@@ -14,13 +14,17 @@
 > - **PR #93 — event/hostel points parity regression test:** merged. Adds a Node-backed test that executes the actual event prompt and normalizer in both frontends and verifies calendar-event points match the SSO ledger record after saving.
 > - **PR #95 — manual acceptance coverage for attachments and points:** merged. Extends the existing manual template with fractional event-points parity, small attachment retention, and aggregate payload-over-850,000-byte filename-only fallback cases; extends the shared-sync checklist with cross-platform attachment transfer and oversized-envelope behavior. Merge commit 4b96d65dbb734adf7d7f25d9e5af20fd32fbd784.
 > - **PR #96 — handoff refresh after #95:** merged. Records the new manual acceptance cases and PR #95 CI run #408. Merge commit 587753b8fc2bb54046e525064d270406e84dd0b9.
+> - **PR #97 — final repository snapshot after #96:** merged. Merge commit fec92575aa231d41b73bc341dad6ce974e62f3d6.
 > - [PR #72](https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp/pull/72) was closed as superseded by #86; its branch was 43 commits behind the then-current main. The institute fallback logic was already present in main.
 > - [Issue #30](https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp/issues/30) remains open. Real Telegram/VK WebView acceptance and test-account sync/recovery checks remain outstanding.
 > - The manual test record template is docs/ux-manual-test-results-template.md; the shared sync checklist is docs/SHARED_SYNC_ACCEPTANCE.md. Do not create duplicate checklists.
 > - PR #95 documentation head `e1655b1342a48770ce54a64fe6a4e906feebb49f` passed GitHub Actions run [#408](https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp/actions/runs/42396482646). This validates repository automation only; the added acceptance cases remain unrun until actual Telegram/VK shell checks are recorded.
 > - PR #89 head `0bcb15fa6c06e7b8fed2dc639bca2938fe507381` passed GitHub Actions run [#394](https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp/actions/runs/42392399338). PR #90 documentation head passed run #396. PR #91 head `a58f7792522a1185198285608ec651d6a3989535` passed run [#398](https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp/actions/runs/42392661244). PR #92 documentation head passed run #400. PR #93 head `e169e9db14340d886eed4932531f3025651ea6ba` passed run [#403](https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp/actions/runs/42392898416). These PR-head runs parsed both frontends and Worker and passed the full regression suite, D1 migration tests, shared-state merge/revision, schedule proxy validation, legacy preservation, VK launch auth, sync race/restore and theme/group-label tests. These are PR-head CI results, not live shell tests.
-> - A separate push-triggered post-merge CI run for the current main commit was not returned by the available commit-run query. Do not describe that as post-merge CI.
-> - PRs #83–#86, #88, #89, #91, #93, #95 and #96 are merged. These changes did not modify production D1 data or secrets. Worker deployment is separate from frontend GitHub Pages publication; verify each deployment independently.
+> - **Post-merge CI:** GitHub Actions run [#413](https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp/actions/runs/42396699227) completed successfully for main commit fec92575aa231d41b73bc341dad6ce974e62f3d6 (push event). The syntax parse, additive migration and listed regression tests all passed.
+> - GitHub Pages build/deployment run [#99](https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp/actions/runs/42396698486) completed successfully for main commit fec92575aa231d41b73bc341dad6ce974e62f3d6 at 2026-11-07 17:31:06 UTC. This is a successful Pages deployment job, not a browser-level or Telegram/VK shell test.
+> - Read-only Cloudflare control-plane inspection at 2026-11-07 17:32:04 UTC recorded deployment 05160b5c-9ea6-4584-91ca-5d43abdaffce, with Worker version fb14ea22-46e8-4d1a-b0d0-c2771a0d9554 (version number 598) receiving 100% of traffic. Its script ETag matches versions 567 and 589; this indicates the deployed script bundle is unchanged from the earlier deployment, not a new backend-code change. D1, TELEGRAM_BOT_TOKEN and VK_APP_SECRET bindings were present; secret values were not read.
+> - The public GitHub Pages URLs and Worker /api/health URL remained inaccessible to the available web verifier during this session. This is a verifier limitation and does not establish that the services are down.
+> - PRs #83–#86, #88, #89, #91, #93, #95, #96 and #97 are merged. These changes did not modify production D1 data or secrets. Worker deployment is separate from frontend GitHub Pages publication.
 >
 > **Next sequence**
 > 1. Complete real Telegram and VK Mini App WebView acceptance using disposable accounts/data. Record results in docs/ux-manual-test-results-template.md.
