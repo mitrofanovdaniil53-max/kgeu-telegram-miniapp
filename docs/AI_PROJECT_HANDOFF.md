@@ -1,4 +1,4 @@
-# AI Project Handoff — KGEU Student Platform (Telegram + VK)
+## Current repository snapshot — 2026-11-07
 
 > **Current repository snapshot verified:** 2026-11-07. This section supersedes older PR/status snapshots further below. Re-check GitHub before any new change.
 >
