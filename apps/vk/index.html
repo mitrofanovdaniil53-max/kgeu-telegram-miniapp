@@ -4692,17 +4692,18 @@ html.vk-light .service-pill {
       const rollback=function(){
         serviceData=previousServiceData;
         kgeuPersonalData=previousPersonalData;
-        try{
-          const restore=function(key,raw){
+        let persisted=true;
+        const restore=function(key,raw){
+          try{
             if(raw===null)localStorage.removeItem(key);
             else localStorage.setItem(key,raw);
-            if(localStorage.getItem(key)!==raw)throw new Error('rollback_not_persisted');
-          };
-          restore(STUDENT_SERVICE_KEY,previousServiceRaw);
-          restore(KGEU_PERSONAL_DATA_KEY,previousPersonalRaw);
-          restore(STUDENT_SERVICE_SYNC_KEY,previousSyncMetaRaw);
-          return true;
-        }catch(e){return false;}
+            if(localStorage.getItem(key)!==raw)persisted=false;
+          }catch(e){persisted=false;}
+        };
+        restore(STUDENT_SERVICE_KEY,previousServiceRaw);
+        restore(KGEU_PERSONAL_DATA_KEY,previousPersonalRaw);
+        restore(STUDENT_SERVICE_SYNC_KEY,previousSyncMetaRaw);
+        return persisted;
       };
       if(!serviceBackupCurrent()){toast('Не удалось создать резервную копию текущих данных. Восстановление отменено.');return;}
       serviceData=serviceNormalizeData(incoming);
