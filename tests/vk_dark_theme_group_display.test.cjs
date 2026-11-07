@@ -59,3 +59,17 @@ test('VK light theme keeps mobile glass surfaces light even when the OS prefers 
     assert.ok(html.includes(selector), 'expected mobile surface consumer: ' + selector);
   }
 });
+
+test('VK light mode overrides legacy dark glass surfaces in mobile layout', () => {
+  const css = extract('<style id="vk-light-theme-mobile-surface-fix-v2">', '</style>');
+  for (const selector of [
+    'html.vk-light .top-shell .tabs',
+    'html.vk-light .top-shell .tabs .tab.active',
+    'html.vk-light .top-shell .top-actions .icon-btn',
+    'html.vk-light .settings-sheet .saved-group',
+    'html.vk-light .settings-sheet .density-segmented',
+    'html.vk-light .service-main-nav .service-btn',
+    'html.vk-light .service-page .service-status.upcoming'
+  ]) assert.ok(css.includes(selector), 'missing explicit light-mode override: ' + selector);
+  assert.match(css, /background:\s*#fff\s*!important/);
+});
