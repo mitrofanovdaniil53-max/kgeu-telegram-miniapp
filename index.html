@@ -3313,13 +3313,72 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
   function serviceApplyCloudSnapshot(snapshot){
     if(!snapshot||!snapshot.found||!snapshot.serviceData||typeof snapshot.serviceData!=='object')throw new Error('cloud_data_not_found');
     serviceBackupBeforeCloudRestore();
-    serviceData=serviceNormalizeData(snapshot.serviceData);
-    localStorage.setItem(STUDENT_SERVICE_KEY,JSON.stringify(serviceData));
-    if(snapshot.personalData&&typeof snapshot.personalData==='object'){
-      const pd=snapshot.personalData;
-      kgeuPersonalData={version:1,notes:(pd.notes&&typeof pd.notes==='object')?pd.notes:{},updatedAt:Date.now()};
-      if(typeof kgeuSavePersonalData==='function')kgeuSavePersonalData(kgeuPersonalData);
-      kgeuMigrateLegacyNotesForActiveGroup({deferSync:true});
+    const previousServiceData=serviceData;
+    const previousPersonalData=kgeuPersonalData;
+    const previousServiceRaw=localStorage.getItem(STUDENT_SERVICE_KEY);
+    const previousPersonalRaw=localStorage.getItem(KGEU_PERSONAL_DATA_KEY);
+    const previousSyncMetaRaw=localStorage.getItem(STUDENT_SERVICE_SYNC_KEY);
+    const nextServiceData=serviceNormalizeData(snapshot.serviceData);
+    const hasPersonalSnapshot=!!(snapshot.personalData&&typeof snapshot.personalData==='object');
+    const pd=hasPersonalSnapshot?snapshot.personalData:null;
+    const nextPersonalData=hasPersonalSnapshot
+      ? {version:1,notes:(pd.notes&&typeof pd.notes==='object')?pd.notes:{},updatedAt:Date.now()}
+      : null;
+    let restorePhase='service';
+    try{
+      const nextServiceRaw=JSON.stringify(nextServiceData);
+      localStorage.setItem(STUDENT_SERVICE_KEY,nextServiceRaw);
+      if(localStorage.getItem(STUDENT_SERVICE_KEY)!==nextServiceRaw){
+        throw new Error('cloud_snapshot_service_save_failed');
+      }
+      if(hasPersonalSnapshot){
+        restorePhase='personal';
+        if(typeof kgeuSavePersonalData!=='function'||!kgeuSavePersonalData(nextPersonalData)){
+          throw new Error('cloud_snapshot_personal_save_failed');
+        }
+        let savedPersonal=null;
+        try{savedPersonal=JSON.parse(localStorage.getItem(KGEU_PERSONAL_DATA_KEY)||'null');}catch(e){}
+        if(!savedPersonal||Number(savedPersonal.version)!==1
+            || JSON.stringify(savedPersonal.notes||{})!==JSON.stringify(nextPersonalData.notes)){
+          throw new Error('cloud_snapshot_personal_save_failed');
+        }
+      }
+      restorePhase='metadata';
+      const m=serviceSyncMeta();
+      m.dirty=false;
+      m.lastLocalSave=Number(nextServiceData.updatedAt||Date.now());
+      m.lastServerSync=Number(snapshot.updatedAt||Date.now());
+      m.lastServerRevision=Number(snapshot.revision||0);
+      const nextSyncMetaRaw=JSON.stringify(m);
+      localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,nextSyncMetaRaw);
+      if(localStorage.getItem(STUDENT_SERVICE_SYNC_KEY)!==nextSyncMetaRaw){
+        throw new Error('cloud_snapshot_metadata_save_failed');
+      }
+    }catch(restoreError){
+      serviceData=previousServiceData;
+      kgeuPersonalData=previousPersonalData;
+      try{
+        const restoreStorageValue=function(key,previousRaw){
+          if(previousRaw===null)localStorage.removeItem(key);
+          else localStorage.setItem(key,previousRaw);
+          if(localStorage.getItem(key)!==previousRaw)throw new Error('rollback_not_persisted');
+        };
+        restoreStorageValue(STUDENT_SERVICE_KEY,previousServiceRaw);
+        restoreStorageValue(KGEU_PERSONAL_DATA_KEY,previousPersonalRaw);
+        restoreStorageValue(STUDENT_SERVICE_SYNC_KEY,previousSyncMetaRaw);
+      }catch(rollbackError){
+        throw new Error('cloud_snapshot_rollback_failed');
+      }
+      throw new Error(restorePhase==='service'
+        ? 'cloud_snapshot_service_save_failed'
+        : restorePhase==='personal'
+          ? 'cloud_snapshot_personal_save_failed'
+          : 'cloud_snapshot_metadata_save_failed');
+    }
+    serviceData=nextServiceData;
+    if(hasPersonalSnapshot){
+      kgeuPersonalData=nextPersonalData;
+      if(typeof kgeuMigrateLegacyNotesForActiveGroup==='function')kgeuMigrateLegacyNotesForActiveGroup({deferSync:true});
     }
     if(snapshot.profileData&&typeof snapshot.profileData==='object'){
       try{
@@ -3333,10 +3392,9 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       }catch(e){}
       if(typeof window.kgeuApplySharedProfile==='function')window.kgeuApplySharedProfile(snapshot.profileData).catch(function(){});
     }
-    const m=serviceSyncMeta();m.dirty=false;m.lastLocalSave=Number(serviceData.updatedAt||Date.now());m.lastServerSync=Number(snapshot.updatedAt||Date.now());m.lastServerRevision=Number(snapshot.revision||0);
-    localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(m));
     kgeuFlushLegacyNoteMigrationSync();
   }
+  
 
   // Refresh only the visible Student Service screen after a remote update.
   // Keep the current section, scroll position, and unsaved form values intact.
@@ -4148,17 +4206,47 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       const incoming=payload&&payload.serviceData?payload.serviceData:payload;
       const previousServiceData=serviceData;
       const previousPersonalData=kgeuPersonalData;
+      const previousServiceRaw=localStorage.getItem(STUDENT_SERVICE_KEY);
+      const previousPersonalRaw=localStorage.getItem(KGEU_PERSONAL_DATA_KEY);
+      const previousSyncMetaRaw=localStorage.getItem(STUDENT_SERVICE_SYNC_KEY);
+      const rollback=function(){
+        serviceData=previousServiceData;
+        kgeuPersonalData=previousPersonalData;
+        try{
+          const restore=function(key,raw){
+            if(raw===null)localStorage.removeItem(key);
+            else localStorage.setItem(key,raw);
+            if(localStorage.getItem(key)!==raw)throw new Error('rollback_not_persisted');
+          };
+          restore(STUDENT_SERVICE_KEY,previousServiceRaw);
+          restore(KGEU_PERSONAL_DATA_KEY,previousPersonalRaw);
+          restore(STUDENT_SERVICE_SYNC_KEY,previousSyncMetaRaw);
+          return true;
+        }catch(e){return false;}
+      };
       if(!serviceBackupCurrent()){toast('Не удалось создать резервную копию текущих данных. Восстановление отменено.');return;}
       serviceData=serviceNormalizeData(incoming);
-      if(!serviceSave()){serviceData=previousServiceData;toast('Не удалось сохранить восстановленные данные. Текущие данные оставлены без изменений.');return;}
-      if(payload.personalData&&typeof payload.personalData==='object'&&typeof kgeuSavePersonalData==='function'){
+      const serviceSaved=serviceSave();
+      const serviceRaw=localStorage.getItem(STUDENT_SERVICE_KEY);
+      if(!serviceSaved||serviceRaw!==JSON.stringify(serviceData)){
+        const rollbackSaved=rollback();
+        toast(rollbackSaved
+          ? 'Не удалось сохранить восстановленные данные. Предыдущие данные восстановлены.'
+          : 'Не удалось сохранить восстановленные данные и выполнить откат. Предварительная резервная копия создана; проверьте данные вручную.');
+        return;
+      }
+      if(payload.personalData&&typeof payload.personalData==='object'){
         const pd=payload.personalData;
         const importedPersonalData={version:1,notes:(pd.notes&&typeof pd.notes==='object')?pd.notes:{},updatedAt:Date.now()};
-        if(!kgeuSavePersonalData(importedPersonalData)){
-          serviceData=previousServiceData;
-          serviceSave();
-          kgeuPersonalData=previousPersonalData;
-          toast('Не удалось сохранить заметки. Восстановление отменено; текущая копия сохранена.');
+        const personalSaved=typeof kgeuSavePersonalData==='function'&&kgeuSavePersonalData(importedPersonalData);
+        let persistedPersonal=null;
+        try{persistedPersonal=JSON.parse(localStorage.getItem(KGEU_PERSONAL_DATA_KEY)||'null');}catch(e){}
+        if(!personalSaved||!persistedPersonal||Number(persistedPersonal.version)!==1
+            ||JSON.stringify(persistedPersonal.notes||{})!==JSON.stringify(importedPersonalData.notes)){
+          const rollbackSaved=rollback();
+          toast(rollbackSaved
+            ? 'Не удалось сохранить заметки. Восстановление отменено; предыдущие данные восстановлены.'
+            : 'Не удалось сохранить заметки и выполнить откат. Предварительная резервная копия создана; проверьте данные вручную.');
           return;
         }
         kgeuPersonalData=importedPersonalData;
