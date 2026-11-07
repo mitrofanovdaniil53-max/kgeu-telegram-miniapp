@@ -3306,20 +3306,91 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     const profile=serviceProfileSnapshot();
     return serviceData.tasks.length+serviceData.deadlines.length+serviceData.events.length+serviceData.hostel.work.length+serviceData.hostel.social.length+notes+(profile.activeGroup&&profile.activeGroup.id?1:0)>0;
   }
-  function serviceBackupBeforeCloudRestore(){
-    try{localStorage.setItem(STUDENT_SERVICE_BACKUP_KEY,JSON.stringify(serviceData));}catch(e){}
-    try{localStorage.setItem('kgeu_student_personal_backup_before_cloud_restore_v1',JSON.stringify(kgeuPersonalData||{version:1,notes:{}}));}catch(e){}
+  function serviceBackupBeforeCloudRestore(requireBackup){
+    try{
+      const serviceBackup=JSON.stringify(serviceData);
+      const personalBackup=JSON.stringify(kgeuPersonalData||{version:1,notes:{}});
+      const personalBackupKey='kgeu_student_personal_backup_before_cloud_restore_v1';
+      localStorage.setItem(STUDENT_SERVICE_BACKUP_KEY,serviceBackup);
+      localStorage.setItem(personalBackupKey,personalBackup);
+      const persisted=localStorage.getItem(STUDENT_SERVICE_BACKUP_KEY)===serviceBackup
+        && localStorage.getItem(personalBackupKey)===personalBackup;
+      if(requireBackup&&!persisted)throw new Error('backup_not_persisted');
+      return persisted;
+    }catch(e){
+      if(requireBackup)throw new Error('cloud_restore_backup_failed');
+      return false;
+    }
   }
   function serviceApplyCloudSnapshot(snapshot){
     if(!snapshot||!snapshot.found||!snapshot.serviceData||typeof snapshot.serviceData!=='object')throw new Error('cloud_data_not_found');
-    serviceBackupBeforeCloudRestore();
-    serviceData=serviceNormalizeData(snapshot.serviceData);
-    localStorage.setItem(STUDENT_SERVICE_KEY,JSON.stringify(serviceData));
-    if(snapshot.personalData&&typeof snapshot.personalData==='object'){
-      const pd=snapshot.personalData;
-      kgeuPersonalData={version:1,notes:(pd.notes&&typeof pd.notes==='object')?pd.notes:{},updatedAt:Date.now()};
-      if(typeof kgeuSavePersonalData==='function')kgeuSavePersonalData(kgeuPersonalData);
-      kgeuMigrateLegacyNotesForActiveGroup({deferSync:true});
+    serviceBackupBeforeCloudRestore(true);
+    const previousServiceData=serviceData;
+    const previousPersonalData=kgeuPersonalData;
+    const previousServiceRaw=localStorage.getItem(STUDENT_SERVICE_KEY);
+    const previousPersonalRaw=localStorage.getItem(KGEU_PERSONAL_DATA_KEY);
+    const previousSyncMetaRaw=localStorage.getItem(STUDENT_SERVICE_SYNC_KEY);
+    const nextServiceData=serviceNormalizeData(snapshot.serviceData);
+    const hasPersonalSnapshot=!!(snapshot.personalData&&typeof snapshot.personalData==='object');
+    const pd=hasPersonalSnapshot?snapshot.personalData:null;
+    const nextPersonalData=hasPersonalSnapshot
+      ? {version:1,notes:(pd.notes&&typeof pd.notes==='object')?pd.notes:{},updatedAt:Date.now()}
+      : null;
+    let restorePhase='service';
+    try{
+      const nextServiceRaw=JSON.stringify(nextServiceData);
+      localStorage.setItem(STUDENT_SERVICE_KEY,nextServiceRaw);
+      if(localStorage.getItem(STUDENT_SERVICE_KEY)!==nextServiceRaw){
+        throw new Error('cloud_snapshot_service_save_failed');
+      }
+      if(hasPersonalSnapshot){
+        restorePhase='personal';
+        if(typeof kgeuSavePersonalData!=='function'||!kgeuSavePersonalData(nextPersonalData)){
+          throw new Error('cloud_snapshot_personal_save_failed');
+        }
+        let savedPersonal=null;
+        try{savedPersonal=JSON.parse(localStorage.getItem(KGEU_PERSONAL_DATA_KEY)||'null');}catch(e){}
+        if(!savedPersonal||Number(savedPersonal.version)!==1
+            || JSON.stringify(savedPersonal.notes||{})!==JSON.stringify(nextPersonalData.notes)){
+          throw new Error('cloud_snapshot_personal_save_failed');
+        }
+      }
+      restorePhase='metadata';
+      const m=serviceSyncMeta();
+      m.dirty=false;
+      m.lastLocalSave=Number(nextServiceData.updatedAt||Date.now());
+      m.lastServerSync=Number(snapshot.updatedAt||Date.now());
+      m.lastServerRevision=Number(snapshot.revision||0);
+      const nextSyncMetaRaw=JSON.stringify(m);
+      localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,nextSyncMetaRaw);
+      if(localStorage.getItem(STUDENT_SERVICE_SYNC_KEY)!==nextSyncMetaRaw){
+        throw new Error('cloud_snapshot_metadata_save_failed');
+      }
+    }catch(restoreError){
+      serviceData=previousServiceData;
+      kgeuPersonalData=previousPersonalData;
+      let rollbackPersisted=true;
+      const restoreStorageValue=function(key,previousRaw){
+        try{
+          if(previousRaw===null)localStorage.removeItem(key);
+          else localStorage.setItem(key,previousRaw);
+          if(localStorage.getItem(key)!==previousRaw)rollbackPersisted=false;
+        }catch(rollbackError){rollbackPersisted=false;}
+      };
+      restoreStorageValue(STUDENT_SERVICE_KEY,previousServiceRaw);
+      restoreStorageValue(KGEU_PERSONAL_DATA_KEY,previousPersonalRaw);
+      restoreStorageValue(STUDENT_SERVICE_SYNC_KEY,previousSyncMetaRaw);
+      if(!rollbackPersisted)throw new Error('cloud_snapshot_rollback_failed');
+      throw new Error(restorePhase==='service'
+        ? 'cloud_snapshot_service_save_failed'
+        : restorePhase==='personal'
+          ? 'cloud_snapshot_personal_save_failed'
+          : 'cloud_snapshot_metadata_save_failed');
+    }
+    serviceData=nextServiceData;
+    if(hasPersonalSnapshot){
+      kgeuPersonalData=nextPersonalData;
+      if(typeof kgeuMigrateLegacyNotesForActiveGroup==='function')kgeuMigrateLegacyNotesForActiveGroup({deferSync:true});
     }
     if(snapshot.profileData&&typeof snapshot.profileData==='object'){
       try{
@@ -3333,10 +3404,9 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       }catch(e){}
       if(typeof window.kgeuApplySharedProfile==='function')window.kgeuApplySharedProfile(snapshot.profileData).catch(function(){});
     }
-    const m=serviceSyncMeta();m.dirty=false;m.lastLocalSave=Number(serviceData.updatedAt||Date.now());m.lastServerSync=Number(snapshot.updatedAt||Date.now());m.lastServerRevision=Number(snapshot.revision||0);
-    localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(m));
     kgeuFlushLegacyNoteMigrationSync();
   }
+  
 
   // Refresh only the visible Student Service screen after a remote update.
   // Keep the current section, scroll position, and unsaved form values intact.
@@ -4149,17 +4219,48 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       const incoming=payload&&payload.serviceData?payload.serviceData:payload;
       const previousServiceData=serviceData;
       const previousPersonalData=kgeuPersonalData;
+      const previousServiceRaw=localStorage.getItem(STUDENT_SERVICE_KEY);
+      const previousPersonalRaw=localStorage.getItem(KGEU_PERSONAL_DATA_KEY);
+      const previousSyncMetaRaw=localStorage.getItem(STUDENT_SERVICE_SYNC_KEY);
+      const rollback=function(){
+        serviceData=previousServiceData;
+        kgeuPersonalData=previousPersonalData;
+        let persisted=true;
+        const restore=function(key,raw){
+          try{
+            if(raw===null)localStorage.removeItem(key);
+            else localStorage.setItem(key,raw);
+            if(localStorage.getItem(key)!==raw)persisted=false;
+          }catch(e){persisted=false;}
+        };
+        restore(STUDENT_SERVICE_KEY,previousServiceRaw);
+        restore(KGEU_PERSONAL_DATA_KEY,previousPersonalRaw);
+        restore(STUDENT_SERVICE_SYNC_KEY,previousSyncMetaRaw);
+        return persisted;
+      };
       if(!serviceBackupCurrent()){toast('Не удалось создать резервную копию текущих данных. Восстановление отменено.');return;}
       serviceData=serviceNormalizeData(incoming);
-      if(!serviceSave()){serviceData=previousServiceData;toast('Не удалось сохранить восстановленные данные. Текущие данные оставлены без изменений.');return;}
-      if(payload.personalData&&typeof payload.personalData==='object'&&typeof kgeuSavePersonalData==='function'){
+      const serviceSaved=serviceSave();
+      const serviceRaw=localStorage.getItem(STUDENT_SERVICE_KEY);
+      if(!serviceSaved||serviceRaw!==JSON.stringify(serviceData)){
+        const rollbackSaved=rollback();
+        toast(rollbackSaved
+          ? 'Не удалось сохранить восстановленные данные. Предыдущие данные восстановлены.'
+          : 'Не удалось сохранить восстановленные данные и выполнить откат. Предварительная резервная копия создана; проверьте данные вручную.');
+        return;
+      }
+      if(payload.personalData&&typeof payload.personalData==='object'){
         const pd=payload.personalData;
         const importedPersonalData={version:1,notes:(pd.notes&&typeof pd.notes==='object')?pd.notes:{},updatedAt:Date.now()};
-        if(!kgeuSavePersonalData(importedPersonalData)){
-          serviceData=previousServiceData;
-          serviceSave();
-          kgeuPersonalData=previousPersonalData;
-          toast('Не удалось сохранить заметки. Восстановление отменено; текущая копия сохранена.');
+        const personalSaved=typeof kgeuSavePersonalData==='function'&&kgeuSavePersonalData(importedPersonalData);
+        let persistedPersonal=null;
+        try{persistedPersonal=JSON.parse(localStorage.getItem(KGEU_PERSONAL_DATA_KEY)||'null');}catch(e){}
+        if(!personalSaved||!persistedPersonal||Number(persistedPersonal.version)!==1
+            ||JSON.stringify(persistedPersonal.notes||{})!==JSON.stringify(importedPersonalData.notes)){
+          const rollbackSaved=rollback();
+          toast(rollbackSaved
+            ? 'Не удалось сохранить заметки. Восстановление отменено; предыдущие данные восстановлены.'
+            : 'Не удалось сохранить заметки и выполнить откат. Предварительная резервная копия создана; проверьте данные вручную.');
           return;
         }
         kgeuPersonalData=importedPersonalData;
@@ -4333,7 +4434,13 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
           toast('Данные получены из облака');
           document.getElementById('app').innerHTML=serviceRenderSync();serviceBind();
         }catch(e){
-          const message=e.message==='cloud_data_not_found'?'В облаке пока нет сохранённых данных. Сначала отправь их с устройства, где они есть.':(e.message||'неизвестная ошибка');
+          const message=e.message==='cloud_data_not_found'?'В облаке пока нет сохранённых данных. Сначала отправь их с устройства, где они есть.'
+            :e.message==='cloud_restore_backup_failed'?'Не удалось подтвердить резервную копию локальных данных. Облачная версия не применена. Проверь хранилище и повтори попытку.'
+            :e.message==='cloud_snapshot_service_save_failed'?'Не удалось сохранить облачные данные на устройстве. Локальная версия восстановлена. Проверь хранилище и повтори попытку.'
+            :e.message==='cloud_snapshot_personal_save_failed'?'Не удалось сохранить заметки из облака. Локальные данные восстановлены; повтори попытку позже.'
+            :e.message==='cloud_snapshot_metadata_save_failed'?'Не удалось сохранить статус восстановления. Локальные данные восстановлены; повтори попытку позже.'
+            :e.message==='cloud_snapshot_rollback_failed'?'Не удалось полностью восстановить локальные данные после ошибки. Предварительная резервная копия сохранена; проверь данные вручную перед продолжением.'
+            :(e.message||'неизвестная ошибка');
           if(feedback)feedback.textContent='Ошибка получения: '+serviceEsc(message);toast('Не удалось получить данные из облака');
         }
         return;
