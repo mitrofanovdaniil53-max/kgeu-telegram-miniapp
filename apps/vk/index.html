@@ -1978,6 +1978,69 @@ html.vk-light .service-pill {
   }
 </style>
 
+
+<style id="vk-light-theme-mobile-surface-fix-v2">
+  /* Explicit light-mode surfaces for the mobile VK WebView.
+     Use concrete colors and !important to beat legacy .vk-light glass rules
+     and the later compact-layout declarations. */
+  html.vk-light .top-shell .tabs {
+    background: #f1f5f9 !important;
+    border-color: #dfe5ee !important;
+    box-shadow: inset 0 1px 0 #fff, 0 2px 8px rgba(16,24,40,.06) !important;
+  }
+  html.vk-light .top-shell .tabs .tab {
+    color: #667085 !important;
+    background: transparent !important;
+    border-color: transparent !important;
+  }
+  html.vk-light .top-shell .tabs .tab.active {
+    color: #1557d6 !important;
+    background: #fff !important;
+    border-color: #e2e8f0 !important;
+    box-shadow: 0 1px 3px rgba(16,24,40,.08) !important;
+  }
+  html.vk-light .top-shell .top-actions .icon-btn {
+    color: #344054 !important;
+    background: #fff !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: 0 1px 4px rgba(16,24,40,.08) !important;
+  }
+  html.vk-light .settings-sheet .saved-group,
+  html.vk-light .settings-sheet .group-result,
+  html.vk-light .settings-sheet .current-group-box,
+  html.vk-light .settings-sheet .settings-section,
+  html.vk-light .settings-sheet .density-segmented {
+    color: #101828 !important;
+    background: #fff !important;
+    border-color: #e2e8f0 !important;
+  }
+  html.vk-light .settings-sheet .density-segmented button {
+    color: #667085 !important;
+    background: transparent !important;
+  }
+  html.vk-light .settings-sheet .density-segmented button.active {
+    color: #101828 !important;
+    background: #f1f5f9 !important;
+  }
+  html.vk-light .service-main-nav .service-btn,
+  html.vk-light .service-page .service-btn:not(.primary):not(.danger),
+  html.vk-light .service-actions .service-btn:not(.primary):not(.danger),
+  html.vk-light .service-action-row .service-btn:not(.primary):not(.danger),
+  html.vk-light .setting-navigation-row {
+    color: #344054 !important;
+    background: #fff !important;
+    border-color: #e2e8f0 !important;
+    box-shadow: 0 1px 4px rgba(16,24,40,.06) !important;
+  }
+  html.vk-light .service-page .service-row-meta,
+  html.vk-light .service-page .service-status.upcoming,
+  html.vk-light .service-page .service-pill {
+    color: #667085 !important;
+    background: #f1f5f9 !important;
+    border-color: #e2e8f0 !important;
+  }
+</style>
+
 </head>
 <body>
 <div class="wrap">
