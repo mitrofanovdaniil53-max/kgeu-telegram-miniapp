@@ -3306,13 +3306,25 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     const profile=serviceProfileSnapshot();
     return serviceData.tasks.length+serviceData.deadlines.length+serviceData.events.length+serviceData.hostel.work.length+serviceData.hostel.social.length+notes+(profile.activeGroup&&profile.activeGroup.id?1:0)>0;
   }
-  function serviceBackupBeforeCloudRestore(){
-    try{localStorage.setItem(STUDENT_SERVICE_BACKUP_KEY,JSON.stringify(serviceData));}catch(e){}
-    try{localStorage.setItem('kgeu_student_personal_backup_before_cloud_restore_v1',JSON.stringify(kgeuPersonalData||{version:1,notes:{}}));}catch(e){}
+  function serviceBackupBeforeCloudRestore(requireBackup){
+    try{
+      const serviceBackup=JSON.stringify(serviceData);
+      const personalBackup=JSON.stringify(kgeuPersonalData||{version:1,notes:{}});
+      const personalBackupKey='kgeu_student_personal_backup_before_cloud_restore_v1';
+      localStorage.setItem(STUDENT_SERVICE_BACKUP_KEY,serviceBackup);
+      localStorage.setItem(personalBackupKey,personalBackup);
+      const persisted=localStorage.getItem(STUDENT_SERVICE_BACKUP_KEY)===serviceBackup
+        && localStorage.getItem(personalBackupKey)===personalBackup;
+      if(requireBackup&&!persisted)throw new Error('backup_not_persisted');
+      return persisted;
+    }catch(e){
+      if(requireBackup)throw new Error('cloud_restore_backup_failed');
+      return false;
+    }
   }
   function serviceApplyCloudSnapshot(snapshot){
     if(!snapshot||!snapshot.found||!snapshot.serviceData||typeof snapshot.serviceData!=='object')throw new Error('cloud_data_not_found');
-    serviceBackupBeforeCloudRestore();
+    serviceBackupBeforeCloudRestore(true);
     const previousServiceData=serviceData;
     const previousPersonalData=kgeuPersonalData;
     const previousServiceRaw=localStorage.getItem(STUDENT_SERVICE_KEY);
@@ -3357,18 +3369,18 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     }catch(restoreError){
       serviceData=previousServiceData;
       kgeuPersonalData=previousPersonalData;
-      try{
-        const restoreStorageValue=function(key,previousRaw){
+      let rollbackPersisted=true;
+      const restoreStorageValue=function(key,previousRaw){
+        try{
           if(previousRaw===null)localStorage.removeItem(key);
           else localStorage.setItem(key,previousRaw);
-          if(localStorage.getItem(key)!==previousRaw)throw new Error('rollback_not_persisted');
-        };
-        restoreStorageValue(STUDENT_SERVICE_KEY,previousServiceRaw);
-        restoreStorageValue(KGEU_PERSONAL_DATA_KEY,previousPersonalRaw);
-        restoreStorageValue(STUDENT_SERVICE_SYNC_KEY,previousSyncMetaRaw);
-      }catch(rollbackError){
-        throw new Error('cloud_snapshot_rollback_failed');
-      }
+          if(localStorage.getItem(key)!==previousRaw)rollbackPersisted=false;
+        }catch(rollbackError){rollbackPersisted=false;}
+      };
+      restoreStorageValue(STUDENT_SERVICE_KEY,previousServiceRaw);
+      restoreStorageValue(KGEU_PERSONAL_DATA_KEY,previousPersonalRaw);
+      restoreStorageValue(STUDENT_SERVICE_SYNC_KEY,previousSyncMetaRaw);
+      if(!rollbackPersisted)throw new Error('cloud_snapshot_rollback_failed');
       throw new Error(restorePhase==='service'
         ? 'cloud_snapshot_service_save_failed'
         : restorePhase==='personal'
@@ -4212,17 +4224,18 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       const rollback=function(){
         serviceData=previousServiceData;
         kgeuPersonalData=previousPersonalData;
-        try{
-          const restore=function(key,raw){
+        let persisted=true;
+        const restore=function(key,raw){
+          try{
             if(raw===null)localStorage.removeItem(key);
             else localStorage.setItem(key,raw);
-            if(localStorage.getItem(key)!==raw)throw new Error('rollback_not_persisted');
-          };
-          restore(STUDENT_SERVICE_KEY,previousServiceRaw);
-          restore(KGEU_PERSONAL_DATA_KEY,previousPersonalRaw);
-          restore(STUDENT_SERVICE_SYNC_KEY,previousSyncMetaRaw);
-          return true;
-        }catch(e){return false;}
+            if(localStorage.getItem(key)!==raw)persisted=false;
+          }catch(e){persisted=false;}
+        };
+        restore(STUDENT_SERVICE_KEY,previousServiceRaw);
+        restore(KGEU_PERSONAL_DATA_KEY,previousPersonalRaw);
+        restore(STUDENT_SERVICE_SYNC_KEY,previousSyncMetaRaw);
+        return persisted;
       };
       if(!serviceBackupCurrent()){toast('Не удалось создать резервную копию текущих данных. Восстановление отменено.');return;}
       serviceData=serviceNormalizeData(incoming);
