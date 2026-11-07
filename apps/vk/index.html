@@ -3733,18 +3733,18 @@ html.vk-light .service-pill {
     }catch(restoreError){
       serviceData=previousServiceData;
       kgeuPersonalData=previousPersonalData;
-      try{
-        const restoreStorageValue=function(key,previousRaw){
+      let rollbackPersisted=true;
+      const restoreStorageValue=function(key,previousRaw){
+        try{
           if(previousRaw===null)localStorage.removeItem(key);
           else localStorage.setItem(key,previousRaw);
-          if(localStorage.getItem(key)!==previousRaw)throw new Error('rollback_not_persisted');
-        };
-        restoreStorageValue(STUDENT_SERVICE_KEY,previousServiceRaw);
-        restoreStorageValue(KGEU_PERSONAL_DATA_KEY,previousPersonalRaw);
-        restoreStorageValue(STUDENT_SERVICE_SYNC_KEY,previousSyncMetaRaw);
-      }catch(rollbackError){
-        throw new Error('cloud_snapshot_rollback_failed');
-      }
+          if(localStorage.getItem(key)!==previousRaw)rollbackPersisted=false;
+        }catch(rollbackError){rollbackPersisted=false;}
+      };
+      restoreStorageValue(STUDENT_SERVICE_KEY,previousServiceRaw);
+      restoreStorageValue(KGEU_PERSONAL_DATA_KEY,previousPersonalRaw);
+      restoreStorageValue(STUDENT_SERVICE_SYNC_KEY,previousSyncMetaRaw);
+      if(!rollbackPersisted)throw new Error('cloud_snapshot_rollback_failed');
       if(restoreError&&restoreError.message==='cloud_snapshot_personal_save_failed')throw restoreError;
       throw new Error(restorePhase==='service'
         ? 'cloud_snapshot_service_save_failed'
