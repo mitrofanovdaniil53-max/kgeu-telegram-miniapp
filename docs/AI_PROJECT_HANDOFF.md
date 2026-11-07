@@ -1,6 +1,33 @@
 # AI Project Handoff — KGEU Student Platform (Telegram + VK)
 
-**Last verified:** 2026-10-25 (refreshed after merging UX documentation PR #56; GitHub state checked on this date).  
+> **Current repository snapshot verified:** 2026-11-07. This section supersedes older PR/status snapshots further below. Re-check GitHub before any new change.
+>
+> - **Repository:** https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp
+> - **Current `main` HEAD:** `64e445236e5edeefeab4b046d394a6e1989d1e09`.
+> - **Open technical PRs, all CI checks green and mergeable against current main; none merged:**
+>   - [#83 — schedule proxy calendar-date validation](https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp/pull/83), head `22b681cafd2d07ec4f5ab999734ea32cc81a28f5`.
+>   - [#84 — Student Service date/numeric validation](https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp/pull/84), head `5223d24128d0bb8ff8395c26e355e839a4ffd3b9`.
+>   - [#85 — transactional JSON/cloud restore safety](https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp/pull/85), head `e4622b621bf849cb40765bd183b95c44c41bf2a0`.
+>   - [#86 — VK light-theme contrast and group-label wrapping](https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp/pull/86), head `23de52a93423fdb7d1069557622498de68bcfed8`.
+> - [PR #72](https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp/pull/72) was closed as superseded by #86. Its branch was 43 commits behind current main. The institute fallback logic from that branch was already present in main.
+> - [Issue #30](https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp/issues/30) remains open. Design/specification/prototype/gap-analysis artifacts are present; real Telegram/VK WebView acceptance and test-account sync/recovery checks remain outstanding.
+> - The manual test record template already exists at `docs/ux-manual-test-results-template.md`; the shared sync checklist is `docs/SHARED_SYNC_ACCEPTANCE.md`. Do not create duplicate checklists.
+> - PR CI includes frontend/Worker syntax, Python regression tests, D1 migration tests, shared-state merge/revision tests, legacy-field preservation, VK launch-auth, VK race/restore checks, and (for #86) theme/group-label regression checks. The Cloudflare Worker build check passed on these PR heads. This is **not** evidence of production deployment or live WebView behavior.
+> - No PR #83–#86 has been merged. No production deployment or production data changes were performed in this work.
+>
+> **Next sequence**
+> 1. Keep all four PRs open for review; do not merge or deploy without the owner's explicit authorization.
+> 2. Arrange separate manual acceptance runs inside real Telegram and VK clients using disposable accounts/data. Record results in `docs/ux-manual-test-results-template.md`.
+> 3. Verify cross-platform link/sync, offline retry, conflicts, backup/restore and rollback using `docs/SHARED_SYNC_ACCEPTANCE.md`.
+> 4. Fix only reproducible issues and add regression coverage. Keep issue #30 open until evidence is recorded or remaining checks are explicitly descoped.
+>
+> **Evidence labels:** source reviewed ≠ automated test passed ≠ owner-reported ≠ manual shell verified. Never claim the latter unless it was actually performed.
+
+---
+
+# AI Project Handoff — KGEU Student Platform (Telegram + VK)
+
+**Historical baseline:** 2026-10-25. Current repository state is recorded in the snapshot above.  
 **Purpose:** continue development in a new ChatGPT conversation without losing architecture, decisions, safety constraints, current work, or verification status.
 
 ## 1. Product and repositories
