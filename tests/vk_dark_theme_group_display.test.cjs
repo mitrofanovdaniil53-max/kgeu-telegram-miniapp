@@ -68,3 +68,19 @@ test('VK dark mode keeps mobile service controls and deadline labels dark', () =
   ]) assert.ok(css.includes(selector), 'missing dark-mode override: ' + selector);
   assert.match(css, /background:\s*var\(--bg2\)\s*!important/);
 });
+
+test('VK dark settings sheet uses dark palette surfaces instead of light glass', () => {
+  const css = extract('<style id="vk-dark-glass-contrast-fix-v1">', '</style>');
+  for (const selector of [
+    'html.vk-dark .settings-sheet',
+    'html.vk-dark .settings-sheet .settings-section',
+    'html.vk-dark .settings-sheet .current-group-box',
+    'html.vk-dark .settings-sheet .saved-group',
+    'html.vk-dark .settings-sheet .field',
+    'html.vk-dark .settings-sheet .density-segmented',
+    'html.vk-dark .top-shell .tabs'
+  ]) assert.ok(css.includes(selector), 'missing dark settings surface: ' + selector);
+  assert.match(css, /background:\s*var\(--bg\)\s*!important/);
+  assert.match(css, /background:\s*var\(--card\)\s*!important/);
+  assert.doesNotMatch(css, /rgba\(255,255,255,\.(?:82|88|94)\)/);
+});
