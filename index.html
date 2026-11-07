@@ -3559,11 +3559,11 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     const h=(src.hostel&&typeof src.hostel==='object')?src.hostel:{};
     const tasks=serviceRecordArray(src.tasks).map(function(r){const x=serviceNormalizeRecord(r,'t');return {id:x.id,title:String(x.title||'').trim(),dueDate:serviceDateKey(x.dueDate)?x.dueDate:'',subject:String(x.subject||''),note:String(x.note||''),done:!!x.done,createdAt:Number(x.createdAt||Date.now()),updatedAt:Number(x.updatedAt||x.createdAt||Date.now())};}).filter(function(x){return x.title;});
     const deadlines=serviceRecordArray(src.deadlines).map(function(r){const x=serviceNormalizeRecord(r,'d');return {id:x.id,title:String(x.title||'').trim(),date:serviceDateKey(x.date)?x.date:'',subject:String(x.subject||''),note:String(x.note||''),done:!!x.done,createdAt:Number(x.createdAt||Date.now()),updatedAt:Number(x.updatedAt||x.createdAt||Date.now())};}).filter(function(x){return x.title;});
-    const events=serviceRecordArray(src.events).map(function(r){const x=serviceNormalizeRecord(r,'e');return {id:x.id,title:String(x.title||'').trim(),date:serviceDateKey(x.date)?x.date:'',points:Number(x.points||0),createdAt:Number(x.createdAt||Date.now()),updatedAt:Number(x.updatedAt||x.createdAt||Date.now())};}).filter(function(x){return x.title;});
+    const events=serviceRecordArray(src.events).map(function(r){const x=serviceNormalizeRecord(r,'e');return {id:x.id,title:String(x.title||'').trim(),date:serviceDateKey(x.date)?x.date:'',points:Math.floor(serviceNonNegativeNumber(x.points,0)),createdAt:Number(x.createdAt||Date.now()),updatedAt:Number(x.updatedAt||x.createdAt||Date.now())};}).filter(function(x){return x.title;});
     const work=serviceRecordArray(h.work).map(function(r){const x=serviceNormalizeRecord(r,'w');return {id:x.id,date:serviceDateKey(x.date)?x.date:'',minutes:serviceNonNegativeNumber(x.minutes,0),points:serviceNonNegativeNumber(x.points,0),title:String(x.title||'Работа'),createdAt:Number(x.createdAt||Date.now()),updatedAt:Number(x.updatedAt||x.createdAt||Date.now())};});
     const social=serviceRecordArray(h.social).map(function(r){const x=serviceNormalizeRecord(r,'s');return {id:x.id,date:serviceDateKey(x.date)?x.date:'',points:serviceNonNegativeNumber(x.points,0),title:String(x.title||'Мероприятие'),note:String(x.note||''),fileName:String(x.fileName||''),fileData:String(x.fileData||''),createdAt:Number(x.createdAt||Date.now()),updatedAt:Number(x.updatedAt||x.createdAt||Date.now())};});
     const rem=src.reminders&&typeof src.reminders==='object'?src.reminders:{};
-    return {version:STUDENT_SERVICE_SCHEMA,schemaVersion:STUDENT_SERVICE_SCHEMA,updatedAt:Number(src.updatedAt||Date.now()),tasks:tasks,deadlines:deadlines,events:events,reminders:{enabled:!!rem.enabled,taskDays:Math.max(0,Math.min(7,Number(rem.taskDays!=null?rem.taskDays:1))),deadlineDays:Math.max(0,Math.min(7,Number(rem.deadlineDays!=null?rem.deadlineDays:1))),eventDays:Math.max(0,Math.min(7,Number(rem.eventDays!=null?rem.eventDays:1)))},hostel:{totalGoal:serviceNonNegativeNumber(h.totalGoal!=null?h.totalGoal:250,250),adminGoal:serviceNonNegativeNumber(h.adminGoal!=null?h.adminGoal:100,100),socialGoal:serviceNonNegativeNumber(h.socialGoal!=null?h.socialGoal:150,150),work:work,social:social}};
+    return {version:STUDENT_SERVICE_SCHEMA,schemaVersion:STUDENT_SERVICE_SCHEMA,updatedAt:Number(src.updatedAt||Date.now()),tasks:tasks,deadlines:deadlines,events:events,reminders:{enabled:!!rem.enabled,taskDays:Math.floor(Math.min(7,serviceNonNegativeNumber(rem.taskDays!=null?rem.taskDays:1,1))),deadlineDays:Math.floor(Math.min(7,serviceNonNegativeNumber(rem.deadlineDays!=null?rem.deadlineDays:1,1))),eventDays:Math.floor(Math.min(7,serviceNonNegativeNumber(rem.eventDays!=null?rem.eventDays:1,1)))},hostel:{totalGoal:serviceNonNegativeNumber(h.totalGoal!=null?h.totalGoal:250,250),adminGoal:serviceNonNegativeNumber(h.adminGoal!=null?h.adminGoal:100,100),socialGoal:serviceNonNegativeNumber(h.socialGoal!=null?h.socialGoal:150,150),work:work,social:social}};
   }
   function serviceLoad(){
     const fallback=serviceEmptyData();
@@ -3585,7 +3585,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
   function serviceSave(){try{serviceData=serviceNormalizeData(serviceData);serviceData.updatedAt=Date.now();localStorage.setItem(STUDENT_SERVICE_KEY,JSON.stringify(serviceData));serviceMarkDirty();return true;}catch(e){toast('Не удалось сохранить данные');return false;}}
   function serviceEsc(s){return escapeHtml(String(s==null?'':s));}
   function serviceDate(s){if(!s)return '';const d=new Date(s+'T00:00:00');return isNaN(d)?s:d.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'});}
-  function serviceDateKey(s){return /^\d{4}-\d{2}-\d{2}$/.test(String(s||''))?String(s):'';}
+  function serviceDateKey(s){const value=String(s||'');if(!/^\d{4}-\d{2}-\d{2}$/.test(value))return '';const parsed=new Date(value+'T00:00:00Z');return Number.isFinite(parsed.getTime())&&parsed.toISOString().slice(0,10)===value?value:'';}
   function serviceTaskStatus(item){
     if(item.done)return {cls:'done',label:'Готово'};
     const d=serviceDateKey(item.dueDate);
@@ -3837,7 +3837,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
   function servicePromptTask(){
     const title=prompt('Название задачи:');if(!title)return;
     const due=prompt('Срок YYYY-MM-DD (необязательно):','');
-    if(due && !/^\d{4}-\d{2}-\d{2}$/.test(due)){toast('Срок должен быть в формате YYYY-MM-DD');return;}
+    if(due && !serviceDateKey(due)){toast('Укажи корректную дату в формате YYYY-MM-DD');return;}
     const subject=servicePromptSubject();
     const note=prompt('Комментарий (необязательно):')||'';
     serviceData.tasks.push({id:'t_'+Date.now(),title:title.trim(),dueDate:due||'',subject:subject,note:note.trim(),done:false,createdAt:Date.now()});serviceSave();render();
@@ -3845,7 +3845,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
   function servicePromptDeadline(){
     const title=prompt('Название дедлайна:');if(!title)return;
     const date=prompt('Дата YYYY-MM-DD:',isoDate(new Date()));if(!date)return;
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){toast('Дата должна быть в формате YYYY-MM-DD');return;}
+    if(!serviceDateKey(date)){toast('Укажи корректную дату в формате YYYY-MM-DD');return;}
     const subject=servicePromptSubject();
     const note=prompt('Комментарий (необязательно):')||'';
     serviceData.deadlines.push({id:'d_'+Date.now(),title:title.trim(),date:date,subject:subject,note:note.trim(),done:false});serviceSave();render();
@@ -3853,6 +3853,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
   function servicePromptEvent(){
     const title=prompt('Название мероприятия:'); if(!title)return;
     const date=prompt('Дата в формате ГГГГ-ММ-ДД:',isoDate(new Date())); if(!date)return;
+    if(!serviceDateKey(date)){toast('Укажи корректную дату в формате YYYY-MM-DD');return;}
     const points=Number(prompt('Сколько социальных баллов?', '10')||0);
     serviceData.events.push({id:'e_'+Date.now(),title:title.trim(),date:date,points:points});
     // Also create a social record, so one input immediately participates in the report.
