@@ -73,3 +73,14 @@ test('VK light mode overrides legacy dark glass surfaces in mobile layout', () =
   ]) assert.ok(css.includes(selector), 'missing explicit light-mode override: ' + selector);
   assert.match(css, /background:\s*#fff\s*!important/);
 });
+
+test('VK dark mode keeps mobile service controls and deadline labels dark', () => {
+  const css = extract('<style id="vk-dark-theme-mobile-surface-fix-v3">', '</style>');
+  for (const selector of [
+    'html.vk-dark .service-main-nav .service-btn',
+    'html.vk-dark .service-page .service-btn:not(.primary):not(.danger)',
+    'html.vk-dark .service-page .service-status.upcoming',
+    'html.vk-dark .service-page .service-pill'
+  ]) assert.ok(css.includes(selector), 'missing dark-mode override: ' + selector);
+  assert.match(css, /background:\s*var\(--bg2\)\s*!important/);
+});
