@@ -24,6 +24,11 @@
 
 ---
 
+# AI Project Handoff — KGEU Student Platform (Telegram + VK)
+
+**Last verified:** 2026-10-25 (refreshed after merging UX documentation PR #56; GitHub state checked on this date).  
+**Purpose:** continue development in a new ChatGPT conversation without losing architecture, decisions, safety constraints, current work, or verification status.
+
 
 ## 1. Product and repositories
 
