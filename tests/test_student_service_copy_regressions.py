@@ -737,7 +737,7 @@ class StudentServiceTransactionalRestoreRegressionTest(unittest.TestCase):
             start = source.index("function serviceApplyImportedData(payload)")
             end = source.index("function serviceImportData(file)", start)
             apply_function = source[start:end]
-            script = "\\n".join([
+            script = "\n".join([
                 "const assert = require('node:assert/strict');",
                 "const STUDENT_SERVICE_KEY='service'; const KGEU_PERSONAL_DATA_KEY='personal'; const STUDENT_SERVICE_SYNC_KEY='sync';",
                 "let serviceData={id:'local'}, kgeuPersonalData={version:1,notes:{local:'note'}};",
@@ -774,7 +774,7 @@ class StudentServiceTransactionalRestoreRegressionTest(unittest.TestCase):
             start = source.index("function serviceApplyCloudSnapshot(")
             end = source.index("// Refresh only the visible Student Service screen", start)
             apply_function = source[start:end]
-            script = "\\n".join([
+            script = "\n".join([
                 "const assert = require('node:assert/strict');",
                 "const STUDENT_SERVICE_KEY='service'; const KGEU_PERSONAL_DATA_KEY='personal'; const STUDENT_SERVICE_SYNC_KEY='sync';",
                 "let serviceData={id:'local'}, kgeuPersonalData={version:1,notes:{local:'note'}};",
