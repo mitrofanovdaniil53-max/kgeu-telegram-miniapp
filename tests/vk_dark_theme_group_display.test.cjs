@@ -43,3 +43,19 @@ test('VK dark theme explicitly styles the reported light-glass controls', () => 
   }
   assert.match(css, /background:\s*rgba\(255,255,255/);
 });
+
+test('VK light theme keeps mobile glass surfaces light even when the OS prefers dark mode', () => {
+  const lightTheme = extract('    html.vk-light {', '\n    }');
+  assert.match(lightTheme, /--bg2:\s*#eef2f7/i);
+
+  // These mobile refinements deliberately consume --bg2; the light theme must own its value.
+  for (const selector of [
+    '.top-shell .icon-btn',
+    '.tabs',
+    '.saved-group',
+    '.service-main-nav .service-btn',
+    '.service-status.upcoming'
+  ]) {
+    assert.ok(html.includes(selector), 'expected mobile surface consumer: ' + selector);
+  }
+});
