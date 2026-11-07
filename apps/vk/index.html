@@ -4990,14 +4990,18 @@ html.vk-light .kgeu-note-icon { color:#667085; }
         const rec={id:'s_'+Date.now(),date:document.getElementById('social-date').value||isoDate(new Date()),points:Math.floor(serviceNonNegativeNumber(document.getElementById('social-points').value,0)),title:document.getElementById('social-title').value.trim()||'Мероприятие',note:document.getElementById('social-note').value.trim(),fileName:file?file.name:'',fileData:''};
         if(!rec.points){toast('Укажи количество социальных баллов');return;}
         const f=await serviceReadFile(file);rec.fileData=f.data;
+        let attachmentSkipped=false;
         if(rec.fileData){
           const candidate=Object.assign({},serviceData,{hostel:Object.assign({},serviceData.hostel,{social:serviceData.hostel.social.concat([rec])})});
           if(!serviceAttachmentFitsSyncLimit(candidate)){
             rec.fileData='';
-            toast('Вложение не сохранено: общий размер данных превысит лимит облачной синхронизации. Название файла сохранено.');
+            attachmentSkipped=true;
           }
         }
-        serviceData.hostel.social.push(rec);serviceSave();document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();toast('Мероприятие ССО добавлено');return;
+        serviceData.hostel.social.push(rec);serviceSave();document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();
+        toast(attachmentSkipped
+          ? 'Мероприятие ССО добавлено; вложение не сохранено из-за общего лимита облачной синхронизации. Название файла сохранено.'
+          : 'Мероприятие ССО добавлено');return;
       }
       if(a==='export-word')return serviceExportWord();
     });});
