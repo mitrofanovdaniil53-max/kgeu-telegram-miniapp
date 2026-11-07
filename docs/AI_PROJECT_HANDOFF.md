@@ -1,7 +1,34 @@
+## Current repository snapshot — 2026-11-07
+
+> **Verified repository state:** 2026-11-07, after merging PRs #83–#86. This snapshot records the base commit immediately before this documentation PR is merged.
+>
+> - **Repository:** https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp
+> - **main base for this documentation update:** 690e99896d9b63363c11af27cc827e4ff4abece7.
+> - **PR #83 — schedule proxy calendar-date validation:** merged. Merge commit 6cf7c59ecf4c799b061410a4c6c1464641dd5674.
+> - **PR #84 — Student Service date/numeric validation:** merged. Merge commit d461d2f6989f136d5d3f3837d40f7d5f1f6c0056.
+> - **PR #85 — transactional JSON/cloud restore safety:** merged. Merge commit 9fd0488c22b3adc96f24e8878604fcd8e63e56e6.
+> - **PR #86 — VK light-theme contrast and group-label wrapping:** merged. Merge commit 690e99896d9b63363c11af27cc827e4ff4abece7.
+> - [PR #72](https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp/pull/72) was closed as superseded by #86; its branch was 43 commits behind the then-current main. The institute fallback logic was already present in main.
+> - [Issue #30](https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp/issues/30) remains open. Real Telegram/VK WebView acceptance and test-account sync/recovery checks remain outstanding.
+> - The manual test record template is docs/ux-manual-test-results-template.md; the shared sync checklist is docs/SHARED_SYNC_ACCEPTANCE.md. Do not create duplicate checklists.
+> - GitHub Actions workflow runs for the pre-merge heads of PRs #83–#87 completed successfully. Checks covered frontend/Worker parsing, Python regression tests, additive D1 migration, shared-state merge/revision behavior, legacy-field preservation, VK launch auth, sync race/restore tests, and (for #86) theme/group-label regression tests. This does not prove live Telegram/VK WebView behavior or production deployment.
+> - PRs #83–#86 are merged. This work has not changed production D1 data or secrets. Deployment state must be checked separately; CI and PR merges are not deployment evidence.
+>
+> **Next sequence**
+> 1. Verify post-merge CI on the resulting main commit and inspect deployment configuration/status before any production rollout.
+> 2. Run separate manual acceptance sessions inside real Telegram and VK clients using disposable accounts/data. Record results in docs/ux-manual-test-results-template.md.
+> 3. Verify cross-platform linking/sync, offline retry, conflicts, backup/restore and rollback using docs/SHARED_SYNC_ACCEPTANCE.md.
+> 4. Fix only reproducible issues. Keep issue #30 open until evidence is recorded or remaining checks are explicitly descoped.
+>
+> **Evidence labels:** source reviewed ≠ automated test passed ≠ owner-reported ≠ manual shell verified.
+
+---
+
 # AI Project Handoff — KGEU Student Platform (Telegram + VK)
 
 **Last verified:** 2026-10-25 (refreshed after merging UX documentation PR #56; GitHub state checked on this date).  
 **Purpose:** continue development in a new ChatGPT conversation without losing architecture, decisions, safety constraints, current work, or verification status.
+
 
 ## 1. Product and repositories
 
