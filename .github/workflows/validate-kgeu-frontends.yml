@@ -77,5 +77,5 @@ jobs:
         run: node --test tests/vk_profile_apply_race.test.cjs
       - name: Test VK legacy service sync CAS and restore guards
         run: node --test tests/vk_legacy_sync_race.test.cjs
-      - name: Test VK dark-theme glass controls and group labels
+      - name: Test VK theme glass controls and group labels
         run: node --test tests/vk_dark_theme_group_display.test.cjs
