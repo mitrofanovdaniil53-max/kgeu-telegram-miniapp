@@ -4686,17 +4686,47 @@ html.vk-light .service-pill {
       const incoming=payload&&payload.serviceData?payload.serviceData:payload;
       const previousServiceData=serviceData;
       const previousPersonalData=kgeuPersonalData;
+      const previousServiceRaw=localStorage.getItem(STUDENT_SERVICE_KEY);
+      const previousPersonalRaw=localStorage.getItem(KGEU_PERSONAL_DATA_KEY);
+      const previousSyncMetaRaw=localStorage.getItem(STUDENT_SERVICE_SYNC_KEY);
+      const rollback=function(){
+        serviceData=previousServiceData;
+        kgeuPersonalData=previousPersonalData;
+        try{
+          const restore=function(key,raw){
+            if(raw===null)localStorage.removeItem(key);
+            else localStorage.setItem(key,raw);
+            if(localStorage.getItem(key)!==raw)throw new Error('rollback_not_persisted');
+          };
+          restore(STUDENT_SERVICE_KEY,previousServiceRaw);
+          restore(KGEU_PERSONAL_DATA_KEY,previousPersonalRaw);
+          restore(STUDENT_SERVICE_SYNC_KEY,previousSyncMetaRaw);
+          return true;
+        }catch(e){return false;}
+      };
       if(!serviceBackupCurrent()){toast('Не удалось создать резервную копию текущих данных. Восстановление отменено.');return;}
       serviceData=serviceNormalizeData(incoming);
-      if(!serviceSave()){serviceData=previousServiceData;toast('Не удалось сохранить восстановленные данные. Текущие данные оставлены без изменений.');return;}
-      if(payload.personalData&&typeof payload.personalData==='object'&&typeof kgeuSavePersonalData==='function'){
+      const serviceSaved=serviceSave();
+      const serviceRaw=localStorage.getItem(STUDENT_SERVICE_KEY);
+      if(!serviceSaved||serviceRaw!==JSON.stringify(serviceData)){
+        const rollbackSaved=rollback();
+        toast(rollbackSaved
+          ? 'Не удалось сохранить восстановленные данные. Предыдущие данные восстановлены.'
+          : 'Не удалось сохранить восстановленные данные и выполнить откат. Предварительная резервная копия создана; проверьте данные вручную.');
+        return;
+      }
+      if(payload.personalData&&typeof payload.personalData==='object'){
         const pd=payload.personalData;
         const importedPersonalData={version:1,notes:(pd.notes&&typeof pd.notes==='object')?pd.notes:{},updatedAt:Date.now()};
-        if(!kgeuSavePersonalData(importedPersonalData)){
-          serviceData=previousServiceData;
-          serviceSave();
-          kgeuPersonalData=previousPersonalData;
-          toast('Не удалось сохранить заметки. Восстановление отменено; текущая копия сохранена.');
+        const personalSaved=typeof kgeuSavePersonalData==='function'&&kgeuSavePersonalData(importedPersonalData);
+        let persistedPersonal=null;
+        try{persistedPersonal=JSON.parse(localStorage.getItem(KGEU_PERSONAL_DATA_KEY)||'null');}catch(e){}
+        if(!personalSaved||!persistedPersonal||Number(persistedPersonal.version)!==1
+            ||JSON.stringify(persistedPersonal.notes||{})!==JSON.stringify(importedPersonalData.notes)){
+          const rollbackSaved=rollback();
+          toast(rollbackSaved
+            ? 'Не удалось сохранить заметки. Восстановление отменено; предыдущие данные восстановлены.'
+            : 'Не удалось сохранить заметки и выполнить откат. Предварительная резервная копия создана; проверьте данные вручную.');
           return;
         }
         kgeuPersonalData=importedPersonalData;
