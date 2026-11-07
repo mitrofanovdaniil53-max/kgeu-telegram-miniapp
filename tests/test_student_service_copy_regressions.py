@@ -1155,7 +1155,7 @@ class StudentServiceAttachmentSyncBudgetRegressionTest(unittest.TestCase):
             self.assertIn("rec.fileData=''", handler)
             self.assertIn("Название файла сохранено", handler)
 
-            script = "\\n".join([
+            script = "\n".join([
                 "const assert = require('node:assert/strict');",
                 "let payload = { personalData: { version: 1, notes: {} }, profileData: {} };",
                 "function serviceSyncPackage() { return payload; }",
