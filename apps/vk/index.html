@@ -4408,6 +4408,22 @@ html.vk-light .kgeu-note-icon { color:#667085; }
       img.src=imageUrl;
     });
   }
+  function serviceAttachmentFitsSyncLimit(nextServiceData){
+    try{
+      const current=serviceSyncPackage();
+      const envelope={
+        envelopeVersion:1,
+        serviceData:serviceNormalizeData(nextServiceData),
+        personalData:current.personalData&&typeof current.personalData==='object'?current.personalData:{version:1,notes:{}},
+        profileData:current.profileData&&typeof current.profileData==='object'?current.profileData:{}
+      };
+      // Worker rejects serialized sync envelopes above 900,000 bytes. Keep a
+      // 50 KB margin so attachment uploads do not leave local-only records.
+      return new Blob([JSON.stringify(envelope)]).size<=850000;
+    }catch(e){
+      return false;
+    }
+  }
   function serviceReadFile(file){
     return new Promise(function(resolve){
       if(!file){resolve({name:'',data:''});return;}
@@ -4973,7 +4989,15 @@ html.vk-light .kgeu-note-icon { color:#667085; }
         const file=document.getElementById('social-file').files[0];
         const rec={id:'s_'+Date.now(),date:document.getElementById('social-date').value||isoDate(new Date()),points:Math.floor(serviceNonNegativeNumber(document.getElementById('social-points').value,0)),title:document.getElementById('social-title').value.trim()||'Мероприятие',note:document.getElementById('social-note').value.trim(),fileName:file?file.name:'',fileData:''};
         if(!rec.points){toast('Укажи количество социальных баллов');return;}
-        const f=await serviceReadFile(file);rec.fileData=f.data;serviceData.hostel.social.push(rec);serviceSave();document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();toast('Мероприятие ССО добавлено');return;
+        const f=await serviceReadFile(file);rec.fileData=f.data;
+        if(rec.fileData){
+          const candidate=Object.assign({},serviceData,{hostel:Object.assign({},serviceData.hostel,{social:serviceData.hostel.social.concat([rec])})});
+          if(!serviceAttachmentFitsSyncLimit(candidate)){
+            rec.fileData='';
+            toast('Вложение не сохранено: общий размер данных превысит лимит облачной синхронизации. Название файла сохранено.');
+          }
+        }
+        serviceData.hostel.social.push(rec);serviceSave();document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();toast('Мероприятие ССО добавлено');return;
       }
       if(a==='export-word')return serviceExportWord();
     });});
