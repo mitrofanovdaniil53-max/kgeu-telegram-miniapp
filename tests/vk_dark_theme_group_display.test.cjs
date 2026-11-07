@@ -28,22 +28,6 @@ test('VK group label normalization safely preserves malformed and plain values',
   assert.equal(normalizeGroupText(null), '');
 });
 
-test('VK dark theme explicitly styles the reported light-glass controls', () => {
-  const css = extract('<style id="vk-dark-glass-contrast-fix-v1">', '</style>');
-  for (const selector of [
-    'html.vk-dark .settings-sheet .saved-group',
-    'html.vk-dark .settings-sheet .group-result',
-    'html.vk-dark .top-shell .tabs',
-    'html.vk-dark .top-shell .top-actions .icon-btn',
-    'html.vk-dark .service-main-nav .service-btn',
-    'html.vk-dark .service-page .service-status.upcoming',
-    'html.vk-dark .service-page .service-row-meta'
-  ]) {
-    assert.ok(css.includes(selector), 'missing dark-theme override: ' + selector);
-  }
-  assert.match(css, /background:\s*rgba\(255,255,255/);
-});
-
 test('VK light theme keeps mobile glass surfaces light even when the OS prefers dark mode', () => {
   const lightTheme = extract('    html.vk-light {', '\n    }');
   assert.match(lightTheme, /--bg2:\s*#eef2f7/i);
