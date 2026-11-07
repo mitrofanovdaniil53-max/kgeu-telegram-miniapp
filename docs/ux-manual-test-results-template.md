@@ -43,6 +43,9 @@ For each task record: Pass / Fail / Blocked / Not run, elapsed time, number of t
 | T15 | Repeat key tasks at narrow width | No clipped content, unintended horizontal overflow or inaccessible controls | Not run | | | |
 | T16 | Repeat key tasks with light/dark/system theme | Text, focus and state indicators remain legible | Not run | | | |
 | T17 | Keyboard/dialog behavior where supported | Tab/Shift+Tab, Escape and focus restoration work | Not run | | | |
+| T18 | Save an event using a fractional points input (for example, 2.8) | Calendar event and corresponding ССО ledger entry show the same normalized integer | Not run | | | |
+| T19 | Add a small image/document attachment | Filename and attachment content remain available after save/relaunch; sync behavior is checked separately below | Not run | | | |
+| T20 | Add attachment(s) that push the aggregate sync envelope above 850,000 bytes | New attachment content is omitted, filename/record remain, and the combined warning is clear | Not run | | | |
 
 ## Sync and recovery checks — disposable data only
 
