@@ -1146,7 +1146,7 @@ class StudentServiceAttachmentSyncBudgetRegressionTest(unittest.TestCase):
             source = (ROOT / relative).read_text(encoding="utf-8")
             marker = "function serviceAttachmentFitsSyncLimit(nextServiceData)"
             start = source.index(marker)
-            end = source.index("\\n  function serviceReadFile(file)", start)
+            end = source.index("\n  function serviceReadFile(file)", start)
             helper = source[start:end]
             handler_start = source.index("if(a==='add-social')")
             handler_end = source.index("if(a==='export-word')", handler_start)
