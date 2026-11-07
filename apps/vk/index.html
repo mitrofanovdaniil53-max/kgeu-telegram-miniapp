@@ -197,6 +197,9 @@ function kgeuSetNote(subject, value) {
     }
     html.vk-light {
       --bg: var(--vk-bg, #f4f6f9);
+      /* Do not inherit the OS dark-mode surface when VK itself is in light mode.
+         Mobile controls use --bg2 for tabs, header actions, saved groups and neutral labels. */
+      --bg2: #eef2f7;
       --card: var(--vk-sec, #ffffff);
       --text: var(--vk-text, #0f172a);
       --muted: var(--vk-hint, #64748b);
