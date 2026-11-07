@@ -23,6 +23,12 @@ function json(request, data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: corsHeaders(request) });
 }
 
+function isValidIsoDate(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(value + 'T00:00:00Z');
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
 function hex(buffer) {
   return [...new Uint8Array(buffer)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
@@ -572,8 +578,7 @@ export default {
     if (url.pathname === '/api/rasp' && request.method === 'GET') {
       const groupId = url.searchParams.get('idGroup') || '';
       const sdate = url.searchParams.get('sdate') || '';
-      if (!/^\d{1,10}$/.test(groupId) || Number(groupId) <= 0 ||
-          !/^\d{4}-\d{2}-\d{2}$/.test(sdate)) {
+      if (!/^\d{1,10}$/.test(groupId) || Number(groupId) <= 0 || !isValidIsoDate(sdate)) {
         return json(request, { ok: false, error: 'invalid_schedule_query' }, 400);
       }
       try {
