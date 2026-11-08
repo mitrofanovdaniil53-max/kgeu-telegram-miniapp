@@ -2069,6 +2069,7 @@ async function handleMiniAppReminders(request, env) {
     if (!Number.isFinite(fireAt) || fireAt <= Date.now() || fireAt > Date.now() + 366 * 24 * 60 * 60 * 1000) {
       return miniAppJson(request, { ok: false, error: 'reminder_time_out_of_range' }, 400);
     }
+    if (!await getUser(env, tgUser.id)) return miniAppJson(request, { ok: false, error: 'start_bot_first' }, 409);
     const existing = await env.KGEU_SCHEDULE.list({ prefix, limit: 100 });
     if (existing.keys.length >= 50) return miniAppJson(request, { ok: false, error: 'reminder_limit_reached' }, 429);
     const id = crypto.randomUUID();
