@@ -1243,8 +1243,10 @@ async function handleCallback(
 if (
     data === 'notify:on'
   ) {
-    user.notifications =
-      true;
+    user.notifications = true;
+    user.dailyNotifications = true;
+    user.reminderNotifications = true;
+    user.changeNotifications = true;
 
     await saveUser(
       env,
@@ -1269,8 +1271,10 @@ if (
   if (
     data === 'notify:off'
   ) {
-    user.notifications =
-      false;
+    user.notifications = false;
+    user.dailyNotifications = false;
+    user.reminderNotifications = false;
+    user.changeNotifications = false;
 
     await saveUser(
       env,
