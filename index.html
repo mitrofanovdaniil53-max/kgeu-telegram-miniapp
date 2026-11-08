@@ -1841,6 +1841,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
   );
   const API = 'https://kgeu-telegram-miniapp.2vkv544dmd.workers.dev/api/rasp';
   const GROUP_DIRECTORY_API = 'https://kgeu-telegram-miniapp.2vkv544dmd.workers.dev/api/groups?year=2026-2027';
+  const TELEGRAM_REMINDERS_API = 'https://kgeu-telegram-miniapp.2vkv544dmd.workers.dev/api/reminders';
   const GROUP_DIRECTORY_CACHE_KEY = 'kgeu_tg_group_directory_2026_2027';
   const GROUP_DIRECTORY_TTL = 6 * 60 * 60 * 1000;
   const FIRST_STUDY = new Date('2026-09-02T00:00:00');
@@ -3652,6 +3653,9 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     }catch(e){return fallback;}
   }
   let serviceData=serviceLoad();
+  let serviceTelegramReminders=[];
+  let serviceTelegramReminderBusy=false;
+  let serviceTelegramReminderError='';
   function serviceSave(){try{serviceData=serviceNormalizeData(serviceData);serviceData.updatedAt=Date.now();localStorage.setItem(STUDENT_SERVICE_KEY,JSON.stringify(serviceData));serviceMarkDirty();return true;}catch(e){toast('Не удалось сохранить данные');return false;}}
   function serviceEsc(s){return escapeHtml(String(s==null?'':s));}
   function serviceDate(s){if(!s)return '';const d=new Date(s+'T00:00:00');return isNaN(d)?s:d.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'});}
@@ -4175,15 +4179,52 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       '<section class="service-card"><h3>Что можно улучшить</h3><p>'+(taskOverdue?('Сейчас есть '+taskOverdue+' просроченных задач — их можно разобрать в разделе «Учёба».'):(taskOpen?'Активные задачи без просрочки — можно заранее закрывать ближайшие сроки.':'Все задачи отмечены как выполненные.'))+'</p></section>'+
       '</div>';
   }
+  function serviceTelegramInitData(){try{return String(tg&&tg.initData||'');}catch(e){return '';}}
+  async function serviceTelegramReminderRequest(method,payload){
+    const initData=serviceTelegramInitData();
+    if(!initData)throw new Error('Открой Mini App через Telegram.');
+    const response=await fetch(TELEGRAM_REMINDERS_API,{method:method,headers:{'X-Telegram-Init-Data':initData,'Content-Type':'application/json'},body:payload?JSON.stringify(payload):undefined,cache:'no-store'});
+    const data=await response.json().catch(function(){return {};});
+    if(!response.ok){if(data.error==='start_bot_first')throw new Error('Сначала открой бота расписания и нажми /start.');throw new Error(data.error==='invalid_init_data'?'Не удалось подтвердить Telegram-сессию. Перезапусти Mini App.':'Не удалось выполнить запрос ('+response.status+').');}
+    return data;
+  }
+  function serviceTelegramReminderRows(){
+    if(serviceTelegramReminderError)return '<div class="service-calendar-empty">'+serviceEsc(serviceTelegramReminderError)+'</div>';
+    if(!serviceTelegramReminders.length)return '<div class="service-calendar-empty">Пока нет личных напоминаний.</div>';
+    return serviceTelegramReminders.map(function(x){const date=new Date(Number(x.eventAt));const label=date.toLocaleString('ru-RU',{timeZone:'Europe/Moscow',day:'2-digit',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});const lead=Number(x.leadMinutes)===0?'в момент события':Number(x.leadMinutes)===15?'за 15 минут':Number(x.leadMinutes)===60?'за 1 час':'за 1 день';return '<div class="service-reminder-row"><div class="service-row-main"><div class="service-row-title">'+serviceEsc(x.title)+'</div><div class="service-row-meta">'+serviceEsc(label)+' · отправка '+serviceEsc(lead)+'</div></div><button class="service-btn" type="button" data-telegram-reminder-delete="'+serviceEsc(x.id)+'">Удалить</button></div>';}).join('');
+  }
+  async function serviceLoadTelegramReminders(){
+    if(serviceTelegramReminderBusy)return;
+    serviceTelegramReminderBusy=true;
+    try{const data=await serviceTelegramReminderRequest('GET');serviceTelegramReminders=Array.isArray(data.reminders)?data.reminders:[];serviceTelegramReminderError='';}
+    catch(e){serviceTelegramReminderError=e&&e.message?e.message:'Ошибка загрузки напоминаний.';}
+    finally{serviceTelegramReminderBusy=false;const list=document.querySelector('.service-telegram-reminder-list');if(list)list.innerHTML=serviceTelegramReminderRows();}
+  }
+  async function serviceCreateTelegramReminder(){
+    const title=document.getElementById('service-telegram-reminder-title');
+    const date=document.getElementById('service-telegram-reminder-at');
+    const lead=document.getElementById('service-telegram-reminder-lead');
+    const name=title?title.value.trim():'';
+    const raw=date?date.value:'';
+    if(!name){toast('Укажи название напоминания');return;}
+    if(!raw){toast('Укажи дату и время события');return;}
+    const eventAt=new Date(raw+'+03:00').getTime();
+    if(!Number.isFinite(eventAt)||eventAt<=Date.now()){toast('Выбери время в будущем');return;}
+    try{await serviceTelegramReminderRequest('POST',{title:name,eventAt:eventAt,leadMinutes:Number(lead?lead.value:15)});serviceTelegramReminderError='';await serviceLoadTelegramReminders();if(title)title.value='';if(date)date.value='';toast('Напоминание сохранено — бот пришлёт сообщение в Telegram.');}
+    catch(e){toast(e&&e.message?e.message:'Не удалось создать напоминание.');}
+  }
+  async function serviceDeleteTelegramReminder(id){
+    try{await serviceTelegramReminderRequest('POST',{action:'delete',id:id});serviceTelegramReminders=serviceTelegramReminders.filter(function(x){return x.id!==id;});const list=document.querySelector('.service-telegram-reminder-list');if(list)list.innerHTML=serviceTelegramReminderRows();toast('Напоминание удалено');}
+    catch(e){toast(e&&e.message?e.message:'Не удалось удалить напоминание.');}
+  }
   function serviceRenderReminders(){
     const r=serviceData.reminders||{enabled:false,taskDays:1,deadlineDays:1,eventDays:1};
     const items=serviceReminderItems();
     const rows=items.map(function(x){const when=x.days===0?'Сегодня':(x.days===1?'Завтра':'Через '+x.days+' дн.');return '<div class="service-reminder-row"><div class="service-row-main"><div class="service-row-title">'+serviceEsc(x.title)+'</div><div class="service-row-meta">'+serviceEsc(x.meta)+' · '+serviceDate(x.date)+'</div></div><span class="service-status '+(x.days===0?'today':'upcoming')+'">'+when+'</span></div>';}).join('')||'<div class="service-calendar-empty">На ближайшие 7 дней ничего нет.</div>';
-    return '<div class="service-page"><section class="service-hero"><div class="service-kicker">Мой сервис</div><h1 class="service-title">Напоминания</h1><div class="service-sub">Локальные напоминания работают, когда сервис открыт. Telegram-уведомления подключим после backend.</div><div class="service-actions"><button class="service-btn" data-service-action="service-home">← Мой сервис</button><button class="service-btn" data-service-action="calendar">Календарь</button></div></section>'+
-      '<section class="service-card"><div class="service-section-title"><h2>Настройки</h2><button class="service-toggle '+(r.enabled?'on':'')+'" data-reminders-toggle aria-label="Включить напоминания"></button></div>'+
-      '<p>Включение: '+(r.enabled?'включено':'выключено')+'. Браузер может дополнительно запросить разрешение на уведомления.</p>'+
-      '<div class="service-actions"><button class="service-btn primary" data-service-action="request-notifications">Разрешить уведомления</button></div></section>'+
-      '<section><div class="service-section-title"><h2>Ближайшие 7 дней</h2><span class="service-pill">'+items.length+'</span></div><div class="service-list">'+rows+'</div></section></div>';
+    return '<div class="service-page"><section class="service-hero"><div class="service-kicker">Мой сервис</div><h1 class="service-title">Напоминания</h1><div class="service-sub">Личные напоминания приходят отдельными сообщениями от бота в Telegram. Разрешение системных уведомлений WebView не требуется.</div><div class="service-actions"><button class="service-btn" data-service-action="service-home">← Мой сервис</button><button class="service-btn" data-service-action="calendar">Календарь</button></div></section>' +
+      '<section class="service-card"><div class="service-section-title"><h2>Новое напоминание</h2></div><p>Укажи время самого события. Бот отправит сообщение заранее в выбранный момент по московскому времени.</p><div class="service-field"><label for="service-telegram-reminder-title">Название</label><input id="service-telegram-reminder-title" type="text" maxlength="120" placeholder="Например, сдать курсовую"></div><div class="service-field"><label for="service-telegram-reminder-at">Дата и время события (МСК)</label><input id="service-telegram-reminder-at" type="datetime-local"></div><div class="service-field"><label for="service-telegram-reminder-lead">Когда напомнить</label><select id="service-telegram-reminder-lead"><option value="15" selected>За 15 минут</option><option value="60">За 1 час</option><option value="1440">За 1 день</option><option value="0">В момент события</option></select></div><div class="service-actions"><button class="service-btn primary" data-service-action="create-telegram-reminder">Создать напоминание</button></div><div class="service-list service-telegram-reminder-list">'+serviceTelegramReminderRows()+'</div></section>' +
+      '<section><div class="service-section-title"><h2>Мои задачи и события</h2><span class="service-pill">'+items.length+'</span></div><div class="service-list">'+rows+'</div></section>' +
+      '<section class="service-card"><div class="service-section-title"><h2>Локальный раздел</h2><button class="service-toggle '+(r.enabled?'on':'')+'" data-reminders-toggle aria-label="Включить локальные напоминания"></button></div><p>Настройка локального раздела приложения. Для сообщений в Telegram используй форму выше.</p></section></div>';
   }
   function serviceRenderCalendar(){
     const d=new Date(serviceCalendarDate.getFullYear(),serviceCalendarDate.getMonth(),1);
@@ -4515,10 +4556,13 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     const subjectSelect=document.getElementById('service-study-subject');
     if(subjectSelect){subjectSelect.addEventListener('change',function(){serviceStudySubject=subjectSelect.value;serviceApplyStudyFilters();});}
     document.querySelectorAll('[data-study-filter]').forEach(function(b){b.addEventListener('click',function(){serviceStudyFilter=b.getAttribute('data-study-filter')||'all';document.querySelectorAll('[data-study-filter]').forEach(function(x){x.classList.toggle('active',x===b);});serviceApplyStudyFilters();});});
+    if(document.querySelector('.service-telegram-reminder-list'))serviceLoadTelegramReminders();
+    document.querySelectorAll('[data-telegram-reminder-delete]').forEach(function(b){b.addEventListener('click',function(){serviceDeleteTelegramReminder(b.getAttribute('data-telegram-reminder-delete')||'');});});
     const reminderToggle=document.querySelector('[data-reminders-toggle]');
     if(reminderToggle) reminderToggle.addEventListener('click',function(){serviceData.reminders=serviceData.reminders||{taskDays:1,deadlineDays:1,eventDays:1};serviceData.reminders.enabled=!serviceData.reminders.enabled;serviceSave();document.getElementById('app').innerHTML=serviceRenderReminders();serviceBind();});
     document.querySelectorAll('[data-service-action]').forEach(function(b){b.addEventListener('click',async function(){
       const a=b.getAttribute('data-service-action');
+      if(a==='create-telegram-reminder')return serviceCreateTelegramReminder();
       if(a==='task')return servicePromptTask();
       if(a==='deadline')return servicePromptDeadline();
       if(a==='event')return servicePromptEvent();
@@ -4602,10 +4646,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       if(a==='export-sync'){return serviceExportSyncPackage();}
       if(a==='export-data'){return serviceExportData();}
       if(a==='import-data'){const input=document.getElementById('service-import-file');if(input){input.onchange=function(){serviceImportData(input.files&&input.files[0]);input.value='';};input.click();}return;}
-      if(a==='request-notifications'){
-        if('Notification' in window){try{const p=await Notification.requestPermission();toast(p==='granted'?'Уведомления разрешены':'Разрешение не выдано');}catch(e){toast('Не удалось запросить разрешение');}}else toast('Этот WebView не поддерживает системные уведомления');
-        return;
-      }
+      if(a==='request-notifications'){toast('Системные уведомления не используются. Напоминания приходят сообщениями от бота.');return;}
       if(a==='hostel'){serviceHostelView='overview';document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();return;}
       if(a==='study'){document.getElementById('app').innerHTML=serviceRenderStudy();serviceBind();return;}
       if(a==='schedule'||a==='today'){switchTab('today');return;}
