@@ -53,7 +53,7 @@ jobs:
             console.log(file + ': ' + scripts.length + ' inline scripts parsed');
           }
 
-          for (const file of ['backend/worker.js', 'workers/kgeu-schedule-bot/worker.js']) {
+          for (const file of ['backend/worker.js', 'workers/kgeu-schedule-bot/worker.js', 'workers/kgeu-vk-bot/worker.js']) {
             if (!fs.existsSync(file)) continue;
             const worker = fs.readFileSync(file, 'utf8')
               .replace(/\bexport default\s*\{/, 'const workerModule = {');
@@ -86,5 +86,7 @@ jobs:
         run: node --test tests/vk_legacy_sync_race.test.cjs
       - name: Test Telegram bot notifications and reminders
         run: node --test tests/telegram_bot_notifications.test.cjs
+      - name: Test VK bot class reminder timing
+        run: node --test tests/vk_bot_reminder_window.test.cjs
       - name: Test VK light/dark mobile glass controls and group labels
         run: node --test tests/vk_dark_theme_group_display.test.cjs
