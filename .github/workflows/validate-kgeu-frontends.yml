@@ -6,6 +6,7 @@ on:
       - "index.html"
       - "apps/vk/index.html"
       - "backend/**"
+      - "workers/**"
       - "tests/**"
       - "docs/**"
       - "prototypes/**"
@@ -51,14 +52,17 @@ jobs:
             console.log(file + ': ' + scripts.length + ' inline scripts parsed');
           }
 
-          const worker = fs.readFileSync('backend/worker.js', 'utf8')
-            .replace(/\bexport default\s*\{/, 'const workerModule = {');
-          try {
-            new Function(worker);
-          } catch (error) {
-            throw new Error('backend/worker.js: ' + error.message);
+          for (const file of ['backend/worker.js', 'workers/kgeu-schedule-bot/worker.js']) {
+            if (!fs.existsSync(file)) continue;
+            const worker = fs.readFileSync(file, 'utf8')
+              .replace(/\bexport default\s*\{/, 'const workerModule = {');
+            try {
+              new Function(worker);
+            } catch (error) {
+              throw new Error(file + ': ' + error.message);
+            }
+            console.log(file + ': parsed');
           }
-          console.log('backend/worker.js: parsed');
           NODE
       - uses: actions/setup-python@v5
         with:
@@ -79,5 +83,7 @@ jobs:
         run: node --test tests/vk_profile_apply_race.test.cjs
       - name: Test VK legacy service sync CAS and restore guards
         run: node --test tests/vk_legacy_sync_race.test.cjs
+      - name: Test Telegram bot notifications and reminders
+        run: node --test tests/telegram_bot_notifications.test.cjs
       - name: Test VK light/dark mobile glass controls and group labels
         run: node --test tests/vk_dark_theme_group_display.test.cjs
