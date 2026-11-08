@@ -2004,6 +2004,7 @@ async function notifyScheduleChanges(env, groupId, dateStr, lessons, users) {
 async function processGroupNotifications(env, groupId, users, todayStr, tomorrowStr, nowMin) {
   let todayLessons = [];
   let tomorrowLessons = [];
+  let tomorrowFetched = false;
   try {
     const lessons = await fetchSchedule(groupId, todayStr);
     todayLessons = lessons.filter(l => String(l['дата'] || '').slice(0, 10) === todayStr);
@@ -2014,12 +2015,13 @@ async function processGroupNotifications(env, groupId, users, todayStr, tomorrow
   try {
     const lessons = await fetchSchedule(groupId, tomorrowStr);
     tomorrowLessons = lessons.filter(l => String(l['дата'] || '').slice(0, 10) === tomorrowStr);
+    tomorrowFetched = true;
   } catch (error) {
     console.error('fetch tomorrow failed group', groupId, error);
   }
 
   await notifyScheduleChanges(env, groupId, todayStr, todayLessons, users);
-  if (tomorrowLessons.length) {
+  if (tomorrowFetched) {
     await notifyScheduleChanges(env, groupId, tomorrowStr, tomorrowLessons, users);
   }
 
