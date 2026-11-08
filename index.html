@@ -4298,6 +4298,143 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     };
     reader.onerror=function(){toast('Не удалось прочитать файл');};reader.readAsText(file);
   }
+  // Conflict-safe merge helpers. Cloud records are the base; local records are
+  // added without discarding either side when the same ID contains different data.
+  function serviceStableMergeValue(value){
+    if(Array.isArray(value))return value.map(serviceStableMergeValue);
+    if(!value||typeof value!=='object')return value;
+    const out={};
+    Object.keys(value).filter(function(key){return !['updatedAt','version','schemaVersion'].includes(key);}).sort().forEach(function(key){out[key]=serviceStableMergeValue(value[key]);});
+    return out;
+  }
+  function serviceMergeRecordList(cloudItems,localItems,suffix){
+    const result=[],byId=new Map();
+    function add(item,fromLocal){
+      if(!item||typeof item!=='object'||Array.isArray(item))return;
+      const id=item.id==null?'':String(item.id);
+      if(!id){
+        const signature=JSON.stringify(serviceStableMergeValue(item));
+        if(!result.some(function(existing){return JSON.stringify(serviceStableMergeValue(existing))===signature;}))result.push(item);
+        return;
+      }
+      if(!byId.has(id)){byId.set(id,result.length);result.push(item);return;}
+      const existing=result[byId.get(id)];
+      if(JSON.stringify(serviceStableMergeValue(existing))===JSON.stringify(serviceStableMergeValue(item)))return;
+      if(!fromLocal)return;
+      let n=1,alternateId=id+'-tg-'+suffix;
+      while(byId.has(alternateId))alternateId=id+'-tg-'+suffix+'-'+(++n);
+      byId.set(alternateId,result.length);
+      result.push(Object.assign({},item,{id:alternateId}));
+    }
+    (Array.isArray(cloudItems)?cloudItems:[]).forEach(function(item){add(item,false);});
+    (Array.isArray(localItems)?localItems:[]).forEach(function(item){add(item,true);});
+    return result;
+  }
+  function serviceMergeDataSnapshots(cloudValue,localValue){
+    const cloud=serviceNormalizeData(cloudValue||serviceEmptyData());
+    const local=serviceNormalizeData(localValue||serviceEmptyData());
+    const merged=Object.assign({},cloud,local,{version:STUDENT_SERVICE_SCHEMA,schemaVersion:STUDENT_SERVICE_SCHEMA,updatedAt:Date.now()});
+    ['tasks','deadlines','events'].forEach(function(key){merged[key]=serviceMergeRecordList(cloud[key],local[key],key);});
+    merged.hostel=Object.assign({},cloud.hostel,local.hostel);
+    ['work','social'].forEach(function(key){merged.hostel[key]=serviceMergeRecordList(cloud.hostel[key],local.hostel[key],key);});
+    return merged;
+  }
+  function serviceMergePersonalSnapshots(cloudValue,localValue){
+    const cloud=cloudValue&&typeof cloudValue==='object'?cloudValue:{version:1,notes:{}};
+    const local=localValue&&typeof localValue==='object'?localValue:{version:1,notes:{}};
+    const cloudNotes=cloud.notes&&typeof cloud.notes==='object'?cloud.notes:{};
+    const localNotes=local.notes&&typeof local.notes==='object'?local.notes:{};
+    const notes=Object.assign({},cloudNotes),conflicts={};
+    Object.keys(localNotes).forEach(function(key){
+      const localText=String(localNotes[key]||'');
+      if(!Object.prototype.hasOwnProperty.call(notes,key))notes[key]=localText;
+      else if(String(notes[key]||'')!==localText)conflicts[key]=localText;
+    });
+    return {personalData:{version:1,notes:notes,updatedAt:Date.now()},conflicts:conflicts};
+  }
+
+  async function serviceMergeCloudVersions(){
+    const feedback=document.getElementById('service-sync-feedback');
+    if(!window.confirm('Объединить локальные и облачные записи? Различающиеся записи с одинаковым ID будут сохранены как отдельные. Локальные значения настроек и общих полей останутся приоритетными. Конфликтующие заметки сохранятся в резервной копии. Удаления автоматически не объединяются.'))return;
+    const localRevisionAtStart=serviceLocalRevision;
+    let localMutationStarted=false,pushSucceeded=false,localRevisionAtPayload=null;
+    const previousServiceData=serviceData;
+    const previousPersonalData=kgeuPersonalData;
+    const previousServiceRaw=localStorage.getItem(STUDENT_SERVICE_KEY);
+    const previousPersonalRaw=localStorage.getItem(KGEU_PERSONAL_DATA_KEY);
+    const previousMetaRaw=localStorage.getItem(STUDENT_SERVICE_SYNC_KEY);
+    try{
+      if(feedback)feedback.textContent='Получаю актуальную облачную версию…';
+      const remote=await servicePullFromBackend();
+      if(!remote||!remote.found)throw new Error('cloud_data_not_found');
+      if(serviceLocalRevision!==localRevisionAtStart)throw new Error('local_changes_during_cloud_merge');
+      const localService=serviceNormalizeData(previousServiceData);
+      const localPersonal=JSON.parse(JSON.stringify(previousPersonalData||{version:1,notes:{}}));
+      const localProfile=serviceProfileSnapshot();
+      const localBackup=JSON.stringify({savedAt:Date.now(),serviceData:localService,personalData:localPersonal,profileData:localProfile});
+      const cloudBackup=JSON.stringify({savedAt:Date.now(),snapshot:remote});
+      localStorage.setItem('kgeu_tg_local_before_merge_v1',localBackup);
+      localStorage.setItem('kgeu_tg_cloud_before_merge_v1',cloudBackup);
+      if(localStorage.getItem('kgeu_tg_local_before_merge_v1')!==localBackup||localStorage.getItem('kgeu_tg_cloud_before_merge_v1')!==cloudBackup)throw new Error('merge_backup_failed');
+
+      const mergedService=serviceMergeDataSnapshots(remote.serviceData,localService);
+      const mergedPersonal=serviceMergePersonalSnapshots(remote.personalData,localPersonal);
+      if(Object.keys(mergedPersonal.conflicts).length){
+        const conflictBackup=JSON.stringify({savedAt:Date.now(),notes:mergedPersonal.conflicts});
+        localStorage.setItem('kgeu_tg_notes_merge_conflict_backup_v1',conflictBackup);
+        if(localStorage.getItem('kgeu_tg_notes_merge_conflict_backup_v1')!==conflictBackup)throw new Error('merge_backup_failed');
+      }
+
+      localMutationStarted=true;
+      localRevisionAtPayload=serviceLocalRevision;
+      serviceData=mergedService;
+      kgeuPersonalData=mergedPersonal.personalData;
+      const nextServiceRaw=JSON.stringify(serviceData);
+      const nextPersonalRaw=JSON.stringify(kgeuPersonalData);
+      localStorage.setItem(STUDENT_SERVICE_KEY,nextServiceRaw);
+      localStorage.setItem(KGEU_PERSONAL_DATA_KEY,nextPersonalRaw);
+      if(localStorage.getItem(STUDENT_SERVICE_KEY)!==nextServiceRaw||localStorage.getItem(KGEU_PERSONAL_DATA_KEY)!==nextPersonalRaw)throw new Error('merge_local_save_failed');
+
+      if(feedback)feedback.textContent='Отправляю объединённую версию с проверкой ревизии…';
+      const result=await servicePushToBackend(Number(remote.revision||0));
+      pushSucceeded=true;
+      const meta=serviceSyncMeta();
+      meta.lastServerSync=Number(result&&result.updatedAt||Date.now());
+      meta.lastServerRevision=Number(result&&result.revision||remote.revision||0);
+      meta.lastLocalSave=Date.now();
+      meta.dirty=serviceLocalRevision!==localRevisionAtPayload;
+      try{localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(meta));}catch(e){}
+      if(meta.dirty)serviceScheduleAutoSync();
+      serviceRefreshVisibleView();
+      if(feedback)feedback.textContent=meta.dirty
+        ?'Объединённая версия сохранена. Новые локальные изменения отправятся следом.'
+        :'Локальные и облачные записи объединены и синхронизированы. Резервные копии обеих версий сохранены.'
+          +(Object.keys(mergedPersonal.conflicts).length?' Конфликтующие заметки сохранены отдельно.':'');
+      toast('Версии объединены');
+    }catch(error){
+      if(localMutationStarted&&!pushSucceeded&&serviceLocalRevision===localRevisionAtPayload){
+        serviceData=previousServiceData;
+        kgeuPersonalData=previousPersonalData;
+        try{
+          if(previousServiceRaw===null)localStorage.removeItem(STUDENT_SERVICE_KEY);else localStorage.setItem(STUDENT_SERVICE_KEY,previousServiceRaw);
+          if(previousPersonalRaw===null)localStorage.removeItem(KGEU_PERSONAL_DATA_KEY);else localStorage.setItem(KGEU_PERSONAL_DATA_KEY,previousPersonalRaw);
+          if(previousMetaRaw===null)localStorage.removeItem(STUDENT_SERVICE_SYNC_KEY);else localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,previousMetaRaw);
+        }catch(rollbackError){}
+      }else if(localMutationStarted&&!pushSucceeded){
+        const meta=serviceSyncMeta();meta.dirty=true;
+        try{localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(meta));}catch(e){}
+      }
+      const message=error.message==='cloud_data_not_found'?'В облаке пока нет сохранённой версии.'
+        :error.message==='local_changes_during_cloud_merge'?'Во время проверки появились новые локальные изменения. Они сохранены; повтори объединение.'
+        :error.message==='merge_backup_failed'?'Не удалось подтвердить резервные копии. Объединение не выполнено.'
+        :error.message==='merge_local_save_failed'?'Не удалось сохранить объединённые данные локально. Предыдущая версия восстановлена.'
+        :error.message==='sync_revision_conflict'?'Облако изменилось во время объединения. Локальная версия сохранена; обнови данные и повтори объединение.'
+        :(error.message||'Неизвестная ошибка');
+      if(feedback)feedback.textContent='Не удалось объединить версии: '+serviceEsc(message);
+      toast('Объединение не завершено');
+    }
+  }
+
   function serviceRenderSync(){
     const m=serviceSyncMeta();
     const device=String(m.deviceId||'').replace(/^(.{8}).+$/,'$1…');
@@ -4310,7 +4447,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     return '<div class="service-page"><section class="service-hero"><div class="service-kicker">Мой сервис</div><h1 class="service-title">Синхронизация</h1><div class="service-sub">Изменения синхронизируются автоматически при сохранении, возвращении в приложение и восстановлении интернета. Ручные действия остаются для диагностики и восстановления. Перед восстановлением локальная копия сохраняется автоматически.</div><div class="service-actions"><button class="service-btn" data-service-action="service-home">← Мой сервис</button><button class="service-btn" data-service-action="data">Данные</button></div></section>'+
       '<section class="service-card"><div class="service-section-title"><h2>Состояние</h2><span id="service-sync-status" class="service-status '+(m.dirty?'today':'done')+'">'+(m.dirty?'Есть локальные изменения':'Локально сохранено')+'</span></div><div class="service-data-grid"><div class="service-data-box"><strong>Локально</strong><span>источник данных</span></div><div class="service-data-box"><strong>'+serviceEsc(device||'—')+'</strong><span>ID устройства</span></div><div class="service-data-box"><strong>'+serviceData.tasks.length+'</strong><span>задач</span></div><div class="service-data-box"><strong>'+serviceData.deadlines.length+'</strong><span>дедлайнов</span></div></div><p class="service-data-note">Последнее локальное изменение: '+serviceEsc(localTime)+' · последняя успешная синхронизация: '+serviceEsc(serverTime)+'.</p></section>'+
       '<section class="service-card"><h2 style="margin:0 0 5px">Связать Telegram и VK</h2><p class="service-data-note">Создай одноразовый код на этом устройстве, затем введи его в VK. Код связывает аккаунты безопасно и не заменяет данные автоматически.</p>'+linkCodeHtml+'<div class="service-actions"><button class="service-btn primary" data-service-action="create-vk-link-code">Создать код привязки VK</button></div><p id="service-link-feedback" class="service-data-note"></p></section>'+
-      '<section class="service-card"><h2 style="margin:0 0 5px">Worker API</h2><p class="service-data-note">Адрес Cloudflare Worker. Для облачного обмена нужны маршруты <code>/api/health</code> и <code>/api/sync</code> с проверкой Telegram initData.</p><div class="service-form-row"><input id="service-sync-endpoint" class="service-input" type="url" inputmode="url" placeholder="https://kgeu-telegram-miniapp.2vkv544dmd.workers.dev" value="'+serviceEsc(endpoint)+'"></div><div class="service-actions"><button class="service-btn" data-service-action="save-sync-endpoint">Сохранить адрес</button><button class="service-btn" data-service-action="check-sync">Проверить связь</button><button class="service-btn primary" data-service-action="sync-now">Отправить в облако</button><button class="service-btn" data-service-action="pull-cloud">Получить из облака</button></div><p id="service-sync-feedback" class="service-data-note">'+(endpoint?(tg?'Telegram initData доступен':'Telegram initData пока не доступен в этом окружении'):'Worker пока не настроен.')+'</p></section>'+
+      '<section class="service-card"><h2 style="margin:0 0 5px">Worker API</h2><p class="service-data-note">Адрес Cloudflare Worker. Для облачного обмена нужны маршруты <code>/api/health</code> и <code>/api/sync</code> с проверкой Telegram initData.</p><div class="service-form-row"><input id="service-sync-endpoint" class="service-input" type="url" inputmode="url" placeholder="https://kgeu-telegram-miniapp.2vkv544dmd.workers.dev" value="'+serviceEsc(endpoint)+'"></div><div class="service-actions"><button class="service-btn" data-service-action="save-sync-endpoint">Сохранить адрес</button><button class="service-btn" data-service-action="check-sync">Проверить связь</button><button class="service-btn primary" data-service-action="sync-now">Отправить в облако</button><button class="service-btn" data-service-action="pull-cloud">Получить из облака</button><button class="service-btn" data-service-action="merge-cloud">Объединить версии</button></div><p id="service-sync-feedback" class="service-data-note">'+(endpoint?(tg?'Telegram initData доступен':'Telegram initData пока не доступен в этом окружении'):'Worker пока не настроен.')+'</p></section>'+
       '<section class="service-card"><h2 style="margin:0 0 5px">Безопасность</h2><p class="service-data-note">Клиент не передаёт доверенный userId из localStorage. В Telegram Mini App сервер должен проверять <code>Telegram.WebApp.initData</code>; данные <code>initDataUnsafe</code> нельзя считать доверенными. До проверки сервером никакая облачная запись не считается авторизованной.</p></section>'+
       '<section class="service-card"><h2 style="margin:0 0 5px">Ручной пакет</h2><p class="service-data-note">Если backend недоступен, JSON-пакет по-прежнему можно сохранить как резервную копию.</p><div class="service-actions"><button class="service-btn" data-service-action="export-sync">Экспортировать пакет</button></div></section></div>';
   }
@@ -4414,6 +4551,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
         catch(e){if(feedback)feedback.textContent='Ошибка связи: '+serviceEsc(e.message||'неизвестная ошибка');toast('Не удалось подключиться к Worker');}
         return;
       }
+      if(a==='merge-cloud'){return serviceMergeCloudVersions();}
       if(a==='sync-now'){
         const feedback=document.getElementById('service-sync-feedback');if(feedback)feedback.textContent='Проверяю облачную версию…';
         try{

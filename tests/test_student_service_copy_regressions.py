@@ -107,6 +107,65 @@ class StudentServiceCopyRegressionTest(unittest.TestCase):
         unlinked_guard = source.index("if (!linked)", link_state)
         self.assertLess(link_state, unlinked_guard)
 
+    def test_telegram_sync_exposes_backup_protected_conflict_merge(self):
+        source = (ROOT / "index.html").read_text(encoding="utf-8")
+        self.assertIn('data-service-action="merge-cloud"', source)
+        self.assertIn("async function serviceMergeCloudVersions()", source)
+        self.assertIn("kgeu_tg_local_before_merge_v1", source)
+        self.assertIn("kgeu_tg_cloud_before_merge_v1", source)
+        self.assertIn("kgeu_tg_notes_merge_conflict_backup_v1", source)
+        self.assertIn("servicePushToBackend(Number(remote.revision||0))", source)
+        self.assertIn("sync_revision_conflict", source)
+        self.assertIn("Удаления автоматически не объединяются", source)
+
+    def test_telegram_conflict_merge_helpers_preserve_unique_and_conflicting_records(self):
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("Node.js is required to execute the Telegram merge helpers")
+        source = (ROOT / "index.html").read_text(encoding="utf-8")
+        start = source.index("  function serviceStableMergeValue(value){")
+        end = source.index("  async function serviceMergeCloudVersions(){", start)
+        helpers = source[start:end]
+        assertions = r'''
+const STUDENT_SERVICE_SCHEMA = 4;
+function serviceNormalizeData(value) { return value; }
+function serviceEmptyData() { return { tasks: [], deadlines: [], events: [], hostel: { work: [], social: [] } }; }
+const cloud = {
+  tasks: [{ id: 'same', title: 'cloud copy' }, { id: 'cloud-only', title: 'cloud only' }],
+  deadlines: [{ id: 'deadline-1', title: 'Exam' }],
+  events: [{ id: 'event-cloud', title: 'Cloud event' }],
+  hostel: { totalGoal: 250, work: [{ id: 'work-cloud' }], social: [{ id: 'social-cloud' }] }
+};
+const local = {
+  tasks: [{ id: 'same', title: 'local copy' }, { id: 'local-only', title: 'local only' }],
+  deadlines: [{ id: 'deadline-1', title: 'Exam', updatedAt: 999 }],
+  events: [{ id: 'event-local', title: 'Local event' }],
+  hostel: { totalGoal: 300, work: [{ id: 'work-local' }], social: [{ id: 'social-local' }] }
+};
+const merged = serviceMergeDataSnapshots(cloud, local);
+assert.equal(merged.tasks.find(x => x.id === 'same').title, 'cloud copy');
+assert.equal(merged.tasks.find(x => x.id === 'same-tg-tasks').title, 'local copy');
+assert.ok(merged.tasks.some(x => x.id === 'cloud-only'));
+assert.ok(merged.tasks.some(x => x.id === 'local-only'));
+assert.equal(merged.deadlines.length, 1, 'metadata-only differences must not duplicate records');
+assert.equal(merged.events.length, 2);
+assert.deepEqual(merged.hostel.work.map(x => x.id).sort(), ['work-cloud', 'work-local']);
+assert.deepEqual(merged.hostel.social.map(x => x.id).sort(), ['social-cloud', 'social-local']);
+assert.equal(merged.hostel.totalGoal, 300, 'local scalar values follow the explicit local-wins rule');
+const notes = serviceMergePersonalSnapshots(
+  { notes: { subject: 'cloud text', untouched: 'cloud' } },
+  { notes: { subject: 'local text', added: 'local' } }
+);
+assert.equal(notes.personalData.notes.subject, 'cloud text');
+assert.equal(notes.personalData.notes.added, 'local');
+assert.equal(notes.conflicts.subject, 'local text');
+console.log('Telegram conflict merge assertions passed');
+''';
+        script = "\n".join(["const assert = require('node:assert/strict');", helpers, assertions])
+        result = subprocess.run([node, "-e", script], capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        self.assertIn("Telegram conflict merge assertions passed", result.stdout)
+
     def test_vk_sync_conflict_offers_backup_protected_merge(self):
         source = (ROOT / "apps" / "vk" / "index.html").read_text(encoding="utf-8")
         self.assertIn('id="shared-merge-both"', source)
