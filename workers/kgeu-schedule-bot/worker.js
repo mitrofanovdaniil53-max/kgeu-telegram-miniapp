@@ -1878,7 +1878,7 @@ async function processGroupNotifications(env, groupId, users, todayStr, tomorrow
 async function sendDailyNotifications(env, users, dateStr) {
   const byGroup = new Map();
   for (const user of users) {
-    if (!user.groupId || user.dailyNotifications === false) continue;
+    if (!user.groupId || user.notifications === false || user.dailyNotifications === false) continue;
     const key = String(user.groupId);
     if (!byGroup.has(key)) byGroup.set(key, []);
     byGroup.get(key).push(user);
@@ -1940,7 +1940,7 @@ async function runNotificationsJob(env) {
   if (parts.hour === DAILY_HOUR && parts.minute < 5) await sendDailyNotifications(env, users, todayStr);
   const byGroup = new Map();
   for (const user of users) {
-    if (!user.groupId) continue;
+    if (!user.groupId || user.notifications === false) continue;
     if (user.reminderNotifications === false && user.changeNotifications === false) continue;
     const gid = String(user.groupId);
     if (!byGroup.has(gid)) byGroup.set(gid, []);
