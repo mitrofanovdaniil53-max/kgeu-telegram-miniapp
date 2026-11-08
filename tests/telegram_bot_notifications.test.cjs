@@ -40,8 +40,8 @@ test('notification categories have independent user preferences', () => {
 });
 
 test('Mini App uses bot chat API instead of browser notification permission', () => {
-  assert.match(frontend, /TELEGRAM_BOT_API \\+ '\\/api\\/reminders'/);
+  assert.ok(frontend.includes("TELEGRAM_BOT_API + '/api/reminders'"));
   assert.match(frontend, /X-Telegram-Init-Data/);
-  assert.match(frontend, /serviceTelegramReminderRequest\\('DELETE'/);
+  assert.ok(frontend.includes("serviceTelegramReminderRequest('DELETE'"));
   assert.match(frontend, /Системные уведомления не используются/);
 });
