@@ -1840,6 +1840,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     String(window.location.hash || '').replace(/^#/, '')
   );
   const API = 'https://kgeu-telegram-miniapp.2vkv544dmd.workers.dev/api/rasp';
+  const TELEGRAM_BOT_API = 'https://kgeu-schedule-bot.2vkv544dmd.workers.dev';
   const GROUP_DIRECTORY_API = 'https://kgeu-telegram-miniapp.2vkv544dmd.workers.dev/api/groups?year=2026-2027';
   const TELEGRAM_REMINDERS_API = 'https://kgeu-telegram-miniapp.2vkv544dmd.workers.dev/api/reminders';
   const GROUP_DIRECTORY_CACHE_KEY = 'kgeu_tg_group_directory_2026_2027';
@@ -4217,14 +4218,122 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     try{await serviceTelegramReminderRequest('POST',{action:'delete',id:id});serviceTelegramReminders=serviceTelegramReminders.filter(function(x){return x.id!==id;});const list=document.querySelector('.service-telegram-reminder-list');if(list)list.innerHTML=serviceTelegramReminderRows();toast('Напоминание удалено');}
     catch(e){toast(e&&e.message?e.message:'Не удалось удалить напоминание.');}
   }
+    let telegramReminders = [];
+  let telegramRemindersLoaded = false;
+  let telegramRemindersLoading = false;
+  let telegramRemindersError = '';
+
+  async function serviceTelegramReminderRequest(method, payload) {
+    const initData = serviceTelegramInitData();
+    if (!initData) throw new Error('Открой Mini App через Telegram, чтобы подключить чат с ботом.');
+    const headers = { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': initData };
+    const options = { method: method, headers: headers };
+    if (payload && method !== 'GET' && method !== 'DELETE') options.body = JSON.stringify(payload);
+    const response = await fetch(TELEGRAM_BOT_API + '/api/reminders', options);
+    const data = await response.json().catch(function(){ return {}; });
+    if (!response.ok || !data.ok) {
+      const errors = {
+        invalid_init_data: 'Не удалось подтвердить Telegram-пользователя. Закрой и снова открой Mini App из бота.',
+        reminder_limit_reached: 'Можно хранить не более 50 активных напоминаний.',
+        reminder_time_out_of_range: 'Выбери дату и время в будущем, не далее чем через год.',
+        reminder_not_found: 'Напоминание уже удалено.'
+      };
+      throw new Error(errors[data.error] || data.error || ('HTTP ' + response.status));
+    }
+    return data;
+  }
+
+  function serviceMoscowDateKey(date) {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Europe/Moscow', year: 'numeric', month: '2-digit', day: '2-digit'
+    }).formatToParts(date);
+    const get = function(type){ return parts.find(function(p){return p.type===type;}).value; };
+    return get('year') + '-' + get('month') + '-' + get('day');
+  }
+
+  async function serviceLoadTelegramReminders() {
+    if (telegramRemindersLoaded || telegramRemindersLoading) return;
+    telegramRemindersLoading = true;
+    telegramRemindersError = '';
+    try {
+      const result = await serviceTelegramReminderRequest('GET');
+      telegramReminders = Array.isArray(result.reminders) ? result.reminders : [];
+    } catch (error) {
+      telegramRemindersError = error.message || 'Не удалось загрузить напоминания.';
+    } finally {
+      telegramRemindersLoading = false;
+      telegramRemindersLoaded = true;
+      if (document.querySelector('[data-telegram-reminders]')) {
+        document.getElementById('app').innerHTML = serviceRenderReminders();
+        serviceBind();
+      }
+    }
+  }
+
+  async function servicePromptTelegramReminder() {
+    const future = new Date(Date.now() + 60 * 60 * 1000);
+    const dateDefault = serviceMoscowDateKey(future);
+    const timeParts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+    }).formatToParts(future);
+    const getTime = function(type){ return timeParts.find(function(p){return p.type===type;}).value; };
+    const timeDefault = getTime('hour') + ':' + getTime('minute');
+    const title = prompt('Что нужно напомнить?');
+    if (!title || !title.trim()) return;
+    const date = prompt('Дата (ГГГГ-ММ-ДД), время московское:', dateDefault);
+    if (!date) return;
+    const time = prompt('Время (ЧЧ:ММ), московское:', timeDefault);
+    if (!time) return;
+    const note = prompt('Дополнительный текст (необязательно):') || '';
+    try {
+      const result = await serviceTelegramReminderRequest('POST', {
+        title: title.trim(), date: date.trim(), time: time.trim(), note: note.trim()
+      });
+      telegramReminders.push(result.reminder);
+      telegramReminders.sort(function(a,b){return Number(a.fireAt)-Number(b.fireAt);});
+      telegramRemindersLoaded = true;
+      document.getElementById('app').innerHTML = serviceRenderReminders();
+      serviceBind();
+      toast('Напоминание сохранено. Бот пришлёт сообщение в Telegram.');
+    } catch (error) {
+      toast(error.message || 'Не удалось создать напоминание.');
+    }
+  }
+
+  async function serviceDeleteTelegramReminder(id) {
+    try {
+      const response = await fetch(TELEGRAM_BOT_API + '/api/reminders?id=' + encodeURIComponent(id), {
+        method: 'DELETE',
+        headers: { 'X-Telegram-Init-Data': serviceTelegramInitData() }
+      });
+      const data = await response.json().catch(function(){return {};});
+      if (!response.ok || !data.ok) throw new Error(data.error || 'Не удалось удалить напоминание.');
+      telegramReminders = telegramReminders.filter(function(item){return item.id !== id;});
+      document.getElementById('app').innerHTML = serviceRenderReminders();
+      serviceBind();
+      toast('Напоминание удалено.');
+    } catch (error) {
+      toast(error.message || 'Не удалось удалить напоминание.');
+    }
+  }
+
   function serviceRenderReminders(){
-    const r=serviceData.reminders||{enabled:false,taskDays:1,deadlineDays:1,eventDays:1};
     const items=serviceReminderItems();
-    const rows=items.map(function(x){const when=x.days===0?'Сегодня':(x.days===1?'Завтра':'Через '+x.days+' дн.');return '<div class="service-reminder-row"><div class="service-row-main"><div class="service-row-title">'+serviceEsc(x.title)+'</div><div class="service-row-meta">'+serviceEsc(x.meta)+' · '+serviceDate(x.date)+'</div></div><span class="service-status '+(x.days===0?'today':'upcoming')+'">'+when+'</span></div>';}).join('')||'<div class="service-calendar-empty">На ближайшие 7 дней ничего нет.</div>';
-    return '<div class="service-page"><section class="service-hero"><div class="service-kicker">Мой сервис</div><h1 class="service-title">Напоминания</h1><div class="service-sub">Личные напоминания приходят отдельными сообщениями от бота в Telegram. Разрешение системных уведомлений WebView не требуется.</div><div class="service-actions"><button class="service-btn" data-service-action="service-home">← Мой сервис</button><button class="service-btn" data-service-action="calendar">Календарь</button></div></section>' +
-      '<section class="service-card"><div class="service-section-title"><h2>Новое напоминание</h2></div><p>Укажи время самого события. Бот отправит сообщение заранее в выбранный момент по московскому времени.</p><div class="service-form"><label for="service-telegram-reminder-title">Название</label><input id="service-telegram-reminder-title" type="text" maxlength="120" placeholder="Например, сдать курсовую"><label for="service-telegram-reminder-at">Дата и время события (МСК)</label><input id="service-telegram-reminder-at" type="datetime-local"><label for="service-telegram-reminder-lead">Когда напомнить</label><select id="service-telegram-reminder-lead"><option value="15" selected>За 15 минут</option><option value="60">За 1 час</option><option value="1440">За 1 день</option><option value="0">В момент события</option></select><div class="service-actions"><button class="service-btn primary" data-service-action="create-telegram-reminder">Создать напоминание</button></div></div><div class="service-list service-telegram-reminder-list">'+serviceTelegramReminderRows()+'</div></section>' +
-      '<section><div class="service-section-title"><h2>Мои задачи и события</h2><span class="service-pill">'+items.length+'</span></div><div class="service-list">'+rows+'</div></section>' +
-      '</div>';
+    const rows=items.map(function(x){
+      const when=x.days===0?'Сегодня':(x.days===1?'Завтра':'Через '+x.days+' дн.');
+      return '<div class="service-reminder-row"><div class="service-row-main"><div class="service-row-title">'+serviceEsc(x.title)+'</div><div class="service-row-meta">'+serviceEsc(x.meta)+' · '+serviceDate(x.date)+'</div></div><span class="service-status '+(x.days===0?'today':'upcoming')+'">'+when+'</span></div>';
+    }).join('')||'<div class="service-calendar-empty">На ближайшие 7 дней ничего нет.</div>';
+    const customRows=telegramReminders.map(function(x){
+      return '<div class="service-reminder-row"><div class="service-row-main"><div class="service-row-title">'+serviceEsc(x.title)+'</div><div class="service-row-meta">'+serviceDate(x.date)+' · '+serviceEsc(x.time)+' · Москва</div>'+(x.note?'<div class="service-row-meta">'+serviceEsc(x.note)+'</div>':'')+'</div><button class="service-btn" data-reminder-delete="'+serviceEsc(x.id)+'">Удалить</button></div>';
+    }).join('');
+    const customContent=telegramRemindersLoading
+      ? '<div class="service-calendar-empty">Загружаю напоминания…</div>'
+      : (telegramRemindersError
+        ? '<div class="service-calendar-empty">'+serviceEsc(telegramRemindersError)+'</div>'
+        : (customRows || '<div class="service-calendar-empty">Пока нет личных напоминаний. Создай первое — бот напишет тебе в нужное время.</div>'));
+    return '<div class="service-page"><section class="service-hero"><div class="service-kicker">Мой сервис</div><h1 class="service-title">Напоминания</h1><div class="service-sub">Личные напоминания приходят сообщением в чат с Telegram-ботом. Mini App может быть закрыт — разрешение WebView не требуется.</div><div class="service-actions"><button class="service-btn" data-service-action="service-home">← Мой сервис</button><button class="service-btn" data-service-action="calendar">Календарь</button></div></section>'+
+      '<section class="service-card"><div class="service-section-title"><h2>Мои напоминания</h2><span class="service-pill">'+telegramReminders.length+'</span></div><p>Укажи название, дату и время по Москве. Бот отправит сообщение в личный чат.</p><div class="service-actions"><button class="service-btn primary" data-reminder-add>+ Создать напоминание</button></div><div class="service-list" data-telegram-reminders>'+customContent+'</div></section>'+
+      '<section><div class="service-section-title"><h2>Ближайшие 7 дней</h2><span class="service-pill">'+items.length+'</span></div><div class="service-list">'+rows+'</div></section></div>';
   }
   function serviceRenderCalendar(){
     const d=new Date(serviceCalendarDate.getFullYear(),serviceCalendarDate.getMonth(),1);
@@ -4530,6 +4639,15 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
   });
 
   function serviceBind(){
+    const reminderAddButton=document.querySelector('[data-reminder-add]');
+    if(reminderAddButton)reminderAddButton.addEventListener('click',servicePromptTelegramReminder);
+    document.querySelectorAll('[data-reminder-delete]').forEach(function(button){
+      button.addEventListener('click',function(){serviceDeleteTelegramReminder(button.getAttribute('data-reminder-delete')||'');});
+    });
+    if(document.querySelector('[data-telegram-reminders]')&&!telegramRemindersLoaded&&!telegramRemindersLoading){
+      serviceLoadTelegramReminders();
+    }
+
     if(document.querySelector('.service-hostel-module')){
       serviceHostelApplyView();
       document.querySelectorAll('[data-hostel-view]').forEach(function(button){
