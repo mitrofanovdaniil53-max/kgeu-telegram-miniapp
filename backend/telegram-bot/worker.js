@@ -7,7 +7,7 @@
  * Secrets:
  *   BOT_TOKEN      — Telegram Bot token
  *
- * Cron Trigger: каждые 5 минут
+ * Cron Trigger: каждую минуту
  */
 
 const API_RASP = 'https://kabinet.kgeu.ru/api/Rasp';
@@ -2049,7 +2049,7 @@ async function processGroupNotifications(
           diff >=
             REMINDER_MINUTES &&
           diff <
-            REMINDER_MINUTES + 5
+            REMINDER_MINUTES + 1
         );
       }
     );
