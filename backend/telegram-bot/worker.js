@@ -940,8 +940,15 @@ async function runPersonalRemindersJob(env, now = Date.now()) {
     for (const key of page.keys) {
       const raw = await env.KGEU_SCHEDULE.get(key.name); if (!raw) continue;
       let item; try { item = JSON.parse(raw); } catch { await env.KGEU_SCHEDULE.delete(key.name); continue; }
-      if (!item || !Number.isFinite(Number(item.sendAt)) || Number(item.sendAt) > now) continue;
-      if (Number(item.eventAt) + 5 * 60000 < now) { await env.KGEU_SCHEDULE.delete(key.name); continue; }
+      if (!item || !Number.isFinite(Number(item.sendAt))) {
+        await env.KGEU_SCHEDULE.delete(key.name);
+        continue;
+      }
+      if (Number(item.sendAt) > now) continue;
+      if (Number(item.sendAt) + 5 * 60000 < now) {
+        await env.KGEU_SCHEDULE.delete(key.name);
+        continue;
+      }
       const userId = key.name.split(':')[1];
       const result = await sendMessage(env, userId, '⏰ <b>Напоминание</b>\\n\\n' + esc(item.title) + '\\n\\nСобытие: ' + new Date(item.eventAt).toLocaleString('ru-RU', { timeZone: TZ }));
       if (result && result.ok) await env.KGEU_SCHEDULE.delete(key.name);
@@ -1044,50 +1051,36 @@ async function handleMiniAppMe(
 
 // ──────────────────── Command / callback handlers ────────────────────
 
-async function ensureUser(
-  env,
-  from
-) {
-  let user =
-    await getUser(
-      env,
-      from.id
-    );
-
+async function ensureUser(env, from) {
+  let user = await getUser(env, from.id);
   if (!user) {
     user = {
-      telegramId:
-        from.id,
-
-      username:
-        from.username ||
-        null,
-
-      firstName:
-        from.first_name ||
-        null,
-
+      telegramId: from.id,
+      username: from.username || null,
+      firstName: from.first_name || null,
       groupId: null,
       groupName: null,
       course: null,
       faculty: null,
       facultyId: null,
-
       notifications: true,
       dailyNotifications: true,
       reminderNotifications: true,
       changeNotifications: true,
-
-      createdAt:
-        Date.now(),
+      createdAt: Date.now()
     };
-
-    await saveUser(
-      env,
-      user
-    );
+    return await saveUser(env, user);
   }
 
+  const legacyEnabled = user.notifications !== false;
+  let migrated = false;
+  for (const field of ['dailyNotifications', 'reminderNotifications', 'changeNotifications']) {
+    if (user[field] == null) {
+      user[field] = legacyEnabled;
+      migrated = true;
+    }
+  }
+  if (migrated) user = await saveUser(env, user);
   return user;
 }
 
@@ -1442,8 +1435,10 @@ if (['notify:daily', 'notify:reminder', 'notify:change'].includes(data)) {
   if (
     data === 'notify:off'
   ) {
-    user.notifications =
-      false;
+    user.notifications = false;
+    user.dailyNotifications = false;
+    user.reminderNotifications = false;
+    user.changeNotifications = false;
 
     await saveUser(
       env,
@@ -1957,229 +1952,95 @@ function buildReplacementText(
  * of that group.
  */
 
-async function processGroupNotifications(
-  env,
-  groupId,
-  users,
-  todayStr,
-  tomorrowStr,
-  nowMin
-) {
-  let todayLessons = [];
-  let tomorrowLessons = [];
+async function scheduleSignature(lessons) {
+  const source = lessons.map(lesson => [
+    lessonCode(lesson),
+    lesson['дата'] || '',
+    lesson['начало'] || '',
+    lesson['конец'] || '',
+    lesson['дисциплина'] || '',
+    lesson['аудитория'] || '',
+    lesson['фиоПреподавателя'] || lesson['преподаватель'] || '',
+    lesson['типЗанятия'] || '',
+    lesson['замена'] ? '1' : '0'
+  ].join('|')).sort().join('\n');
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(source));
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
 
-  try {
-    const a =
-      await fetchSchedule(
-        groupId,
-        todayStr
-      );
-
-    todayLessons =
-      a.filter(
-        (l) =>
-          (
-            l['дата'] || ''
-          ).slice(0, 10) ===
-          todayStr
-      );
-
-  } catch (e) {
-    console.error(
-      'fetch today failed group',
-      groupId,
-      e
-    );
-
+async function notifyScheduleChanges(env, groupId, dateStr, lessons, users) {
+  const signature = await scheduleSignature(lessons);
+  const snapshotKey = `schedule-snapshot:${groupId}:${dateStr}`;
+  const previous = await env.KGEU_SCHEDULE.get(snapshotKey);
+  if (previous === null) {
+    await env.KGEU_SCHEDULE.put(snapshotKey, signature, { expirationTtl: 3 * 24 * 60 * 60 });
     return;
   }
+  if (previous === signature) return;
 
+  let allDelivered = true;
+  for (const user of users) {
+    if (user.notifications === false || user.changeNotifications === false) continue;
+    const key = `schedule-change:${user.telegramId}:${dateStr}:${signature}`;
+    if (await wasSent(env, key)) continue;
+    try {
+      const result = await sendMessage(
+        env,
+        user.telegramId,
+        `🔄 <b>Изменение расписания</b>\nВ расписании группы <b>${esc(user.groupName || groupId)}</b> обнаружены изменения на ${formatRuDate(dateStr)}.\n\nОткрой Mini App, чтобы посмотреть актуальное расписание.`
+      );
+      if (result && result.ok) await markSent(env, key, 3 * 24 * 60 * 60);
+      else allDelivered = false;
+    } catch (error) {
+      allDelivered = false;
+      console.error('schedule change notification failed', user.telegramId, error);
+    }
+  }
+  if (allDelivered) {
+    await env.KGEU_SCHEDULE.put(snapshotKey, signature, { expirationTtl: 3 * 24 * 60 * 60 });
+  }
+}
+
+async function processGroupNotifications(env, groupId, users, todayStr, tomorrowStr, nowMin) {
+  let todayLessons = [];
+  let tomorrowLessons = [];
   try {
-    const b =
-      await fetchSchedule(
-        groupId,
-        tomorrowStr
-      );
-
-    tomorrowLessons =
-      b.filter(
-        (l) =>
-          (
-            l['дата'] || ''
-          ).slice(0, 10) ===
-          tomorrowStr
-      );
-
-  } catch (e) {
-    console.error(
-      'fetch tomorrow failed group',
-      groupId,
-      e
-    );
+    const lessons = await fetchSchedule(groupId, todayStr);
+    todayLessons = lessons.filter(l => String(l['дата'] || '').slice(0, 10) === todayStr);
+  } catch (error) {
+    console.error('fetch today failed group', groupId, error);
+    return;
+  }
+  try {
+    const lessons = await fetchSchedule(groupId, tomorrowStr);
+    tomorrowLessons = lessons.filter(l => String(l['дата'] || '').slice(0, 10) === tomorrowStr);
+  } catch (error) {
+    console.error('fetch tomorrow failed group', groupId, error);
   }
 
-  // Reminders:
-  // lessons starting in ~15 minutes
+  await notifyScheduleChanges(env, groupId, todayStr, todayLessons, users);
+  if (tomorrowLessons.length) {
+    await notifyScheduleChanges(env, groupId, tomorrowStr, tomorrowLessons, users);
+  }
 
-  const reminderLessons =
-    todayLessons.filter(
-      (l) => {
-        const start =
-          parseTimeMinutes(
-            l['начало']
-          );
+  const reminderLessons = todayLessons.filter(lesson => {
+    const start = parseTimeMinutes(lesson['начало']);
+    if (start == null) return false;
+    const diff = start - nowMin;
+    return diff >= REMINDER_MINUTES && diff < REMINDER_MINUTES + 1;
+  });
 
-        if (
-          start == null
-        ) {
-          return false;
-        }
-
-        const diff =
-          start - nowMin;
-
-        return (
-          diff >=
-            REMINDER_MINUTES &&
-          diff <
-            REMINDER_MINUTES + 1
-        );
-      }
-    );
-
-  const replacementCandidates =
-    [
-      ...todayLessons,
-      ...tomorrowLessons
-    ].filter(
-      (l) =>
-        l['замена'] === true
-    );
-
-  for (
-    const user of users
-  ) {
-    if (
-      user.notifications === false
-    ) {
-      continue;
-    }
-
-    const chatId =
-      user.telegramId;
-
-    for (
-      const lesson
-      of (user.reminderNotifications === false ? [] : reminderLessons)
-    ) {
-      const code =
-        lessonCode(
-          lesson
-        );
-
-      const key =
-        notifKey(
-          chatId,
-          code,
-          'reminder'
-        );
-
+  for (const user of users) {
+    if (user.notifications === false || user.reminderNotifications === false) continue;
+    for (const lesson of reminderLessons) {
+      const code = lessonCode(lesson);
+      const key = notifKey(user.telegramId, code, 'reminder');
       try {
-        if (
-          await wasSent(
-            env,
-            key
-          )
-        ) {
-          continue;
-        }
-
-        const res =
-          await sendMessage(
-            env,
-            chatId,
-            buildReminderText(
-              lesson
-            )
-          );
-
-        if (
-          res &&
-          res.ok
-        ) {
-          await markSent(
-            env,
-            key
-          );
-        }
-
-      } catch (e) {
-        console.error(
-          'reminder send failed',
-          chatId,
-          e
-        );
-      }
-    }
-
-    for (
-      const lesson
-      of (user.changeNotifications === false ? [] : replacementCandidates)
-    ) {
-      const code =
-        lessonCode(
-          lesson
-        );
-
-      const key =
-        replacementKey(
-          chatId,
-          code
-        );
-
-      try {
-        if (
-          await wasSent(
-            env,
-            key
-          )
-        ) {
-          continue;
-        }
-
-        const dateStr =
-          (
-            lesson['дата'] ||
-            ''
-          ).slice(0, 10);
-
-        const res =
-          await sendMessage(
-            env,
-            chatId,
-            buildReplacementText(
-              lesson,
-              dateStr
-            )
-          );
-
-        if (
-          res &&
-          res.ok
-        ) {
-          await markSent(
-            env,
-            key,
-            60 * 60 * 72
-          );
-        }
-
-      } catch (e) {
-        console.error(
-          'replacement send failed',
-          chatId,
-          e
-        );
+        if (await wasSent(env, key)) continue;
+        const result = await sendMessage(env, user.telegramId, buildReminderText(lesson));
+        if (result && result.ok) await markSent(env, key);
+      } catch (error) {
+        console.error('reminder send failed', user.telegramId, error);
       }
     }
   }
