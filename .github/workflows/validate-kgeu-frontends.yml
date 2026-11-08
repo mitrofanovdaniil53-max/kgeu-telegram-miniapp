@@ -17,6 +17,7 @@ on:
       - "index.html"
       - "apps/vk/index.html"
       - "backend/**"
+      - "workers/**"
       - "tests/**"
       - "docs/**"
       - "prototypes/**"
