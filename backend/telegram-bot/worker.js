@@ -214,6 +214,9 @@ async function saveUser(env, user) {
     faculty: user.faculty || null,
     facultyId: user.facultyId != null ? user.facultyId : null,
     notifications: user.notifications !== false,
+    dailyNotifications: user.dailyNotifications !== false,
+    reminderNotifications: user.reminderNotifications !== false,
+    changeNotifications: user.changeNotifications !== false,
     createdAt: user.createdAt || Date.now()
   };
 
@@ -265,6 +268,9 @@ async function migrateLegacyUser(env, telegramId) {
       faculty: group && group.facul ? group.facul : null,
       facultyId: group && group.facultyID != null ? group.facultyID : null,
       notifications: legacyNotifyRaw === null ? true : legacyNotifyRaw === '1',
+      dailyNotifications: true,
+      reminderNotifications: true,
+      changeNotifications: true,
       createdAt: Date.now()
     };
 
@@ -525,42 +531,21 @@ function miniAppUrl(user) {
 }
 
 function notifyKeyboard(user) {
-  const on =
-    user &&
-    user.notifications !== false;
-
+  const mark = (value) => value === false ? '⬜' : '✅';
   return {
     inline_keyboard: [
       [
-        {
-          text: on
-            ? '✅ Включены'
-            : '✅ Включить',
-          callback_data: 'notify:on'
-        },
-        {
-          text: !on
-            ? '❌ Выключены'
-            : '❌ Выключить',
-          callback_data: 'notify:off'
-        },
+        { text: '✅ Включить всё', callback_data: 'notify:on' },
+        { text: '⏸ Выключить всё', callback_data: 'notify:off' }
       ],
-      [
-        {
-          text: '📊 Статус',
-          callback_data: 'notify:status'
-        }
-      ],
-      [
-        {
-          text: '« Назад',
-          callback_data: 'menu:home'
-        }
-      ],
-    ],
+      [{ text: mark(user.dailyNotifications) + ' 07:00 — расписание', callback_data: 'notify:daily' }],
+      [{ text: mark(user.reminderNotifications) + ' За 15 минут до пары', callback_data: 'notify:reminder' }],
+      [{ text: mark(user.changeNotifications) + ' Изменения / замены', callback_data: 'notify:change' }],
+      [{ text: '📊 Статус', callback_data: 'notify:status' }],
+      [{ text: '« Назад', callback_data: 'menu:home' }]
+    ]
   };
 }
-
 function facultiesKeyboard(faculties) {
   const rows =
     faculties.map(
@@ -687,22 +672,16 @@ function welcomeText(user) {
 }
 
 function notifyStatusText(user) {
-  const on =
-    user &&
-    user.notifications !== false;
-
+  const master = user && user.notifications !== false;
+  const state = (value) => master && value !== false ? 'включено' : 'выключено';
   return (
-    `🔔 <b>Уведомления</b>\n\n` +
-    `Статус: <b>${
-      on
-        ? 'включены'
-        : 'выключены'
-    }</b>\n` +
-    `Напоминание: за ${REMINDER_MINUTES} минут\n` +
-    `Часовой пояс: ${TZ}`
+    '🔔 <b>Уведомления</b>\\n\\n' +
+    '07:00 — расписание: <b>' + state(user.dailyNotifications) + '</b>\\n' +
+    'За 15 минут до пары: <b>' + state(user.reminderNotifications) + '</b>\\n' +
+    'Изменения / замены: <b>' + state(user.changeNotifications) + '</b>\\n\\n' +
+    'Часовой пояс: ' + TZ
   );
 }
-
 function formatDaySchedule(
   lessons,
   dateStr
@@ -1095,6 +1074,9 @@ async function ensureUser(
       facultyId: null,
 
       notifications: true,
+      dailyNotifications: true,
+      reminderNotifications: true,
+      changeNotifications: true,
 
       createdAt:
         Date.now(),
@@ -1420,11 +1402,22 @@ async function handleCallback(
   return;
 }
 
-if (
+if (['notify:daily', 'notify:reminder', 'notify:change'].includes(data)) {
+    const field = data === 'notify:daily' ? 'dailyNotifications' : data === 'notify:reminder' ? 'reminderNotifications' : 'changeNotifications';
+    user[field] = user[field] === false;
+    user.notifications = user.dailyNotifications !== false || user.reminderNotifications !== false || user.changeNotifications !== false;
+    await saveUser(env, user);
+    await editMessage(env, chatId, messageId, notifyStatusText(user), { reply_markup: notifyKeyboard(user) });
+    return;
+  }
+
+  if (
     data === 'notify:on'
   ) {
-    user.notifications =
-      true;
+    user.notifications = true;
+    user.dailyNotifications = true;
+    user.reminderNotifications = true;
+    user.changeNotifications = true;
 
     await saveUser(
       env,
@@ -2077,7 +2070,7 @@ async function processGroupNotifications(
 
     for (
       const lesson
-      of reminderLessons
+      of (user.reminderNotifications === false ? [] : reminderLessons)
     ) {
       const code =
         lessonCode(
@@ -2131,7 +2124,7 @@ async function processGroupNotifications(
 
     for (
       const lesson
-      of replacementCandidates
+      of (user.changeNotifications === false ? [] : replacementCandidates)
     ) {
       const code =
         lessonCode(
