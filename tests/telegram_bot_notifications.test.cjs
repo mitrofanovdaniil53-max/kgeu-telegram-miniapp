@@ -7,7 +7,8 @@ const frontend = fs.readFileSync('index.html', 'utf8');
 
 test('personal reminder API validates signed Telegram Mini App data', () => {
   assert.match(worker, /validateTelegramInitData\(initData, env\.BOT_TOKEN\)/);
-  assert.match(worker, /personal-reminder:\s*' \+ tgUser\.id/);
+  assert.match(worker, /personalReminderKey\(telegramId, reminderId\)/);
+  assert.match(worker, /personal-reminder:\$\{telegramId\}:\$\{reminderId\}/);
 });
 
 test('personal reminders are isolated by Telegram account and capped', () => {
