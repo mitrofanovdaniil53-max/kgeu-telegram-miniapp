@@ -127,7 +127,6 @@ class StudentServiceCopyRegressionTest(unittest.TestCase):
         end = source.index("  async function serviceMergeCloudVersions(){", start)
         helpers = source[start:end]
         assertions = r'''
-const assert = require('node:assert/strict');
 const STUDENT_SERVICE_SCHEMA = 4;
 function serviceNormalizeData(value) { return value; }
 function serviceEmptyData() { return { tasks: [], deadlines: [], events: [], hostel: { work: [], social: [] } }; }
