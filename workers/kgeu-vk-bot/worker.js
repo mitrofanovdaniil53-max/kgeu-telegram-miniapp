@@ -1866,6 +1866,15 @@ async function sendDailyNotifications(
    REMINDERS
 ========================================================= */
 
+function isReminderDue(diff) {
+  // The cron runs every five minutes. Include the full polling interval so
+  // every lesson start minute is covered; the KV key below prevents duplicates.
+  const earliestMinutes = Math.max(1, REMINDER_MINUTES - CRON_MINUTES);
+  return Number.isFinite(diff)
+    && diff >= earliestMinutes
+    && diff <= REMINDER_MINUTES;
+}
+
 async function sendReminders(
   env,
   now = new Date()
@@ -1946,10 +1955,7 @@ async function sendReminders(
         start -
         currentMinutes;
 
-      if (
-        diff < 13 ||
-        diff > REMINDER_MINUTES
-      ) {
+      if (!isReminderDue(diff)) {
         continue;
       }
 
