@@ -36,7 +36,7 @@ All requests require the signed Telegram Mini App `initData` in `X-Telegram-Init
 
 - Personal reminders are checked every minute and delivered as messages from the Telegram bot.
 - Daily timetable is sent at 07:00 Europe/Moscow, once per user per day.
-- Existing class reminders and replacement notices continue through the existing notification job.
+- Existing class reminders run 15 minutes before a lesson; timetable snapshots detect changes for today and tomorrow and notify users who enabled change alerts.
 - No browser Notification API permission is required for bot chat messages.
 
 ## Rollout checklist
