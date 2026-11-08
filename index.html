@@ -4355,7 +4355,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
 
   async function serviceMergeCloudVersions(){
     const feedback=document.getElementById('service-sync-feedback');
-    if(!window.confirm('Объединить локальные и облачные записи? Различающиеся записи с одинаковым ID будут сохранены как отдельные. Конфликтующие заметки сохранятся в резервной копии; при совпадении ID возможны дубликаты. Удаления автоматически не объединяются.'))return;
+    if(!window.confirm('Объединить локальные и облачные записи? Различающиеся записи с одинаковым ID будут сохранены как отдельные. Локальные значения настроек и общих полей останутся приоритетными. Конфликтующие заметки сохранятся в резервной копии. Удаления автоматически не объединяются.'))return;
     const localRevisionAtStart=serviceLocalRevision;
     let localMutationStarted=false,pushSucceeded=false,localRevisionAtPayload=null;
     const previousServiceData=serviceData;
@@ -4386,6 +4386,7 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       }
 
       localMutationStarted=true;
+      localRevisionAtPayload=serviceLocalRevision;
       serviceData=mergedService;
       kgeuPersonalData=mergedPersonal.personalData;
       const nextServiceRaw=JSON.stringify(serviceData);
@@ -4394,7 +4395,6 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       localStorage.setItem(KGEU_PERSONAL_DATA_KEY,nextPersonalRaw);
       if(localStorage.getItem(STUDENT_SERVICE_KEY)!==nextServiceRaw||localStorage.getItem(KGEU_PERSONAL_DATA_KEY)!==nextPersonalRaw)throw new Error('merge_local_save_failed');
 
-      localRevisionAtPayload=serviceLocalRevision;
       if(feedback)feedback.textContent='Отправляю объединённую версию с проверкой ревизии…';
       const result=await servicePushToBackend(Number(remote.revision||0));
       pushSucceeded=true;
