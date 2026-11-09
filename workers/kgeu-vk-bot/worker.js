@@ -5,6 +5,11 @@ const VK_API_VERSION = "5.199";
 const APP_URL =
   "https://mitrofanovdaniil53-max.github.io/kgeu-schedule-vk/index.html";
 
+const BACKEND_ME_URL =
+  "https://kgeu-telegram-miniapp.2vkv544dmd.workers.dev/api/account/me";
+const PERSONAL_REMINDER_PREFIX = "personal-reminder:";
+const VK_MINI_APP_ORIGIN = "https://mitrofanovdaniil53-max.github.io";
+
 const API_RASP = "https://kabinet.kgeu.ru/api/Rasp";
 const API_GROUPS =
   "https://kabinet.kgeu.ru/api/raspGrouplist?year=2026-2027";
@@ -2037,6 +2042,204 @@ async function sendReminders(
 }
 
 
+
+/* =========================================================
+   PERSONAL REMINDERS FROM VK MINI APP
+========================================================= */
+
+function personalReminderKey(vkId, id) {
+  return PERSONAL_REMINDER_PREFIX + String(vkId) + ":" + String(id);
+}
+
+function personalReminderCors(request) {
+  const origin = request.headers.get("Origin") || "";
+  const headers = {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
+    "Vary": "Origin",
+    "Access-Control-Allow-Headers": "Content-Type, X-VK-Launch-Params",
+    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+    "Access-Control-Max-Age": "86400",
+  };
+  if (origin === VK_MINI_APP_ORIGIN) {
+    headers["Access-Control-Allow-Origin"] = origin;
+  }
+  return headers;
+}
+
+function personalReminderJson(request, payload, status = 200) {
+  return new Response(
+    status === 204 ? null : JSON.stringify(payload),
+    { status, headers: personalReminderCors(request) }
+  );
+}
+
+async function resolveVkMiniAppUser(request) {
+  const launchParams = request.headers.get("X-VK-Launch-Params") || "";
+  if (!launchParams) throw new Error("vk_auth_required");
+  const response = await fetch(BACKEND_ME_URL, {
+    method: "GET",
+    headers: { "X-VK-Launch-Params": launchParams },
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok || !payload || payload.ok !== true ||
+      payload.provider !== "vk" || !/^\d+$/.test(String(payload.providerUserId || ""))) {
+    throw new Error("vk_auth_invalid");
+  }
+  return String(payload.providerUserId);
+}
+
+function validPersonalReminderDate(date) {
+  if (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+  const parsed = new Date(date + "T00:00:00Z");
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date;
+}
+
+function formatPersonalReminderDate(date) {
+  const parts = String(date || "").split("-");
+  return parts.length === 3 ? parts[2] + "." + parts[1] + "." + parts[0] : String(date || "");
+}
+
+async function handlePersonalReminders(request, env) {
+  if (request.method === "OPTIONS") return personalReminderJson(request, null, 204);
+  if (!["GET", "POST", "DELETE"].includes(request.method)) {
+    return personalReminderJson(request, { ok: false, error: "method_not_allowed" }, 405);
+  }
+
+  let vkId;
+  try {
+    vkId = await resolveVkMiniAppUser(request);
+  } catch (error) {
+    const code = error && error.message ? error.message : "vk_auth_invalid";
+    return personalReminderJson(request, { ok: false, error: code }, 401);
+  }
+
+  const user = await getUser(env, vkId);
+  if (!user) {
+    return personalReminderJson(request, { ok: false, error: "start_bot_first" }, 409);
+  }
+
+  const prefix = PERSONAL_REMINDER_PREFIX + vkId + ":";
+  if (request.method === "GET") {
+    const reminders = [];
+    let cursor;
+    do {
+      const page = await env.KGEU_VK_USERS.list({ prefix, cursor, limit: 1000 });
+      for (const item of page.keys || []) {
+        const reminder = await env.KGEU_VK_USERS.get(item.name, "json");
+        if (reminder && Number(reminder.fireAt) > Date.now()) reminders.push(reminder);
+      }
+      cursor = page.list_complete ? undefined : page.cursor;
+    } while (cursor);
+    reminders.sort((a, b) => Number(a.fireAt) - Number(b.fireAt));
+    return personalReminderJson(request, { ok: true, reminders });
+  }
+
+  if (request.method === "POST") {
+    let payload;
+    try {
+      payload = await request.json();
+    } catch (_) {
+      return personalReminderJson(request, { ok: false, error: "invalid_json" }, 400);
+    }
+    const title = String(payload && payload.title || "").trim().slice(0, 120);
+    const note = String(payload && payload.note || "").trim().slice(0, 500);
+    const date = String(payload && payload.date || "");
+    const time = String(payload && payload.time || "");
+    if (!title || !validPersonalReminderDate(date) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) {
+      return personalReminderJson(request, { ok: false, error: "invalid_reminder" }, 400);
+    }
+
+    // All reminder times are interpreted in Moscow time (UTC+03:00).
+    const fireAt = new Date(date + "T" + time + ":00+03:00").getTime();
+    if (!Number.isFinite(fireAt) || fireAt <= Date.now() ||
+        fireAt > Date.now() + 366 * 24 * 60 * 60 * 1000) {
+      return personalReminderJson(request, { ok: false, error: "reminder_time_out_of_range" }, 400);
+    }
+
+    const existing = await env.KGEU_VK_USERS.list({ prefix, limit: 100 });
+    if ((existing.keys || []).length >= 50) {
+      return personalReminderJson(request, { ok: false, error: "reminder_limit_reached" }, 429);
+    }
+
+    const id = crypto.randomUUID();
+    const reminder = {
+      id,
+      vkId,
+      title,
+      note,
+      date,
+      time,
+      fireAt,
+      createdAt: Date.now(),
+    };
+    await env.KGEU_VK_USERS.put(
+      personalReminderKey(vkId, id),
+      JSON.stringify(reminder),
+      { expirationTtl: 366 * 24 * 60 * 60 }
+    );
+    return personalReminderJson(request, { ok: true, reminder }, 201);
+  }
+
+  const id = String(new URL(request.url).searchParams.get("id") || "");
+  if (!/^[0-9a-f-]{36}$/i.test(id)) {
+    return personalReminderJson(request, { ok: false, error: "invalid_reminder_id" }, 400);
+  }
+  const key = personalReminderKey(vkId, id);
+  if (!await env.KGEU_VK_USERS.get(key)) {
+    return personalReminderJson(request, { ok: false, error: "reminder_not_found" }, 404);
+  }
+  await env.KGEU_VK_USERS.delete(key);
+  return personalReminderJson(request, { ok: true, deleted: true });
+}
+
+async function processPersonalReminders(env, now = Date.now()) {
+  let cursor;
+  do {
+    const page = await env.KGEU_VK_USERS.list({
+      prefix: PERSONAL_REMINDER_PREFIX,
+      cursor,
+      limit: 1000,
+    });
+    for (const item of page.keys || []) {
+      let reminder;
+      try {
+        reminder = await env.KGEU_VK_USERS.get(item.name, "json");
+      } catch (_) {
+        reminder = null;
+      }
+      if (!reminder || !/^\d+$/.test(String(reminder.vkId || "")) ||
+          !Number.isFinite(Number(reminder.fireAt))) {
+        await env.KGEU_VK_USERS.delete(item.name);
+        continue;
+      }
+      const fireAt = Number(reminder.fireAt);
+      if (fireAt > now) continue;
+      if (fireAt < now - 10 * 60 * 1000) {
+        await env.KGEU_VK_USERS.delete(item.name);
+        continue;
+      }
+
+      const message =
+        "🔔 Напоминание\n\n" +
+        String(reminder.title || "Напоминание") +
+        "\n📅 " + formatPersonalReminderDate(reminder.date) +
+        " · " + String(reminder.time || "");
+      const fullMessage = reminder.note
+        ? message + "\n\n" + String(reminder.note)
+        : message;
+
+      try {
+        await sendMessage(env, Number(reminder.vkId), fullMessage);
+        await env.KGEU_VK_USERS.delete(item.name);
+      } catch (error) {
+        console.error("PERSONAL REMINDER SEND ERROR", reminder.vkId, error?.stack || error);
+      }
+    }
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
+}
+
 /* =========================================================
    CHANGE NOTIFICATIONS
 ========================================================= */
@@ -2289,6 +2492,11 @@ async function runCron(env) {
   await sendChangeNotifications(
     env,
     now
+  );
+
+  await processPersonalReminders(
+    env,
+    now.getTime()
   );
 }
 
@@ -2681,6 +2889,11 @@ export default {
     env,
     ctx
   ) {
+    const requestUrl = new URL(request.url);
+    if (requestUrl.pathname === "/api/reminders") {
+      return handlePersonalReminders(request, env);
+    }
+
     /*
      * GET — проверка Worker в браузере.
      */
