@@ -4722,16 +4722,20 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
       if(a==='pull-cloud'){
         const feedback=document.getElementById('service-sync-feedback');if(feedback)feedback.textContent='Получаю данные из облака…';
         try{
+          const localRevisionAtPullStart=serviceLocalRevision;
           const snapshot=await servicePullFromBackend();
+          if(serviceLocalRevision!==localRevisionAtPullStart)throw new Error('local_changes_during_cloud_restore');
           if(!snapshot||!snapshot.found){throw new Error('cloud_data_not_found');}
           if((serviceHasLocalContent()||serviceSyncMeta().dirty)&&!window.confirm('Данные на этом устройстве будут заменены облачной версией. Перед заменой текущие данные сохранятся в резервную копию. Продолжить?')){
             if(feedback)feedback.textContent='Восстановление отменено. Локальные данные не изменены.';return;
           }
+          // The confirmation dialog can remain open while the user edits elsewhere.
+          if(serviceLocalRevision!==localRevisionAtPullStart)throw new Error('local_changes_during_cloud_restore');
           serviceApplyCloudSnapshot(snapshot);
           toast('Данные получены из облака');
           document.getElementById('app').innerHTML=serviceRenderSync();serviceBind();
         }catch(e){
-          const message=e.message==='cloud_data_not_found'?'В облаке пока нет сохранённых данных. Сначала отправь их с устройства, где они есть.'
+          const message=e.message==='local_changes_during_cloud_restore'?'Во время получения облачной версии появились локальные изменения. Они сохранены; повтори получение после синхронизации.':e.message==='cloud_data_not_found'?'В облаке пока нет сохранённых данных. Сначала отправь их с устройства, где они есть.'
             :e.message==='cloud_restore_backup_failed'?'Не удалось подтвердить резервную копию локальных данных. Облачная версия не применена. Проверь хранилище и повтори попытку.'
             :e.message==='cloud_snapshot_service_save_failed'?'Не удалось сохранить облачные данные на устройстве. Локальная версия восстановлена. Проверь хранилище и повтори попытку.'
             :e.message==='cloud_snapshot_personal_save_failed'?'Не удалось сохранить заметки из облака. Локальные данные восстановлены; повтори попытку позже.'
