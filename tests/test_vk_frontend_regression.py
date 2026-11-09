@@ -13,6 +13,14 @@ class VkFrontendRegressionTest(unittest.TestCase):
     def setUpClass(cls):
         cls.html = VK_HTML.read_text(encoding="utf-8")
 
+    def test_vk_personal_reminders_use_authenticated_bot_api(self):
+        self.assertIn("function serviceVkPersonalReminderRequest(method,payload,id)", self.html)
+        self.assertIn("https://kgeu-vk-bot.2vkv544dmd.workers.dev/api/reminders", self.html)
+        self.assertIn("data-vk-personal-reminder-form", self.html)
+        self.assertIn("serviceLoadVkPersonalReminders()", self.html)
+        self.assertIn("X-VK-Launch-Params", self.html)
+        self.assertIn("Время указывается по Москве.", self.html)
+
     def test_signed_launch_params_support_query_and_hash(self):
         self.assertIn("function kgeuVkLaunchParams()", self.html)
         self.assertIn("const candidates = [window.location.search, window.location.hash]", self.html)
