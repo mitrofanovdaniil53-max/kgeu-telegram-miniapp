@@ -4027,6 +4027,75 @@ html.vk-light .kgeu-note-icon { color:#667085; }
     }catch(e){return fallback;}
   }
   let serviceData=serviceLoad();
+
+  const VK_PERSONAL_REMINDER_API='https://kgeu-vk-bot.2vkv544dmd.workers.dev/api/reminders';
+  let vkPersonalReminders=[];
+  let vkPersonalRemindersState='idle';
+  let vkPersonalRemindersError='';
+  function serviceMoscowTodayKey(){
+    const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Moscow',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+    const get=function(type){return parts.find(function(x){return x.type===type;}).value;};
+    return get('year')+'-'+get('month')+'-'+get('day');
+  }
+  async function serviceVkPersonalReminderRequest(method,payload,id){
+    const launchParams=typeof kgeuVkLaunchParams==='function'?kgeuVkLaunchParams():'';
+    if(!launchParams)throw new Error('vk_launch_params_missing');
+    let url=VK_PERSONAL_REMINDER_API;
+    if(id)url+='?id='+encodeURIComponent(id);
+    const headers={'X-VK-Launch-Params':launchParams};
+    const options={method:method,headers:headers};
+    if(payload){headers['Content-Type']='application/json';options.body=JSON.stringify(payload);}
+    const response=await fetch(url,options);
+    const raw=await response.text();
+    let data=null;try{data=raw?JSON.parse(raw):null;}catch(e){data={};}
+    if(!response.ok)throw new Error(data&&data.error?data.error:'http_'+response.status);
+    return data||{};
+  }
+  function serviceVkReminderErrorText(error){
+    const code=String(error&&error.message||error||'');
+    if(code==='start_bot_first')return 'Сначала открой диалог с ботом сообщества КГЭУ и нажми «Начать». После этого напоминания будут приходить в личные сообщения VK.';
+    if(code==='vk_launch_params_missing'||code==='vk_auth_required'||code==='vk_auth_invalid')return 'Не удалось подтвердить вход через VK. Закрой и заново открой мини-приложение из VK.';
+    if(code==='reminder_limit_reached')return 'Можно хранить не более 50 активных личных напоминаний.';
+    if(code==='reminder_time_out_of_range')return 'Выбери дату и время в будущем, не далее чем через год.';
+    return 'Не удалось выполнить запрос: '+(code||'неизвестная ошибка');
+  }
+  async function serviceLoadVkPersonalReminders(){
+    if(!window.KGEU_VK_PLATFORM)return;
+    vkPersonalRemindersState='loading';
+    vkPersonalRemindersError='';
+    try{
+      const data=await serviceVkPersonalReminderRequest('GET');
+      vkPersonalReminders=Array.isArray(data.reminders)?data.reminders:[];
+      vkPersonalRemindersState='ready';
+    }catch(error){
+      vkPersonalRemindersState='error';
+      vkPersonalRemindersError=serviceVkReminderErrorText(error);
+    }
+    const heading=document.querySelector('.service-page .service-title');
+    if(heading&&heading.textContent.trim()==='Напоминания'){
+      document.getElementById('app').innerHTML=serviceRenderReminders();
+      serviceBind();
+    }
+  }
+  function serviceRenderVkPersonalReminders(){
+    if(!window.KGEU_VK_PLATFORM)return '';
+    let status='';
+    if(vkPersonalRemindersState==='loading')status='<div class="service-empty">Загружаем личные напоминания…</div>';
+    else if(vkPersonalRemindersState==='error')status='<div class="service-empty">'+serviceEsc(vkPersonalRemindersError)+'</div>';
+    const rows=vkPersonalReminders.map(function(item){
+      return '<div class="service-reminder-row"><div class="service-row-main"><div class="service-row-title">'+serviceEsc(item.title)+'</div><div class="service-row-meta">'+serviceEsc(item.date)+' · '+serviceEsc(item.time)+(item.note?' · '+serviceEsc(item.note):'')+'</div></div><button type="button" class="service-btn" data-vk-reminder-delete="'+serviceEsc(item.id)+'">Удалить</button></div>';
+    }).join('');
+    const list=vkPersonalRemindersState==='ready'?(rows||'<div class="service-empty">Пока нет личных напоминаний.</div>'):status;
+    return '<section class="service-card"><div class="service-section-title"><h2>Личные напоминания через VK-бота</h2><span class="service-pill">'+vkPersonalReminders.length+'</span></div>'+
+      '<p>Бот отправит сообщение в личный диалог в указанное время. Приложение может быть закрыто. Время указывается по Москве.</p>'+
+      '<form class="service-form" data-vk-personal-reminder-form>'+
+      '<label>Название<input name="title" maxlength="120" required placeholder="Например, подготовить доклад"></label>'+
+      '<div class="service-form-row"><label>Дата<input type="date" name="date" min="'+serviceMoscowTodayKey()+'" required value="'+serviceMoscowTodayKey()+'"></label>'+
+      '<label>Время<input type="time" name="time" required></label></div>'+
+      '<label>Комментарий (необязательно)<textarea name="note" maxlength="500" placeholder="Дополнительная информация"></textarea></label>'+
+      '<button type="submit" class="service-btn primary" '+(vkPersonalRemindersState==='loading'?'disabled':'')+'>Создать напоминание</button></form>'+
+      '<div class="service-list" style="margin-top:12px">'+list+'</div></section>';
+  }
   function serviceSave(){try{serviceData=serviceNormalizeData(serviceData);serviceData.updatedAt=Date.now();localStorage.setItem(STUDENT_SERVICE_KEY,JSON.stringify(serviceData));serviceMarkDirty();return true;}catch(e){toast('Не удалось сохранить данные');return false;}}
   window.kgeuUpdateSharedServiceDataLocal=function(data){
     try{
@@ -4650,11 +4719,12 @@ html.vk-light .kgeu-note-icon { color:#667085; }
     const r=serviceData.reminders||{enabled:false,taskDays:1,deadlineDays:1,eventDays:1};
     const items=serviceReminderItems();
     const rows=items.map(function(x){const when=x.days===0?'Сегодня':(x.days===1?'Завтра':'Через '+x.days+' дн.');return '<div class="service-reminder-row"><div class="service-row-main"><div class="service-row-title">'+serviceEsc(x.title)+'</div><div class="service-row-meta">'+serviceEsc(x.meta)+' · '+serviceDate(x.date)+'</div></div><span class="service-status '+(x.days===0?'today':'upcoming')+'">'+when+'</span></div>';}).join('')||'<div class="service-calendar-empty">На ближайшие 7 дней ничего нет.</div>';
+    const personalRemindersHtml=serviceRenderVkPersonalReminders();
     return '<div class="service-page"><section class="service-hero"><div class="service-kicker">Мой сервис</div><h1 class="service-title">Напоминания</h1><div class="service-sub">Локальные напоминания работают, когда сервис открыт. Telegram-уведомления подключим после backend.</div><div class="service-actions"><button class="service-btn" data-service-action="service-home">← Мой сервис</button><button class="service-btn" data-service-action="calendar">Календарь</button></div></section>'+
       '<section class="service-card"><div class="service-section-title"><h2>Настройки</h2><button class="service-toggle '+(r.enabled?'on':'')+'" data-reminders-toggle aria-label="Включить напоминания"></button></div>'+
       '<p>Включение: '+(r.enabled?'включено':'выключено')+'. Браузер может дополнительно запросить разрешение на уведомления.</p>'+
       '<div class="service-actions"><button class="service-btn primary" data-service-action="request-notifications">Разрешить уведомления</button></div></section>'+
-      '<section><div class="service-section-title"><h2>Ближайшие 7 дней</h2><span class="service-pill">'+items.length+'</span></div><div class="service-list">'+rows+'</div></section></div>';
+      '<section><div class="service-section-title"><h2>Ближайшие 7 дней</h2><span class="service-pill">'+items.length+'</span></div><div class="service-list">'+rows+'</div></section>'+personalRemindersHtml+'</div>';
   }
   function serviceRenderCalendar(){
     const d=new Date(serviceCalendarDate.getFullYear(),serviceCalendarDate.getMonth(),1);
@@ -4892,6 +4962,42 @@ html.vk-light .kgeu-note-icon { color:#667085; }
     document.querySelectorAll('[data-study-filter]').forEach(function(b){b.addEventListener('click',function(){serviceStudyFilter=b.getAttribute('data-study-filter')||'all';document.querySelectorAll('[data-study-filter]').forEach(function(x){x.classList.toggle('active',x===b);});serviceApplyStudyFilters();});});
     const reminderToggle=document.querySelector('[data-reminders-toggle]');
     if(reminderToggle) reminderToggle.addEventListener('click',function(){serviceData.reminders=serviceData.reminders||{taskDays:1,deadlineDays:1,eventDays:1};serviceData.reminders.enabled=!serviceData.reminders.enabled;serviceSave();document.getElementById('app').innerHTML=serviceRenderReminders();serviceBind();});
+
+    const personalReminderForm=document.querySelector('[data-vk-personal-reminder-form]');
+    if(personalReminderForm)personalReminderForm.addEventListener('submit',async function(event){
+      event.preventDefault();
+      const form=event.currentTarget;
+      const submit=form.querySelector('button[type="submit"]');
+      if(submit)submit.disabled=true;
+      const payload={
+        title:String(form.elements.title.value||'').trim(),
+        date:String(form.elements.date.value||''),
+        time:String(form.elements.time.value||''),
+        note:String(form.elements.note.value||'').trim()
+      };
+      try{
+        await serviceVkPersonalReminderRequest('POST',payload);
+        toast('Личное напоминание создано');
+        await serviceLoadVkPersonalReminders();
+      }catch(error){
+        toast(serviceVkReminderErrorText(error));
+        if(submit)submit.disabled=false;
+      }
+    });
+    document.querySelectorAll('[data-vk-reminder-delete]').forEach(function(button){
+      button.addEventListener('click',async function(){
+        const id=button.getAttribute('data-vk-reminder-delete')||'';
+        button.disabled=true;
+        try{
+          await serviceVkPersonalReminderRequest('DELETE',null,id);
+          toast('Напоминание удалено');
+          await serviceLoadVkPersonalReminders();
+        }catch(error){
+          toast(serviceVkReminderErrorText(error));
+          button.disabled=false;
+        }
+      });
+    });
     document.querySelectorAll('[data-service-action]').forEach(function(b){b.addEventListener('click',async function(){
       const a=b.getAttribute('data-service-action');
       if(a==='task'||a==='deadline'||a==='event'){document.getElementById('app').innerHTML=serviceRenderEntryForm(a);serviceBind();window.scrollTo({top:0,behavior:'smooth'});return;}
@@ -4899,7 +5005,7 @@ html.vk-light .kgeu-note-icon { color:#667085; }
       if(a==='note-custom')return serviceOpenCustomNote();
       if(a==='service-home'){document.getElementById('app').innerHTML=serviceRenderToday();serviceBind();window.scrollTo({top:0,behavior:'smooth'});return;}
       if(a==='calendar'){document.getElementById('app').innerHTML=serviceRenderCalendar();serviceBind();window.scrollTo({top:0,behavior:'smooth'});return;}
-      if(a==='reminders'){document.getElementById('app').innerHTML=serviceRenderReminders();serviceBind();window.scrollTo({top:0,behavior:'smooth'});return;}
+      if(a==='reminders'){document.getElementById('app').innerHTML=serviceRenderReminders();serviceBind();window.scrollTo({top:0,behavior:'smooth'});if(window.KGEU_VK_PLATFORM)serviceLoadVkPersonalReminders();return;}
       if(a==='analytics'){document.getElementById('app').innerHTML=serviceRenderAnalytics();serviceBind();window.scrollTo({top:0,behavior:'smooth'});return;}
       if(a==='data'){document.getElementById('app').innerHTML=serviceRenderData();serviceBind();window.scrollTo({top:0,behavior:'smooth'});return;}
       if(a==='sync'){document.getElementById('app').innerHTML=serviceRenderSync();serviceBind();window.scrollTo({top:0,behavior:'smooth'});return;}
