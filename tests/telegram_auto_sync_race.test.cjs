@@ -98,3 +98,78 @@ test('Telegram manual cloud restore aborts if local data changes during GET or c
   assert.ok(confirm < secondGuard && secondGuard < apply);
   assert.match(handler, /local_changes_during_cloud_restore/);
 });
+
+const manualStart = html.indexOf("if(a==='sync-now'){");
+const manualEnd = html.indexOf("if(a==='pull-cloud'){", manualStart);
+assert.ok(manualStart >= 0 && manualEnd > manualStart, 'Telegram manual push handler must exist');
+const manualPushSource = html.slice(manualStart, manualEnd);
+
+function createManualPushHarness(postGate) {
+  const state = {
+    meta: { dirty: true, lastServerSync: 200, lastServerRevision: 4 },
+    pushStarted: false,
+    expectedRevision: null,
+    scheduled: 0,
+    feedback: { textContent: '' },
+    app: { innerHTML: '' }
+  };
+  const factory = new Function('state', 'postGate', `
+    let serviceLocalRevision = 20;
+    const STUDENT_SERVICE_SYNC_KEY = 'sync-meta';
+    const localStorage = {
+      setItem(key, value) {
+        if (key === STUDENT_SERVICE_SYNC_KEY) state.meta = JSON.parse(value);
+      }
+    };
+    const window = { confirm() { return true; } };
+    const document = {
+      getElementById(id) {
+        if (id === 'service-sync-feedback') return state.feedback;
+        if (id === 'app') return state.app;
+        return null;
+      }
+    };
+    function serviceSyncMeta() { return Object.assign({}, state.meta); }
+    function servicePullFromBackend() {
+      return Promise.resolve({ found: true, revision: 4, updatedAt: 200 });
+    }
+    function servicePushToBackend(revision) {
+      state.pushStarted = true;
+      state.expectedRevision = revision;
+      return postGate.promise;
+    }
+    function serviceHasLocalContent() { return true; }
+    function serviceScheduleAutoSync() { state.scheduled += 1; }
+    function serviceEsc(value) { return String(value); }
+    function serviceRenderSync() { return 'sync'; }
+    function serviceBind() {}
+    function toast() {}
+    return {
+      run: async function(a) { ${manualPushSource} },
+      editDuringPost() {
+        serviceLocalRevision += 1;
+        state.meta.dirty = true;
+      }
+    };
+  `);
+  return { state, ...factory(state, postGate) };
+}
+
+test('Telegram manual push keeps edits made while POST is pending', async () => {
+  const postGate = deferred();
+  const h = createManualPushHarness(postGate);
+  const operation = h.run('sync-now');
+  for (let i = 0; i < 20 && !h.state.pushStarted; i += 1) {
+    await new Promise(resolve => setImmediate(resolve));
+  }
+  assert.equal(h.state.pushStarted, true);
+  h.editDuringPost();
+  postGate.resolve({ revision: 5, updatedAt: 300, status: 'saved' });
+  await operation;
+
+  assert.equal(h.state.expectedRevision, 4);
+  assert.equal(h.state.meta.lastServerRevision, 5);
+  assert.equal(h.state.meta.dirty, true, 'a successful older payload must not clear a newer local edit');
+  assert.equal(h.state.scheduled, 1, 'the newer local edit must be queued for another sync');
+  assert.match(h.state.feedback.textContent, /новые локальные изменения/);
+});
