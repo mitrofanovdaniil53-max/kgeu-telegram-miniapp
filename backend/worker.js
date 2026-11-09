@@ -680,6 +680,7 @@ export default {
           ok: true,
           accountId,
           provider: identity.provider,
+          providerUserId: identity.userId,
           linkedProviders: (linked.results || []).map(row => String(row.provider)),
           found: state.found,
           updatedAt: state.updatedAt,
