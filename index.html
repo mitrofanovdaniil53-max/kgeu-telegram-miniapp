@@ -3509,9 +3509,21 @@ html.tg-dark .kgeu-note-icon.has-note{color:#8FB1FF;background:rgba(143,177,255,
     serviceAutoSyncRunning=true;
     serviceSetAutoSyncStatus('Синхронизирую изменения…','busy');
     try{
-      const meta=serviceSyncMeta();
-      const localHasContent=serviceHasLocalContent();
+      // Capture the local generation before GET. A user edit made while the cloud
+      // request is in flight must be visible to the decision made after the pull.
+      const localRevisionAtPullStart=serviceLocalRevision;
+      let meta=serviceSyncMeta();
       const remote=await servicePullFromBackend();
+      // Refresh metadata and content after GET: the first snapshot may now be stale.
+      meta=serviceSyncMeta();
+      const localChangedDuringPull=serviceLocalRevision!==localRevisionAtPullStart;
+      const localHasContent=serviceHasLocalContent();
+      if(localChangedDuringPull&&!meta.dirty){
+        // Keep the in-memory generation guard authoritative even if localStorage
+        // could not persist the dirty flag during the concurrent edit.
+        meta.dirty=true;
+        try{localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(meta));}catch(e){}
+      }
       if(remote&&remote.found){
         const remoteAt=Number(remote.updatedAt||0);
         const lastSync=Number(meta.lastServerSync||0);
