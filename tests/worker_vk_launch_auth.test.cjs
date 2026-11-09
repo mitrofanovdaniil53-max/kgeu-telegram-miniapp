@@ -113,3 +113,8 @@ test('VK launch auth rejects malformed or mismatched app/user identifiers', asyn
     /vk_auth_invalid/
   );
 });
+
+test('authenticated account profile exposes the verified provider user ID', () => {
+  const backendSource = fs.readFileSync('backend/worker.js', 'utf8');
+  assert.match(backendSource, /providerUserId:\s*identity\.userId/);
+});

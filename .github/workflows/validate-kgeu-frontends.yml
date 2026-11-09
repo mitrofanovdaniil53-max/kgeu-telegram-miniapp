@@ -88,5 +88,7 @@ jobs:
         run: node --test tests/telegram_bot_notifications.test.cjs
       - name: Test VK bot class reminder timing
         run: node --test tests/vk_bot_reminder_window.test.cjs
+      - name: Test VK bot personal reminders API and delivery
+        run: node --test tests/vk_bot_personal_reminders.test.cjs
       - name: Test VK light/dark mobile glass controls and group labels
         run: node --test tests/vk_dark_theme_group_display.test.cjs
