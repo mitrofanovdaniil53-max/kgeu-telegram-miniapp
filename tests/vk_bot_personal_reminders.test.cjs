@@ -173,8 +173,8 @@ test('due VK personal reminder is sent once and removed only after successful VK
   assert.equal(kv.values.has(key), false);
   const vkCall = calls.find(call => call.url.includes('api.vk.com/method/messages.send'));
   assert.ok(vkCall, 'VK messages.send must be called');
-  assert.match(String(vkCall.options.body), /Проверить расписание/);
-  assert.match(String(vkCall.options.body), /Не опоздать/);
+  assert.match(new URLSearchParams(String(vkCall.options.body)).get('message'), /Проверить расписание/);
+  assert.match(new URLSearchParams(String(vkCall.options.body)).get('message'), /Не опоздать/);
 });
 
 test('overdue VK personal reminders older than ten minutes are discarded without sending', async () => {
