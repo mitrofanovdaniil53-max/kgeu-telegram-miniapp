@@ -4087,7 +4087,7 @@ html.vk-light .kgeu-note-icon { color:#667085; }
     }).join('');
     const list=vkPersonalRemindersState==='ready'?(rows||'<div class="service-empty">Пока нет личных напоминаний.</div>'):status;
     return '<section class="service-card"><div class="service-section-title"><h2>Личные напоминания через VK-бота</h2><span class="service-pill">'+vkPersonalReminders.length+'</span></div>'+
-      '<p>Бот отправит сообщение в личный диалог в указанное время. Приложение может быть закрыто. Время указывается по Москве.</p>'+
+      '<p>Бот отправит сообщение в личный диалог; проверка выполняется раз в 5 минут, поэтому возможна задержка до 5 минут. Приложение может быть закрыто. Время указывается по Москве.</p>'+
       '<form class="service-form" data-vk-personal-reminder-form>'+
       '<label>Название<input name="title" maxlength="120" required placeholder="Например, подготовить доклад"></label>'+
       '<div class="service-form-row"><label>Дата<input type="date" name="date" min="'+serviceMoscowTodayKey()+'" required value="'+serviceMoscowTodayKey()+'"></label>'+
