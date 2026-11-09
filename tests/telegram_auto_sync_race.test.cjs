@@ -81,3 +81,20 @@ test('Telegram refreshes dirty metadata after GET and pushes against an unchange
   assert.equal(h.state.expectedRevision, 4, 'the write must use the revision returned by GET');
   assert.equal(h.state.meta.dirty, false, 'successful upload should clear the dirty flag');
 });
+
+test('Telegram manual cloud restore aborts if local data changes during GET or confirmation', () => {
+  const pullStart = html.indexOf("if(a==='pull-cloud'){");
+  const pullEnd = html.indexOf("if(a==='export-sync')", pullStart);
+  assert.ok(pullStart >= 0 && pullEnd > pullStart, 'manual pull handler must exist');
+  const handler = html.slice(pullStart, pullEnd);
+  const capture = handler.indexOf('const localRevisionAtPullStart=serviceLocalRevision;');
+  const get = handler.indexOf('const snapshot=await servicePullFromBackend();');
+  const firstGuard = handler.indexOf("if(serviceLocalRevision!==localRevisionAtPullStart)throw new Error('local_changes_during_cloud_restore');");
+  const confirm = handler.indexOf('window.confirm(');
+  const secondGuard = handler.indexOf("if(serviceLocalRevision!==localRevisionAtPullStart)throw new Error('local_changes_during_cloud_restore');", firstGuard + 1);
+  const apply = handler.indexOf('serviceApplyCloudSnapshot(snapshot);');
+  assert.ok(capture >= 0 && capture < get);
+  assert.ok(get < firstGuard && firstGuard < confirm);
+  assert.ok(confirm < secondGuard && secondGuard < apply);
+  assert.match(handler, /local_changes_during_cloud_restore/);
+});
