@@ -1,3 +1,29 @@
+## Current repository snapshot — 2026-11-08
+
+> **Verified repository state:** 2026-11-08, after PR #99.
+>
+> - **Repository:** https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp
+> - **Current `main` HEAD:** `0544f062c854bba8b94dc1150a307b4f7c15c5f0` — `fix(vk): add timeouts to schedule and group directory requests (#99)`.
+> - **Open pull requests:** before this documentation PR was opened, the repository's `GET /pulls?state=open` endpoint returned no existing open PRs.
+> - **PR #99:** merged. It adds the existing 12-second timeout/AbortController pattern to VK schedule and group-directory fetches; no Worker/API/D1/secrets/account-data/launch-URL changes were included. The regression test extracts and executes the real helper in both frontends, checks timeout rejection and abort of the stalled request, and checks a successful response.
+> - **PR-head CI:** run [#416](https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp/actions/runs/42406806692) passed for PR head `539e91633924c41fddfa7c472f83cf6db94fcc69`.
+> - **Post-merge CI:** run [#417](https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp/actions/runs/42406857939) passed on push for the current `main` SHA. The syntax job, migration tests, shared-state/revision tests, schedule proxy validation, legacy-field preservation, VK launch signature, sync-race/restore guards, and theme/group-label tests all passed.
+> - **GitHub Pages:** build/deployment run [#101](https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp/actions/runs/42406857737) completed successfully for the same current `main` SHA. This is deployment-job evidence, not a browser or Mini App shell test.
+> - **PR #100 validation (2026-11-08):** the latest documentation commit `d40ad5bdab815d193d891dfd8a1dffc4e4ebbd58` passed GitHub Actions run [#419](https://github.com/mitrofanovdaniil53-max/kgeu-telegram-miniapp/actions/runs/42508032264); all 14 job steps completed successfully. Cloudflare's Git integration also reported a successful **preview** deployment for this commit. This is not a production deployment and does not establish browser/Mini App runtime behavior.
+> - **Cloudflare Worker control plane:** read-only inspection at 2026-11-08 recorded latest deployment `a75a2923-f322-436f-8ea9-5338c85648b0`, created 2026-11-07 19:34:31 UTC, routing 100% to Worker version `c71f91c5-a8e8-4270-873f-3ce0bc6c0ebc` (version 605). Its script ETag `d3e5c69687cea5b69c381c9563b012b512a7a8ac0ba14f78b2582c05fbc93778` matches versions 598 and 601; this indicates the Worker script bundle did not change across these uploads. D1 and the expected secret bindings were present; secret values were not read.
+> - **Issue #30:** remains open. Published Telegram/VK shell acceptance, fresh/disposable-account linking and bidirectional sync, conflict/offline/recovery checks, and the expanded attachment/points cases remain unrecorded. Use the existing `docs/ux-manual-test-results-template.md` and `docs/SHARED_SYNC_ACCEPTANCE.md`; do not create duplicate checklists.
+> - The published Pages URLs were not accessible to the available web verifier in this check. Worker `/api/health` was not directly reverified here; control-plane deployment evidence alone does not establish HTTP health.
+>
+> **Next sequence**
+> 1. Complete manual acceptance in the actual Telegram and VK apps, separately, using disposable accounts and records.
+> 2. Record device, app/WebView version, commit/deployment, viewport/theme, exact steps, observed result, errors and evidence in the existing manual template.
+> 3. Complete the shared-sync/recovery and attachment-boundary checks in the existing checklist.
+> 4. Keep issue #30 open until evidence is recorded or the owner explicitly descopes the remaining checks.
+>
+> **Evidence labels:** source reviewed ≠ automated test passed ≠ owner-reported ≠ manual shell verified.
+
+---
+
 ## Current repository snapshot — 2026-11-07
 
 > **Verified repository state:** 2026-11-07, after merging PR #97.
