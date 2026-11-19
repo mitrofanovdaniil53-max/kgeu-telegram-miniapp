@@ -49,7 +49,7 @@ function createHarness(options = {}) {
   }
   if (state.legacyMeta !== null) state.storage.set('kgeu_student_service_sync_v1', JSON.stringify(state.legacyMeta));
 
-  const factory = new Function('state', 'helperSource', 'syncSource', `
+  const factory = new Function('state', 'helperSource', 'syncSource', 'clone', `
     const STUDENT_SERVICE_KEY = 'kgeu_student_service_v1';
     const SERVICE_CACHE_KEY = 'kgeu_student_service_cache_v1';
     const DEFAULT_SERVICE = (${JSON.stringify(emptyService())});
