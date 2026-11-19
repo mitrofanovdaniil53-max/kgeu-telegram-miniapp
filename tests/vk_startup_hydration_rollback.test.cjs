@@ -67,7 +67,7 @@ test('backup persists and verifies all cache and metadata snapshots', () => {
 
 test('rollback attempts every key even when one restoration write fails', () => {
   for (const key of [keys.student, keys.cache, keys.sync, keys.meta]) {
-    const h = harness({ failSet: { key, at: 2 } });
+    const h = harness({ failSet: { key, at: 1 } });
     assert.equal(h.api.backupVkServiceCacheBeforeHydration(), true);
     for (const target of [keys.student, keys.cache, keys.sync, keys.meta]) h.map.set(target, '"cloud"');
     const result = h.api.restoreVkServiceCacheAfterFailedHydration(keys.backup);
