@@ -115,6 +115,15 @@ test('get() error during listUsers fails the complete scan instead of returning 
   await assert.rejects(vk.listUsers({ KGEU_VK_USERS: vkKv }), /KV_READ_ERROR/);
 });
 
+test('saveUser does not perform read-after-write verification that can fail after a successful put', async () => {
+  const tg = loadWorker(tgPath), vk = loadWorker(vkPath);
+  const tgKv = makeKv(), vkKv = makeKv();
+  await tg.saveUser({ KGEU_SCHEDULE: tgKv }, { telegramId: '1' });
+  await vk.saveUser({ KGEU_VK_USERS: vkKv }, { vkId: 1 });
+  assert.equal(tgKv.calls.get.length, 0);
+  assert.equal(vkKv.calls.get.length, 0);
+});
+
 test('VK loadGroups falls back to upstream API after KV cache read error and does not overwrite cache', async () => {
   let fetchCount = 0;
   const vk = loadWorker(vkPath, {
@@ -145,6 +154,14 @@ test('KV put/delete errors are propagated and not reported as successful operati
   const vkDelete = makeKv({ values: { [oldVk]: JSON.stringify({ vkId: '1', fireAt: now - 20 * 60 * 1000 }) }, failDelete: () => true });
   await assert.rejects(tg.processPersonalReminders({ KGEU_SCHEDULE: tgDelete }, now), /injected delete failure/);
   await assert.rejects(vk.processPersonalReminders({ KGEU_VK_USERS: vkDelete }, now), /injected delete failure/);
+});
+
+test('VK cron performs only one complete user scan and shares its snapshot across notification jobs', async () => {
+  const vk = loadWorker(vkPath);
+  const kv = makeKv();
+  await vk.runCron({ KGEU_VK_USERS: kv, VK_TOKEN: 'test-token' });
+  assert.equal(kv.calls.list.filter(prefix => prefix === 'vk:user:').length, 1);
+  assert.equal(kv.calls.list.filter(prefix => prefix === 'user:').length, 1);
 });
 
 test('VK cron skips all broadcasts when the complete user scan fails', async () => {
