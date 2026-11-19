@@ -42,19 +42,21 @@ function createHarness(options = {}) {
     postCount: 0,
     statuses: [],
     failBackup: !!options.failBackup,
+    remoteGate: options.remoteGate || null,
     storage: new Map()
   };
   if (state.cache != null) {
     state.storage.set('kgeu_student_service_v1', JSON.stringify(state.cache));
-    state.storage.set('kgeu_student_service_cache_v1', JSON.stringify(state.cache));
+    state.storage.set('kgeu_vk_shared_service_cache_v1', JSON.stringify(state.cache));
   }
   if (state.legacyMeta !== null) state.storage.set('kgeu_student_service_sync_v1', JSON.stringify(state.legacyMeta));
 
   const factory = new Function('state', 'helperSource', 'syncSource', 'clone', `
     const STUDENT_SERVICE_KEY = 'kgeu_student_service_v1';
-    const SERVICE_CACHE_KEY = 'kgeu_student_service_cache_v1';
+    const SERVICE_CACHE_KEY = 'kgeu_vk_shared_service_cache_v1';
     const DEFAULT_SERVICE = (${JSON.stringify(emptyService())});
     let busy = false;
+    let serviceHydrationUnsafe = false;
     const snapshot = { serviceData: DEFAULT_SERVICE, personalData: { version: 1, notes: {} }, profileData: {} };
     const navigator = { onLine: true };
     const document = { visibilityState: 'visible' };
@@ -74,15 +76,20 @@ function createHarness(options = {}) {
         localStorage.setItem('kgeu_student_service_sync_v1', JSON.stringify(legacy));
         return true;
       },
-      kgeuMarkStudentServiceSynced() {}
+      kgeuMarkStudentServiceSynced() {},
+      kgeuSetSharedServiceDataInMemory(data) { state.cache = clone(data); return true; },
+      kgeuGetSharedServiceData() { return clone(state.cache); }
     };
     function readMeta() { return Object.assign({}, state.meta, { dirtyNotes: [...(state.meta.dirtyNotes || [])] }); }
     function writeMeta(meta) { state.meta = Object.assign({}, meta, { dirtyNotes: [...(meta.dirtyNotes || [])] }); }
     function readCachedService() { return state.cache == null ? null : clone(state.cache); }
+    function readCachedServiceState() { return { valid: true, exists: state.cache != null, data: readCachedService() }; }
     function writeCachedService(data) {
       state.cache = clone(data);
-      localStorage.setItem(STUDENT_SERVICE_KEY, JSON.stringify(data));
-      localStorage.setItem(SERVICE_CACHE_KEY, JSON.stringify(data));
+      const value = JSON.stringify(data);
+      localStorage.setItem(STUDENT_SERVICE_KEY, value);
+      localStorage.setItem(SERVICE_CACHE_KEY, value);
+      return { ok: true, keys: [STUDENT_SERVICE_KEY, SERVICE_CACHE_KEY], errors: [] };
     }
     function hasMeaningfulServiceData(data) {
       if (!data || typeof data !== 'object') return false;
@@ -124,6 +131,7 @@ function createHarness(options = {}) {
     async function request(url, options) {
       if (url === '/api/account/me') return { linkedProviders: ['telegram', 'vk'] };
       if (url === '/api/sync' && (!options || options.method === 'GET')) {
+        if (state.remoteGate) return clone(await state.remoteGate.promise);
         if (state.remote instanceof Error) throw state.remote;
         return clone(state.remote);
       }
@@ -235,4 +243,31 @@ test('repeated startup hydration is idempotent and does not duplicate records', 
   await h.syncNow('startup');
   assert.equal(h.state.applyCount, 1);
   assert.deepEqual(h.state.cache.tasks.map(item => item.id), ['cloud-1']);
+});
+
+
+function deferred() {
+  let resolve;
+  const promise = new Promise(res => { resolve = res; });
+  return { promise, resolve };
+}
+
+test('local edit during pending startup GET is preserved and not overwritten by hydration', async () => {
+  const gate = deferred();
+  const h = createHarness({ remoteGate: gate });
+  const pending = h.syncNow('startup');
+  await new Promise(resolve => setImmediate(resolve));
+  const local = serviceWithTask('local-pending', 'Edited during GET');
+  h.state.cache = clone(local);
+  h.state.storage.set('kgeu_student_service_v1', JSON.stringify(local));
+  h.state.storage.set('kgeu_vk_shared_service_cache_v1', JSON.stringify(local));
+  h.state.meta.dirty = true;
+  h.state.meta.dirtyService = true;
+  h.state.legacyMeta = { dirty: true, lastServerSync: 700 };
+  h.state.storage.set('kgeu_student_service_sync_v1', JSON.stringify(h.state.legacyMeta));
+  gate.resolve({ found: true, revision: 8, updatedAt: 800, serviceData: serviceWithTask('cloud-pending', 'Cloud pending'), personalData: { version: 1, notes: {} }, profileData: {} });
+  await pending;
+  assert.equal(h.state.applyCount, 0);
+  assert.deepEqual(h.state.cache, local);
+  assert.equal(h.state.postCount, 0);
 });
