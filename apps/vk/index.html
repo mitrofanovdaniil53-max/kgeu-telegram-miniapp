@@ -4105,14 +4105,31 @@ html.vk-light .kgeu-note-icon { color:#667085; }
     }catch(e){}
   };
   window.kgeuApplySharedServiceData=function(data,updatedAt){
+    const previousServiceData=serviceData;
+    const previousServiceRaw=localStorage.getItem(STUDENT_SERVICE_KEY);
+    const previousSyncMetaRaw=localStorage.getItem(STUDENT_SERVICE_SYNC_KEY);
     try{
-      serviceBackupBeforeCloudRestore();
+      serviceBackupBeforeCloudRestore(true);
       serviceData=serviceNormalizeData(data||serviceEmptyData());
-      localStorage.setItem(STUDENT_SERVICE_KEY,JSON.stringify(serviceData));
+      const nextServiceRaw=JSON.stringify(serviceData);
+      localStorage.setItem(STUDENT_SERVICE_KEY,nextServiceRaw);
+      if(localStorage.getItem(STUDENT_SERVICE_KEY)!==nextServiceRaw)throw new Error('shared_service_cache_write_failed');
       const meta=serviceSyncMeta();meta.dirty=false;meta.lastServerSync=Number(updatedAt||Date.now());meta.lastLocalSave=Number(serviceData.updatedAt||Date.now());
-      localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(meta));
+      const nextSyncMetaRaw=JSON.stringify(meta);
+      localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,nextSyncMetaRaw);
+      if(localStorage.getItem(STUDENT_SERVICE_SYNC_KEY)!==nextSyncMetaRaw)throw new Error('shared_service_meta_write_failed');
       if(document.querySelector('.service-page'))serviceRefreshVisibleView();
-    }catch(e){}
+      return true;
+    }catch(e){
+      serviceData=previousServiceData;
+      try{
+        if(previousServiceRaw==null)localStorage.removeItem(STUDENT_SERVICE_KEY);
+        else localStorage.setItem(STUDENT_SERVICE_KEY,previousServiceRaw);
+        if(previousSyncMetaRaw==null)localStorage.removeItem(STUDENT_SERVICE_SYNC_KEY);
+        else localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,previousSyncMetaRaw);
+      }catch(restoreError){}
+      return false;
+    }
   };
   window.kgeuMarkStudentServiceSynced=function(updatedAt){
     try{const meta=serviceSyncMeta();meta.dirty=false;meta.lastServerSync=Number(updatedAt||Date.now());meta.lastLocalSave=Number(serviceData.updatedAt||Date.now());localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(meta));}catch(e){}
@@ -5891,6 +5908,85 @@ document.addEventListener("DOMContentLoaded", () => {
     meta.dirtyService = false;
     writeMeta(meta);
   };
+  function readLegacyServiceSyncMetaForSharedSync() {
+    const raw = localStorage.getItem('kgeu_student_service_sync_v1');
+    if (raw == null) return { exists: false, valid: true, dirty: false };
+    try {
+      const value = JSON.parse(raw);
+      if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return { exists: true, valid: false, dirty: false };
+      }
+      return { exists: true, valid: true, dirty: !!value.dirty };
+    } catch (e) {
+      return { exists: true, valid: false, dirty: false };
+    }
+  }
+
+  function backupVkServiceCacheBeforeHydration() {
+    const key = 'kgeu_vk_service_before_hydration_v1';
+    try {
+      const backup = JSON.stringify({
+        savedAt: Date.now(),
+        studentService: localStorage.getItem(STUDENT_SERVICE_KEY),
+        serviceCache: localStorage.getItem(SERVICE_CACHE_KEY),
+        legacySyncMeta: localStorage.getItem('kgeu_student_service_sync_v1')
+      });
+      localStorage.setItem(key, backup);
+      return localStorage.getItem(key) === backup;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function restoreVkServiceCacheAfterFailedHydration(backupKey) {
+    try {
+      const raw = localStorage.getItem(backupKey);
+      if (!raw) return;
+      const backup = JSON.parse(raw);
+      if (backup.studentService == null) localStorage.removeItem(STUDENT_SERVICE_KEY);
+      else localStorage.setItem(STUDENT_SERVICE_KEY, backup.studentService);
+      if (backup.serviceCache == null) localStorage.removeItem(SERVICE_CACHE_KEY);
+      else localStorage.setItem(SERVICE_CACHE_KEY, backup.serviceCache);
+      if (backup.legacySyncMeta == null) localStorage.removeItem('kgeu_student_service_sync_v1');
+      else localStorage.setItem('kgeu_student_service_sync_v1', backup.legacySyncMeta);
+    } catch (e) {}
+  }
+
+  function applyCloudServiceDataSafely(data, updatedAt) {
+    const backupKey = 'kgeu_vk_service_before_hydration_v1';
+    if (!backupVkServiceCacheBeforeHydration()) return false;
+    let applied = false;
+    try {
+      if (typeof window.kgeuApplySharedServiceData === 'function') {
+        applied = window.kgeuApplySharedServiceData(data, updatedAt) === true;
+      } else {
+        writeCachedService(data);
+        applied = true;
+      }
+      if (!applied) throw new Error('shared_service_hydration_failed');
+      writeCachedService(data);
+      const primary = JSON.parse(localStorage.getItem(STUDENT_SERVICE_KEY) || 'null');
+      const secondary = JSON.parse(localStorage.getItem(SERVICE_CACHE_KEY) || 'null');
+      if (!sameServiceContent(primary, data) || !sameServiceContent(secondary, data)) {
+        throw new Error('shared_service_cache_verification_failed');
+      }
+      return true;
+    } catch (e) {
+      try {
+        if (typeof window.kgeuApplySharedServiceData === 'function') {
+          const raw = localStorage.getItem(backupKey);
+          const backup = raw ? JSON.parse(raw) : null;
+          const previous = backup && backup.studentService
+            ? JSON.parse(backup.studentService)
+            : DEFAULT_SERVICE;
+          window.kgeuApplySharedServiceData(previous, Date.now());
+        }
+      } catch (restoreError) {}
+      restoreVkServiceCacheAfterFailedHydration(backupKey);
+      return false;
+    }
+  }
+
   async function syncNow(reason) {
     if (busy || navigator.onLine === false || document.visibilityState !== 'visible') return;
     busy = true;
@@ -5918,11 +6014,19 @@ document.addEventListener("DOMContentLoaded", () => {
       if (remote && remote.found) {
         const remoteRevision = Number(remote.revision || 0);
         const cachedService = readCachedService();
+        const legacyServiceMeta = readLegacyServiceSyncMetaForSharedSync();
+        const serviceMetadataConflict = legacyServiceMeta.exists
+          && (!legacyServiceMeta.valid || legacyServiceMeta.dirty !== !!meta.dirtyService);
+        let serviceHydrationBlocked = false;
         let mergedFirstLink = false;
         // First link is an identity merge, not permission to discard pre-existing VK-local Student Service data.
         // If both sides contain different meaningful service records, pause automatic sync and let the user choose
         // one of the explicit, backup-protected conflict actions in Settings.
-        if (!meta.initialized && cachedService && hasMeaningfulServiceData(cachedService)
+        if (serviceMetadataConflict) {
+          snapshot.serviceData = cachedService || DEFAULT_SERVICE;
+          serviceHydrationBlocked = true;
+          setStatus('Метаданные синхронизации Student Service расходятся. Локальная версия сохранена; автоматическое применение облачных данных приостановлено.');
+        } else if (!meta.initialized && cachedService && hasMeaningfulServiceData(cachedService)
             && !sameServiceContent(cachedService, remote.serviceData || DEFAULT_SERVICE)) {
           const backupKey = 'kgeu_vk_local_before_first_link_v1';
           try {
@@ -5947,24 +6051,56 @@ document.addEventListener("DOMContentLoaded", () => {
           setStatus('Есть конфликт настроек профиля: в Telegram изменились общие данные после последней синхронизации. Локальные настройки VK сохранены; сначала получи облачную версию и сравни изменения.');
           return;
         }
-        if (meta.dirtyService && cachedService && !mergedFirstLink) {
-          if (!meta.lastServerRevision || remoteRevision > Number(meta.lastServerRevision || 0)) {
+        if (serviceMetadataConflict) {
+          shouldPush = false;
+        } else if (meta.dirtyService && !mergedFirstLink) {
+          if (!cachedService) {
+            snapshot.serviceData = DEFAULT_SERVICE;
+            serviceHydrationBlocked = true;
+            setStatus('Есть локальные изменения Student Service, но локальный кэш не найден. Облачная версия не применена автоматически.');
+          } else if (!meta.lastServerRevision || remoteRevision > Number(meta.lastServerRevision || 0)) {
             snapshot.serviceData = cachedService;
             renderSharedServiceView();
             setStatus('Есть конфликт: в Telegram изменились данные после последней синхронизации. Локальная версия VK сохранена; выбери, какую версию оставить, в настройках синхронизации.');
             return;
+          } else {
+            snapshot.serviceData = cachedService;
+            shouldPush = true;
           }
-          snapshot.serviceData = cachedService;
-          shouldPush = true;
         } else if (mergedFirstLink) {
           // Keep the just-created union; the ordinary first-sync pull must not replace it.
         } else {
-          const revisionChanged = !meta.initialized || !cachedService || remoteRevision > Number(meta.lastServerRevision || 0);
-          snapshot.serviceData = remote.serviceData || DEFAULT_SERVICE;
-          if (revisionChanged) {
-            writeCachedService(snapshot.serviceData);
-            if (typeof window.kgeuApplySharedServiceData === 'function') window.kgeuApplySharedServiceData(snapshot.serviceData, remote.updatedAt);
-            renderSharedServiceView();
+          const remoteServiceData = remote.serviceData || DEFAULT_SERVICE;
+          const lastServerRevision = Number(meta.lastServerRevision || 0);
+          const localHasServiceData = hasMeaningfulServiceData(cachedService);
+          const remoteHasServiceData = hasMeaningfulServiceData(remoteServiceData);
+          const contentMatches = !!cachedService && sameServiceContent(cachedService, remoteServiceData);
+          const cloudIsNotOlder = remoteRevision >= lastServerRevision;
+
+          if (localHasServiceData && !remoteHasServiceData) {
+            snapshot.serviceData = cachedService;
+            serviceHydrationBlocked = true;
+          } else if (localHasServiceData && remoteRevision === lastServerRevision && !contentMatches) {
+            snapshot.serviceData = cachedService;
+            serviceHydrationBlocked = true;
+          } else {
+            snapshot.serviceData = remoteServiceData;
+            const revisionChanged = !meta.initialized || !cachedService || remoteRevision > lastServerRevision;
+            const emptyLocalNeedsHydration = !!cachedService && !localHasServiceData
+              && remoteHasServiceData && remoteRevision === lastServerRevision;
+            const shouldHydrate = cloudIsNotOlder && !contentMatches
+              && (revisionChanged || emptyLocalNeedsHydration);
+            if (shouldHydrate) {
+              if (applyCloudServiceDataSafely(remoteServiceData, remote.updatedAt)) {
+                renderSharedServiceView();
+              } else {
+                snapshot.serviceData = cachedService || DEFAULT_SERVICE;
+                serviceHydrationBlocked = true;
+              }
+            }
+          }
+          if (serviceHydrationBlocked) {
+            setStatus('Student Service не обновлён автоматически: обнаружено расхождение данных или метаданных. Локальная версия сохранена для проверки.');
           }
         }
         const merged = mergeNotes(remote.personalData, local, meta.dirtyNotes || []);
@@ -6006,6 +6142,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
+      if (serviceHydrationBlocked) shouldPush = false;
       if (shouldPush) {
         const result = await request('/api/sync', { method: 'POST', body: JSON.stringify(payloadForSync(personal, profile, Number(remote && remote.revision || 0))) });
         const latestMetaAfterPush = readMeta();
@@ -6056,7 +6193,9 @@ document.addEventListener("DOMContentLoaded", () => {
         snapshot.personalData = personal;
         snapshot.profileData = profile;
         renderSharedServiceView();
-        setStatus('Данные VK и Telegram синхронизированы.');
+        setStatus(serviceHydrationBlocked
+          ? 'Данные Student Service сохранены локально: обнаружен конфликт содержимого или метаданных. Проверь версии перед повторной синхронизацией.'
+          : 'Данные VK и Telegram синхронизированы.');
       }
     } catch (e) {
       if (String(e && e.message || '') === 'sync_revision_conflict') {
