@@ -221,7 +221,7 @@ async function migrateLegacyUser(env,telegramId){
 
 async function listUsers(env){
  const users=new Map();
- const scan=async(prefix,legacy=false)=>{const names=await listKvKeys(env.KGEU_SCHEDULE,prefix);for(const name of names){if(legacy&&!/^user:\\d+$/.test(name))continue;const st=requireKvRead(await readKvState(env.KGEU_SCHEDULE,name),name);if(st.status==="NOT_FOUND")throw new Error("KV_SCAN_INCOMPLETE: "+name);const u=JSON.parse(st.value);if(!u||typeof u!=="object")throw new Error("KV_SCAN_INVALID_USER: "+name);if(u.vkId!=null&&u.telegramId==null){if(legacy)continue;throw new Error("KV_SCAN_PLATFORM_MISMATCH: "+name);}if(u.telegramId==null)throw new Error("KV_SCAN_UNVERIFIABLE_USER: "+name);const id=String(u.telegramId),expected=legacy?name.slice(5):name.slice("telegram:user:".length);if(id!==expected)throw new Error("KV_SCAN_ID_MISMATCH: "+name);users.set(id,u);}};
+ const scan=async(prefix,legacy=false)=>{const names=await listKvKeys(env.KGEU_SCHEDULE,prefix);for(const name of names){if(legacy&&!/^user:\\d+$/.test(name))continue;const st=requireKvRead(await readKvState(env.KGEU_SCHEDULE,name),name);if(st.status==="NOT_FOUND")throw new Error("KV_SCAN_INCOMPLETE: "+name);const u=JSON.parse(st.value);if(!u||typeof u!=="object")throw new Error("KV_SCAN_INVALID_USER: "+name);if(u.vkId!=null&&u.telegramId==null){if(legacy)continue;throw new Error("KV_SCAN_PLATFORM_MISMATCH: "+name);}if(u.telegramId==null)throw new Error("KV_SCAN_UNVERIFIABLE_USER: "+name);const id=String(u.telegramId),expected=legacy?name.slice(5):name.slice("telegram:user:".length);if(id!==expected)throw new Error("KV_SCAN_ID_MISMATCH: "+name);if(!users.has(id))users.set(id,u);}};
  await scan("telegram:user:");await scan("user:",true);return [...users.values()];
 }
 
@@ -1848,7 +1848,7 @@ function personalReminderKey(telegramId, reminderId) {
 
 async function processPersonalReminders(env,now=Date.now()){
  const names=[...await listKvKeys(env.KGEU_SCHEDULE,"telegram:personal-reminder:"),...await listKvKeys(env.KGEU_SCHEDULE,"personal-reminder:")];
- for(const name of [...new Set(names)]){const st=requireKvRead(await readKvState(env.KGEU_SCHEDULE,name,"json"),name);if(st.status==="NOT_FOUND")continue;const r=st.value;if(!r||!/^\\d+$/.test(String(r.telegramId||""))||!Number.isFinite(Number(r.fireAt)))throw new Error("PERSONAL_REMINDER_STATE_INVALID: "+name);const id=name.startsWith("telegram:personal-reminder:")?name.slice("telegram:personal-reminder:".length).split(":")[0]:name.slice("personal-reminder:".length).split(":")[0];if(String(r.telegramId)!==id)throw new Error("PERSONAL_REMINDER_ID_MISMATCH: "+name);const fireAt=Number(r.fireAt);if(fireAt>now)continue;if(fireAt<now-10*60*1000){await env.KGEU_SCHEDULE.delete(name);continue;}const msg=`🔔 <b>Напоминание</b>\\n\\n<b>${esc(r.title)}</b>\\n📅 ${esc(formatRuDate(r.date))} · ${esc(r.time)}`+(r.note?`\\n\\n${esc(r.note)}`:"");const result=await sendMessage(env,r.telegramId,msg);if(result&&result.ok)await env.KGEU_SCHEDULE.delete(name);}
+ for(const name of [...new Set(names)]){const st=requireKvRead(await readKvState(env.KGEU_SCHEDULE,name,"json"),name);if(st.status==="NOT_FOUND")continue;const r=st.value;if(r&&r.vkId!=null&&r.telegramId==null)continue;if(!r||!/^\\d+$/.test(String(r.telegramId||""))||!Number.isFinite(Number(r.fireAt)))throw new Error("PERSONAL_REMINDER_STATE_INVALID: "+name);const id=name.startsWith("telegram:personal-reminder:")?name.slice("telegram:personal-reminder:".length).split(":")[0]:name.slice("personal-reminder:".length).split(":")[0];if(String(r.telegramId)!==id)throw new Error("PERSONAL_REMINDER_ID_MISMATCH: "+name);const fireAt=Number(r.fireAt);if(fireAt>now)continue;if(fireAt<now-10*60*1000){await env.KGEU_SCHEDULE.delete(name);continue;}const msg=`🔔 <b>Напоминание</b>\\n\\n<b>${esc(r.title)}</b>\\n📅 ${esc(formatRuDate(r.date))} · ${esc(r.time)}`+(r.note?`\\n\\n${esc(r.note)}`:"");const result=await sendMessage(env,r.telegramId,msg);if(result&&result.ok)await env.KGEU_SCHEDULE.delete(name);}
 }
 
 async function runNotificationsJob(env) {
@@ -1965,7 +1965,7 @@ async function handleMiniAppReminders(request, env) {
   if (request.method === 'GET') {
     const reminders=[];
     const names=[...await listKvKeys(env.KGEU_SCHEDULE,prefix),...await listKvKeys(env.KGEU_SCHEDULE,legacyPrefix)];
-    for(const name of [...new Set(names)]){const st=requireKvRead(await readKvState(env.KGEU_SCHEDULE,name,"json"),name);if(st.status==="NOT_FOUND")throw new Error("KV_SCAN_INCOMPLETE: "+name);const r=st.value;if(!r||String(r.telegramId)!==String(tgUser.id)||!Number.isFinite(Number(r.fireAt)))throw new Error("PERSONAL_REMINDER_STATE_INVALID: "+name);if(Number(r.fireAt)>Date.now())reminders.push(r);}
+    for(const name of [...new Set(names)]){const st=requireKvRead(await readKvState(env.KGEU_SCHEDULE,name,"json"),name);if(st.status==="NOT_FOUND")throw new Error("KV_SCAN_INCOMPLETE: "+name);const r=st.value;if(r&&r.vkId!=null&&r.telegramId==null)continue;if(!r||String(r.telegramId)!==String(tgUser.id)||!Number.isFinite(Number(r.fireAt)))throw new Error("PERSONAL_REMINDER_STATE_INVALID: "+name);if(Number(r.fireAt)>Date.now())reminders.push(r);}
     reminders.sort((a,b)=>Number(a.fireAt)-Number(b.fireAt));
     return miniAppJson(request,{ok:true,reminders});
   }
