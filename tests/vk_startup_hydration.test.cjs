@@ -307,7 +307,7 @@ test('partial or malformed shared metadata blocks startup GET, hydration and POS
   await h.syncNow('startup');
   assert.equal(h.state.applyCount, 0);
   assert.equal(h.state.postCount, 0);
-  assert.ok(h.state.statuses.some(item => /метаданные синхронизации повреждены/.test(item.message)));
+  assert.ok(h.state.statuses.some(item => /метаданные синхронизации повреждены/i.test(item.message)));
 });
 
 test('dirty local service state is preserved when the cloud revision is newer', async () => {
