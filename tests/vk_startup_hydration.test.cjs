@@ -60,6 +60,7 @@ function createHarness(options = {}) {
     const DEFAULT_SERVICE = (${JSON.stringify(emptyService())});
     let busy = false;
     let serviceHydrationUnsafe = false;
+    let sharedSyncMetadataWriteFailed = false;
     const snapshot = { serviceData: DEFAULT_SERVICE, personalData: { version: 1, notes: {} }, profileData: {} };
     const navigator = { onLine: true };
     const document = { visibilityState: 'visible' };
