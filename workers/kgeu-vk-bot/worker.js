@@ -29,6 +29,8 @@ const GROUP_CACHE_TTL = 6 * 60 * 60 * 1000;
 
 // Explicit KV read states. READ_ERROR is never interpreted as NOT_FOUND.
 function stableRandomId(seed){let hash=2166136261;for(const char of String(seed)){hash^=char.charCodeAt(0);hash=Math.imul(hash,16777619);}return(hash>>>0)%2147483647||1;}
+async function kvPut(kv,key,value,options){try{return await kv.put(key,value,options);}catch(error){const wrapped=new Error("KGEU_STORAGE_UNAVAILABLE: KV put failed for "+key);wrapped.code="KGEU_STORAGE_UNAVAILABLE";wrapped.cause=error;throw wrapped;}}
+async function kvDelete(kv,key){try{return await kv.delete(key);}catch(error){const wrapped=new Error("KGEU_STORAGE_UNAVAILABLE: KV delete failed for "+key);wrapped.code="KGEU_STORAGE_UNAVAILABLE";wrapped.cause=error;throw wrapped;}}
 async function readKvState(kv,key,type){try{const value=type?await kv.get(key,type):await kv.get(key);return value===null||value===undefined?{status:"NOT_FOUND"}:{status:"FOUND",value};}catch(error){return{status:"READ_ERROR",error};}}
 function requireKvRead(state,key){if(state.status==="READ_ERROR"){const error=new Error("KGEU_STORAGE_UNAVAILABLE: KV read failed for "+key);error.code="KGEU_STORAGE_UNAVAILABLE";error.cause=state.error;throw error;}return state;}
 async function listKvKeys(kv,prefix,maxKeys=10000){const names=[],seen=new Set();let cursor;do{const page=await kv.list({prefix,cursor,limit:1000});if(!page||!Array.isArray(page.keys)||typeof page.list_complete!=="boolean")throw new Error("KV_LIST_INCOMPLETE: "+prefix);for(const item of page.keys){if(!item||typeof item.name!=="string"||!item.name.startsWith(prefix))throw new Error("KV_LIST_INCOMPLETE: "+prefix);names.push(item.name);if(names.length>maxKeys)throw new Error("KV_SCAN_BOUND_EXCEEDED: "+prefix);}if(page.list_complete)break;if(!page.cursor||seen.has(page.cursor))throw new Error("KV_LIST_INCOMPLETE: "+prefix);seen.add(page.cursor);cursor=page.cursor;}while(true);return names;}
@@ -141,7 +143,7 @@ async function saveUser(env, user) {
     updatedAt: Date.now(),
   };
 
-  await env.KGEU_VK_USERS.put(
+  await kvPut(env.KGEU_VK_USERS, 
     userKey(clean.vkId),
     JSON.stringify(clean)
   );
@@ -1699,7 +1701,7 @@ async function sendDailyNotifications(
           Number(groupId),
           date
         );
-    } catch (e) {
+    } catch (e) { if (e?.code === "KGEU_STORAGE_UNAVAILABLE") throw e;
       console.error(
         "DAILY SCHEDULE ERROR",
         groupId,
@@ -1744,7 +1746,7 @@ async function sendDailyNotifications(
           stableRandomId(`daily:${user.vkId}:${date}`)
         );
 
-        await env.KGEU_VK_USERS.put(
+        await kvPut(env.KGEU_VK_USERS, 
           key,
           "1",
           {
@@ -1752,7 +1754,7 @@ async function sendDailyNotifications(
               3 * 24 * 60 * 60,
           }
         );
-      } catch (e) {
+      } catch (e) { if (e?.code === "KGEU_STORAGE_UNAVAILABLE") throw e;
         console.error(
           "DAILY SEND ERROR",
           user.vkId,
@@ -1833,7 +1835,7 @@ async function sendReminders(
           Number(groupId),
           today
         );
-    } catch (e) {
+    } catch (e) { if (e?.code === "KGEU_STORAGE_UNAVAILABLE") throw e;
       console.error(
         "REMINDER SCHEDULE ERROR",
         groupId,
@@ -1919,7 +1921,7 @@ async function sendReminders(
             stableRandomId(`reminder:${user.vkId}:${today}:${lessonCode(lesson)}`)
           );
 
-          await env.KGEU_VK_USERS.put(
+          await kvPut(env.KGEU_VK_USERS, 
             key,
             "1",
             {
@@ -1927,7 +1929,7 @@ async function sendReminders(
                 24 * 60 * 60,
             }
           );
-        } catch (e) {
+        } catch (e) { if (e?.code === "KGEU_STORAGE_UNAVAILABLE") throw e;
           console.error(
             "REMINDER SEND ERROR",
             user.vkId,
@@ -2007,7 +2009,7 @@ async function handlePersonalReminders(request, env) {
   let vkId;
   try {
     vkId = await resolveVkMiniAppUser(request);
-  } catch (error) {
+  } catch (error) { if (error?.code === "KGEU_STORAGE_UNAVAILABLE") throw error;
     const code = error && error.message ? error.message : "vk_auth_invalid";
     return personalReminderJson(request, { ok: false, error: code }, 401);
   }
@@ -2081,7 +2083,7 @@ async function handlePersonalReminders(request, env) {
       fireAt,
       createdAt: Date.now(),
     };
-    await env.KGEU_VK_USERS.put(
+    await kvPut(env.KGEU_VK_USERS, 
       personalReminderKey(vkId, id),
       JSON.stringify(reminder),
       { expirationTtl: 366 * 24 * 60 * 60 }
@@ -2097,13 +2099,13 @@ async function handlePersonalReminders(request, env) {
   if(state.status==="NOT_FOUND"){key=LEGACY_PERSONAL_REMINDER_PREFIX+vkId+":"+id;state=requireKvRead(await readKvState(env.KGEU_VK_USERS,key,"json"),key);}
   if(state.status==="NOT_FOUND")return personalReminderJson(request,{ok:false,error:"reminder_not_found"},404);
   if(!state.value||String(state.value.vkId)!==String(vkId))throw new Error("PERSONAL_REMINDER_ID_MISMATCH: "+key);
-  await env.KGEU_VK_USERS.delete(key);
+  await kvDelete(env.KGEU_VK_USERS, key);
   return personalReminderJson(request, { ok: true, deleted: true });
 }
 
 async function processPersonalReminders(env,now=Date.now()){
  const names=[...await listKvKeys(env.KGEU_VK_USERS,PERSONAL_REMINDER_PREFIX),...await listKvKeys(env.KGEU_VK_USERS,LEGACY_PERSONAL_REMINDER_PREFIX)];
- for(const name of [...new Set(names)]){const state=requireKvRead(await readKvState(env.KGEU_VK_USERS,name,"json"),name);if(state.status==="NOT_FOUND")continue;const reminder=state.value;if(reminder&&reminder.telegramId!=null&&reminder.vkId==null)continue;if(!reminder||!/^\d+$/.test(String(reminder.vkId||""))||!Number.isFinite(Number(reminder.fireAt)))throw new Error("PERSONAL_REMINDER_STATE_INVALID: "+name);const id=name.startsWith(PERSONAL_REMINDER_PREFIX)?name.slice(PERSONAL_REMINDER_PREFIX.length).split(":")[0]:name.slice(LEGACY_PERSONAL_REMINDER_PREFIX.length).split(":")[0];if(String(reminder.vkId)!==id)throw new Error("PERSONAL_REMINDER_ID_MISMATCH: "+name);const fireAt=Number(reminder.fireAt);if(fireAt>now)continue;if(fireAt<now-10*60*1000){await env.KGEU_VK_USERS.delete(name);continue;}const message="🔔 Напоминание\\n\\n"+String(reminder.title||"Напоминание")+"\\n📅 "+formatPersonalReminderDate(reminder.date)+" · "+String(reminder.time||"");const full=reminder.note?message+"\\n\\n"+String(reminder.note):message;await sendMessage(env,Number(reminder.vkId),full,null,stableRandomId("personal-reminder:"+name));await env.KGEU_VK_USERS.delete(name);}
+ for(const name of [...new Set(names)]){const state=requireKvRead(await readKvState(env.KGEU_VK_USERS,name,"json"),name);if(state.status==="NOT_FOUND")continue;const reminder=state.value;if(reminder&&reminder.telegramId!=null&&reminder.vkId==null)continue;if(!reminder||!/^\d+$/.test(String(reminder.vkId||""))||!Number.isFinite(Number(reminder.fireAt)))throw new Error("PERSONAL_REMINDER_STATE_INVALID: "+name);const id=name.startsWith(PERSONAL_REMINDER_PREFIX)?name.slice(PERSONAL_REMINDER_PREFIX.length).split(":")[0]:name.slice(LEGACY_PERSONAL_REMINDER_PREFIX.length).split(":")[0];if(String(reminder.vkId)!==id)throw new Error("PERSONAL_REMINDER_ID_MISMATCH: "+name);const fireAt=Number(reminder.fireAt);if(fireAt>now)continue;if(fireAt<now-10*60*1000){await kvDelete(env.KGEU_VK_USERS, name);continue;}const message="🔔 Напоминание\\n\\n"+String(reminder.title||"Напоминание")+"\\n📅 "+formatPersonalReminderDate(reminder.date)+" · "+String(reminder.time||"");const full=reminder.note?message+"\\n\\n"+String(reminder.note):message;await sendMessage(env,Number(reminder.vkId),full,null,stableRandomId("personal-reminder:"+name));await kvDelete(env.KGEU_VK_USERS, name);}
 }
 
 /* =========================================================
@@ -2159,7 +2161,7 @@ async function sendChangeNotifications(
           Number(groupId),
           date
         );
-    } catch (e) {
+    } catch (e) { if (e?.code === "KGEU_STORAGE_UNAVAILABLE") throw e;
       console.error(
         "CHANGE SCHEDULE ERROR",
         groupId,
@@ -2183,7 +2185,7 @@ async function sendChangeNotifications(
       );
 
     if (!previous) {
-      await env.KGEU_VK_USERS.put(
+      await kvPut(env.KGEU_VK_USERS, 
         snapshotKey,
         current,
         {
@@ -2201,7 +2203,7 @@ async function sendChangeNotifications(
       continue;
     }
 
-    await env.KGEU_VK_USERS.put(
+    await kvPut(env.KGEU_VK_USERS, 
       snapshotKey,
       current,
       {
@@ -2241,7 +2243,7 @@ async function sendChangeNotifications(
           stableRandomId(`change:${user.vkId}:${date}:${scheduleSignature(lessons)}`)
         );
 
-        await env.KGEU_VK_USERS.put(
+        await kvPut(env.KGEU_VK_USERS, 
           key,
           "1",
           {
@@ -2249,7 +2251,7 @@ async function sendChangeNotifications(
               24 * 60 * 60,
           }
         );
-      } catch (e) {
+      } catch (e) { if (e?.code === "KGEU_STORAGE_UNAVAILABLE") throw e;
         console.error(
           "CHANGE SEND ERROR",
           user.vkId,
@@ -2292,7 +2294,7 @@ async function runCron(env) {
   let users;
   try {
     users = await listUsers(env);
-  } catch (e) {
+  } catch (e) { if (e?.code === "KGEU_STORAGE_UNAVAILABLE") throw e;
     console.error("CRON USER LOAD FAILED; notification jobs skipped:", e?.stack || e);
     return;
   }
@@ -2453,7 +2455,7 @@ async function handleMessageNew(
         peerId,
         user
       );
-    } catch (e) {
+    } catch (e) { if (e?.code === "KGEU_STORAGE_UNAVAILABLE") throw e;
       console.error(
         "SCHEDULE MESSAGE ERROR:",
         e?.stack || e
@@ -2675,7 +2677,7 @@ async function handleMessageNew(
 
       return;
     }
-  } catch (e) {
+  } catch (e) { if (e?.code === "KGEU_STORAGE_UNAVAILABLE") throw e;
     console.error(
       "DIRECT GROUP SEARCH ERROR:",
       e?.stack || e
@@ -2755,7 +2757,7 @@ export default {
     try {
       update =
         await request.json();
-    } catch (e) {
+    } catch (e) { if (e?.code === "KGEU_STORAGE_UNAVAILABLE") throw e;
       console.error(
         "CALLBACK JSON ERROR:",
         e?.stack || e
