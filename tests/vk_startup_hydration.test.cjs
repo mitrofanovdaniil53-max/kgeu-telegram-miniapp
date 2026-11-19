@@ -35,7 +35,7 @@ function createHarness(options = {}) {
     meta: Object.assign({ initialized: true, lastServerRevision: 7, lastSyncAt: 0, dirty: false, dirtyService: false, dirtyProfile: false, dirtyNotes: [], localChangeVersion: 0 }, clone(options.meta || {})),
     cache: options.cache === undefined ? emptyService() : clone(options.cache),
     legacyMeta: options.legacyMeta === undefined ? { dirty: false, lastServerSync: 0 } : clone(options.legacyMeta),
-    remote: options.remote === undefined ? { found: true, revision: 7, updatedAt: 700, serviceData: serviceWithTask('cloud-1', 'Cloud task'), personalData: { version: 1, notes: {} }, profileData: {} } : clone(options.remote),
+    remote: options.remote === undefined ? { found: true, revision: 7, updatedAt: 700, serviceData: serviceWithTask('cloud-1', 'Cloud task'), personalData: { version: 1, notes: {} }, profileData: {} } : (options.remote instanceof Error ? options.remote : clone(options.remote)),
     applyCount: 0,
     renderCount: 0,
     postCount: 0,
