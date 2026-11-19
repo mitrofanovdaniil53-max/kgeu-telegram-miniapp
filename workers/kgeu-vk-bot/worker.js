@@ -2290,7 +2290,7 @@ async function listUsers(env){
  for(const name of names){
   const isNew=name.startsWith(USER_PREFIX),isForeign=name.startsWith("user:telegram:");
   if(isForeign)continue;
-  const legacy=/^user:\\d+$/.test(name);
+  const legacy=/^user:\d+$/.test(name);
   if(!isNew&&!legacy)continue;
   const state=requireKvRead(await readKvState(env.KGEU_VK_USERS,name,"json"),name);
   if(state.status==="NOT_FOUND")throw new Error("KV_SCAN_INCOMPLETE: "+name);
