@@ -354,7 +354,7 @@ const cloudApplySource = between('  function serviceApplyCloudSnapshot(snapshot,
 const JOURNAL_KEY = 'kgeu_vk_service_dirty_journal_v1';
 
 function createDirtyJournalRuntime(storage, options = {}) {
-  const state = { requests: 0, serviceRequests: 0, scheduled: 0, statuses: [], remote: options.remote || {
+  const state = { requests: 0, serviceRequests: 0, scheduled: 0, statuses: [], syncGetStarted: false, postRequests: 0, remoteGate: options.remoteGate || null, remote: options.remote || {
     found: true, revision: 99, updatedAt: 9900, serviceData: withTask('cloud-newer', 'Cloud newer'),
     personalData: { version: 1, notes: {} }, profileData: {}
   } };
@@ -393,7 +393,7 @@ function createDirtyJournalRuntime(storage, options = {}) {
     "function setTimeout() { state.scheduled++; return state.scheduled; }",
     "function clearTimeout() {}",
     "function launchParams() { return 'vk_user_id=1&sign=test'; }",
-    "function fetch() { state.requests++; return Promise.resolve({ ok: true, text: async () => JSON.stringify(state.remote) }); }",
+    "function fetch(url, options) { state.requests++; const method = options && options.method || 'GET'; if (String(url).endsWith('/api/account/me')) return Promise.resolve({ ok: true, text: async () => JSON.stringify({ linkedProviders: ['telegram', 'vk'] }) }); if (String(url).endsWith('/api/sync') && method === 'GET') { state.syncGetStarted = true; return state.remoteGate || Promise.resolve({ ok: true, text: async () => JSON.stringify(state.remote) }); } if (String(url).endsWith('/api/sync') && method === 'POST') { state.postRequests++; return Promise.resolve({ ok: true, text: async () => JSON.stringify({ revision: 100, updatedAt: 10000 }) }); } throw new Error('unexpected_fetch_' + url); }",
     sharedRequestSource,
     "function serviceSyncPackage() { return {}; }",
     "function serviceSyncRequest() { state.serviceRequests++; return Promise.resolve({ revision: 100, updatedAt: 10000 }); }",
@@ -532,6 +532,34 @@ test('shared-cache mirror failure leaves journal and makes serviceSave return fa
   assert.equal(JSON.parse(storage.map.get(KEYS.cache)).tasks[0].id, 'local-before');
   assert.ok(storage.map.has(JOURNAL_KEY));
   assert.equal(JSON.parse(storage.map.get(KEYS.legacyMeta)).dirty, false, 'dirty metadata is not claimed after mirror failure');
+});
+
+test('dirty journal created during pending GET blocks newer cloud hydration and POST', async () => {
+  const remote = {
+    found: true, revision: 99, updatedAt: 9900,
+    serviceData: withTask('cloud-newer-in-flight', 'Cloud newer in flight'),
+    personalData: { version: 1, notes: {} }, profileData: {}
+  };
+  let resolveRemote;
+  const remoteGate = new Promise(resolve => { resolveRemote = resolve; });
+  const storage = createStorage(cleanDirtyJournalSeed(), {
+    failWrites: { [KEYS.legacyMeta]: [1], [KEYS.sharedMeta]: [1] }
+  });
+  const h = createDirtyJournalRuntime(storage, { remote, remoteGate });
+  const pendingSync = h.syncNow('startup');
+  for (let i = 0; i < 12 && !h.state.syncGetStarted; i++) await Promise.resolve();
+  assert.equal(h.state.syncGetStarted, true, 'sync must reach the deferred remote GET');
+  const localChanged = withTask('local-edit-during-get', 'Local edit during GET');
+  h.setServiceData(localChanged);
+  assert.equal(h.serviceSave(), false);
+  assert.ok(storage.map.has(JOURNAL_KEY));
+  resolveRemote({ ok: true, text: async () => JSON.stringify(remote) });
+  await pendingSync;
+  assert.equal(h.state.applies || 0, 0, 'newer remote response must not hydrate over the dirty local cache');
+  assert.equal(h.state.postRequests, 0, 'no clean or dirty POST may bypass the journal');
+  assert.equal(JSON.parse(storage.map.get(KEYS.student)).tasks[0].id, 'local-edit-during-get');
+  assert.equal(JSON.parse(storage.map.get(KEYS.cache)).tasks[0].id, 'local-edit-during-get');
+  assert.ok(storage.map.has(JOURNAL_KEY));
 });
 
 test('real serviceSave leaves durable journal after both legacy and shared metadata writes fail; reload blocks hydration and every POST route', async () => {
