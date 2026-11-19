@@ -4138,6 +4138,9 @@ html.vk-light .kgeu-note-icon { color:#667085; }
   window.kgeuSetSharedServiceDataInMemory=function(data){
     try{serviceData=serviceNormalizeData(data||serviceEmptyData());return true;}catch(e){return false;}
   };
+  window.kgeuGetSharedServiceData=function(){
+    try{return serviceNormalizeData(serviceData);}catch(e){return serviceEmptyData();}
+  };
   window.kgeuMarkStudentServiceSynced=function(updatedAt){
     try{const meta=serviceSyncMeta();meta.dirty=false;meta.lastServerSync=Number(updatedAt||Date.now());meta.lastLocalSave=Number(serviceData.updatedAt||Date.now());localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(meta));}catch(e){}
   };
@@ -6078,10 +6081,13 @@ document.addEventListener("DOMContentLoaded", () => {
         applyCalled = true;
         if (window.kgeuApplySharedServiceData(data, updatedAt) !== true) throw new Error('shared_service_hydration_failed');
       }
-      const writeResult = writeCachedService(data);
+      const appliedData = typeof window.kgeuGetSharedServiceData === 'function'
+        ? window.kgeuGetSharedServiceData()
+        : data;
+      const writeResult = writeCachedService(appliedData);
       if (!writeResult.ok) throw new Error('shared_service_cache_write_failed');
       const state = readCachedServiceState();
-      if (!state.valid || !state.data || !sameServiceContent(state.data, data)) {
+      if (!state.valid || !state.data || !sameServiceContent(state.data, appliedData)) {
         throw new Error('shared_service_cache_verification_failed');
       }
       return true;
@@ -6232,6 +6238,9 @@ document.addEventListener("DOMContentLoaded", () => {
               && (revisionChanged || emptyLocalNeedsHydration);
             if (shouldHydrate) {
               if (applyCloudServiceDataSafely(remoteServiceData, remote.updatedAt)) {
+                if (typeof window.kgeuGetSharedServiceData === 'function') {
+                  snapshot.serviceData = window.kgeuGetSharedServiceData();
+                }
                 renderSharedServiceView();
               } else {
                 snapshot.serviceData = cachedService || DEFAULT_SERVICE;
