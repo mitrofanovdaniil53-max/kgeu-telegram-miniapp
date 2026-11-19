@@ -356,6 +356,7 @@ function createDirtyJournalRuntime(storage, options = {}) {
   } };
   const factory = new Function('storage', 'state', [
     'const localStorage = storage;',
+    "const API = 'https://test.invalid';",
     "const STUDENT_SERVICE_KEY = 'kgeu_student_service_v1';",
     "const SERVICE_CACHE_KEY = 'kgeu_vk_shared_service_cache_v1';",
     "const STUDENT_SERVICE_SYNC_KEY = 'kgeu_student_service_sync_v1';",
