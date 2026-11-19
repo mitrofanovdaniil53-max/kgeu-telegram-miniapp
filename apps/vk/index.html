@@ -4124,12 +4124,17 @@ html.vk-light .kgeu-note-icon { color:#667085; }
   }
   window.kgeuUpdateSharedServiceDataLocal=function(data){
     try{
+      if(window.KGEU_VK_PLATFORM&&(typeof window.kgeuBeginStudentServiceSave!=='function'||!window.kgeuBeginStudentServiceSave()))return false;
       serviceData=serviceNormalizeData(data||serviceEmptyData());
-      localStorage.setItem(STUDENT_SERVICE_KEY,JSON.stringify(serviceData));
+      const raw=JSON.stringify(serviceData);
+      localStorage.setItem(STUDENT_SERVICE_KEY,raw);
+      if(localStorage.getItem(STUDENT_SERVICE_KEY)!==raw)return false;
       if(document.querySelector('.service-page'))serviceRefreshVisibleView();
-    }catch(e){}
+      return true;
+    }catch(e){return false;}
   };
   window.kgeuApplySharedServiceData=function(data,updatedAt){
+    if(window.KGEU_VK_PLATFORM&&(typeof window.kgeuCanStudentServiceSync!=='function'||!window.kgeuCanStudentServiceSync()))return false;
     const previousServiceData=serviceData;
     const previousServiceRaw=localStorage.getItem(STUDENT_SERVICE_KEY);
     const previousSyncMetaRaw=localStorage.getItem(STUDENT_SERVICE_SYNC_KEY);
@@ -6541,12 +6546,27 @@ document.addEventListener("DOMContentLoaded", () => {
     data.version = Number(data.version || 4);
     data.schemaVersion = Number(data.schemaVersion || data.version || 4);
     data.updatedAt = Date.now();
+    if (typeof window.kgeuBeginStudentServiceSave !== 'function' || !window.kgeuBeginStudentServiceSave()) {
+      setStatus('Не удалось зафиксировать резервный dirty-журнал. Изменения не сохранены.');
+      return false;
+    }
     snapshot.serviceData = data;
-    writeCachedService(data);
-    if (typeof window.kgeuUpdateSharedServiceDataLocal === 'function') window.kgeuUpdateSharedServiceDataLocal(data);
-    window.kgeuSharedSyncMarkDirty('service');
+    const cacheWrite = writeCachedService(data);
+    if (!cacheWrite.ok) {
+      setStatus('Не удалось подтвердить запись локального кэша. Dirty-журнал сохранён; синхронизация заблокирована.');
+      return false;
+    }
+    if (typeof window.kgeuUpdateSharedServiceDataLocal !== 'function' || window.kgeuUpdateSharedServiceDataLocal(data) !== true) {
+      setStatus('Не удалось подтвердить локальное состояние Student Service. Dirty-журнал сохранён; синхронизация заблокирована.');
+      return false;
+    }
+    if (typeof window.kgeuMarkStudentServiceDirty !== 'function' || window.kgeuMarkStudentServiceDirty() !== true) {
+      setStatus('Не удалось подтвердить dirty metadata Student Service. Dirty-журнал сохранён; синхронизация заблокирована.');
+      return false;
+    }
     renderSharedServiceView(resetFormKind);
     setStatus('Изменения сервиса сохранены локально и поставлены в очередь синхронизации.');
+    return true;
   }
   function sharedServiceNewId(prefix) {
     return prefix + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 9);
