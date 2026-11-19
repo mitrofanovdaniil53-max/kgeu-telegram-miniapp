@@ -455,6 +455,23 @@ test('real serviceSave aborts before primary cache write when durable journal wr
   assert.equal(storage.map.has(JOURNAL_KEY), false);
 });
 
+test('real serviceSave aborts when journal read-back does not confirm the write', () => {
+  const storage = createStorage(cleanDirtyJournalSeed(), { silentWrites: { [JOURNAL_KEY]: [1] } });
+  const before = storage.map.get(KEYS.student);
+  const h = createDirtyJournalRuntime(storage);
+  h.setServiceData(withTask('journal-readback-fail', 'Journal readback failure'));
+  assert.equal(h.serviceSave(), false);
+  assert.equal(storage.map.get(KEYS.student), before);
+});
+
+test('primary cache read-back failure returns false and leaves the durable journal', () => {
+  const storage = createStorage(cleanDirtyJournalSeed(), { silentWrites: { [KEYS.student]: [1] } });
+  const h = createDirtyJournalRuntime(storage);
+  h.setServiceData(withTask('primary-readback-fail', 'Primary readback failure'));
+  assert.equal(h.serviceSave(), false);
+  assert.ok(storage.map.has(JOURNAL_KEY));
+});
+
 test('real serviceSave leaves durable journal after both legacy and shared metadata writes fail; reload blocks hydration and every POST route', async () => {
   const storage = createStorage(cleanDirtyJournalSeed(), {
     failWrites: {
@@ -546,6 +563,8 @@ test('malformed or unreadable dirty journal blocks real startup sync without cle
     await h.syncNow('startup');
     assert.equal(h.state.requests, 0, mode);
     assert.equal(h.state.applies || 0, 0, mode);
+    await assert.rejects(() => h.request('/api/sync', { method: 'POST', body: '{}' }), /student_service_dirty_journal_blocked/, mode);
+    await assert.rejects(() => h.serviceManualSyncPush(), /student_service_dirty_journal_blocked/, mode);
     assert.ok(storage.map.has(JOURNAL_KEY), mode);
   }
 });
