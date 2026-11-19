@@ -161,6 +161,16 @@ test('backup failure prevents the real application apply function from running',
   assert.equal(h.storage.map.get(KEYS.student), JSON.stringify(before));
 });
 
+test('serviceBackupBeforeCloudRestore(true) failure prevents the actual shared apply from applying cloud data', () => {
+  const h = createHarness({ faults: { failWrites: { [KEYS.serviceBackup]: [1] } } });
+  const before = h.getMemory();
+  const beforeRaw = h.storage.map.get(KEYS.student);
+  assert.equal(h.window.kgeuApplySharedServiceData(withTask('cloud-must-not-apply', 'Cloud must not apply'), 200), false);
+  assert.deepEqual(h.getMemory(), before);
+  assert.equal(h.storage.map.get(KEYS.student), beforeRaw);
+  assert.notEqual(h.getMemory().tasks[0].id, 'cloud-must-not-apply');
+});
+
 test('real apply path rolls back when either cache key write fails', () => {
   for (const [key, occurrence] of [[KEYS.cache, 1], [KEYS.student, 2]]) {
     const h = createHarness({ faults: { failWrites: { [key]: [occurrence] } } });
