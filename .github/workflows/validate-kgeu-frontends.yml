@@ -84,6 +84,12 @@ jobs:
         run: node --test tests/vk_startup_hydration.test.cjs
       - name: Test VK startup hydration real storage/apply path
         run: node --test tests/vk_startup_hydration_storage.test.cjs
+      - name: Test VK startup hydration metadata states
+        run: node --test tests/vk_startup_hydration_metadata.test.cjs
+      - name: Test VK startup hydration rollback failure paths
+        run: node --test tests/vk_startup_hydration_rollback.test.cjs
+      - name: Test VK startup hydration deferred GET race
+        run: node --test tests/vk_startup_hydration_race.test.cjs
       - name: Test Telegram auto-sync edit-race protection
         run: node --test tests/telegram_auto_sync_race.test.cjs
       - name: Test VK shared profile apply race protection
