@@ -325,6 +325,9 @@ test('actual apply path handles failure of the primary cache key write before th
 // These functions are extracted verbatim from apps/vk/index.html; only localStorage,
 // network, timer and DOM boundaries are deterministic test adapters.
 const serviceSaveSource = between('  function serviceSave(){', '  window.kgeuUpdateSharedServiceDataLocal=function(data){');
+const updateSharedLocalSource = between('  window.kgeuUpdateSharedServiceDataLocal=function(data){', '  window.kgeuApplySharedServiceData=function(data,updatedAt){');
+const saveSharedServiceSource = between('  function saveSharedServiceData(data, resetFormKind) {', '  function sharedServiceNewId(prefix) {');
+
 const serviceDirtySource = between('  function serviceMarkDirty(){', '  // Used by the separate subject-notes script');
 const servicePushSource = between('  async function servicePushToBackend(expectedRevision){', '  async function servicePullFromBackend(){');
 const manualPushSource = between('  async function serviceManualSyncPush(){', '  function serviceEsc(s)');
@@ -353,6 +356,7 @@ function createDirtyJournalRuntime(storage, options = {}) {
     "const navigator = { onLine: true };",
     "const document = { visibilityState: 'visible', querySelector() { return null; } };",
     "let serviceData = " + JSON.stringify(withTask('local-before', 'Local before')) + ";",
+    "let snapshot = { serviceData: serviceData };",
     "let kgeuPersonalData = { version: 1, notes: {} };",
     "let serviceLocalRevision = 0;",
     "let serviceAutoSyncTimer = null;",
@@ -361,6 +365,7 @@ function createDirtyJournalRuntime(storage, options = {}) {
     "let serviceHydrationUnsafe = false;",
     "const statuses = state.statuses;",
     "function serviceNormalizeData(value) { return JSON.parse(JSON.stringify(value || DEFAULT_SERVICE)); }",
+    "function serviceEmptyData() { return DEFAULT_SERVICE; }",
     "function serviceScheduleAutoSync() {}",
     "function serviceRefreshVisibleView() {}",
     "function toast() {}",
@@ -378,6 +383,7 @@ function createDirtyJournalRuntime(storage, options = {}) {
     "function writeMeta(value) { state.meta = Object.assign({}, value); return true; }",
     "function readCachedServiceState() { return { valid: true, exists: true, data: serviceData }; }",
     "function readCachedService() { return serviceData; }",
+    cacheSource,
     "function hasMeaningfulServiceData(data) { return !!(data && data.tasks && data.tasks.length); }",
     "function sameServiceContent(a, b) { return JSON.stringify(a) === JSON.stringify(b); }",
     "function mergeServiceRecords(a, b) { return Object.assign({}, a, b); }",
@@ -394,13 +400,15 @@ function createDirtyJournalRuntime(storage, options = {}) {
     serviceMetaSource,
     serviceDirtySource,
     serviceSaveSource,
+    updateSharedLocalSource,
     sharedMetaSource,
     legacyMetaSource,
     sharedDirtySource,
+    saveSharedServiceSource,
     servicePushSource,
     manualPushSource,
     sharedSyncNowSource,
-    "return { serviceSave, serviceMarkDirty, syncNow, servicePushToBackend, serviceManualSyncPush, setServiceData(value) { serviceData = serviceNormalizeData(value); }, getServiceData() { return serviceData; }, readMeta, readServiceDirtyJournal, canSync: window.kgeuCanStudentServiceSync, window };"
+    "return { serviceSave, serviceMarkDirty, saveSharedServiceData, syncNow, servicePushToBackend, serviceManualSyncPush, setServiceData(value) { serviceData = serviceNormalizeData(value); }, getServiceData() { return serviceData; }, readMeta, readServiceDirtyJournal, canSync: window.kgeuCanStudentServiceSync, window };"
   ].join('\n'));
   return { state, ...factory(storage, state) };
 }
@@ -461,6 +469,20 @@ test('real serviceSave leaves durable journal after both legacy and shared metad
   await assert.rejects(() => h2.servicePushToBackend(), /student_service_dirty_journal_blocked/);
   await assert.rejects(() => h2.serviceManualSyncPush(), /student_service_dirty_journal_blocked/);
   assert.equal(h2.state.serviceRequests, 0, 'manual paths must be blocked before GET/POST');
+});
+
+test('alternate shared service editor save uses the same durable journal and cannot bypass dirty metadata failure', () => {
+  const storage = createStorage(cleanDirtyJournalSeed(), {
+    failWrites: { [KEYS.legacyMeta]: [1], [KEYS.sharedMeta]: [1] }
+  });
+  const h = createDirtyJournalRuntime(storage);
+  const localChanged = withTask('alternate-save-dirty', 'Alternate save path');
+  assert.equal(h.saveSharedServiceData(localChanged), false);
+  assert.ok(storage.map.has(JOURNAL_KEY));
+  assert.deepEqual(JSON.parse(storage.map.get(KEYS.student)).tasks.map(item => item.id), ['alternate-save-dirty']);
+  assert.deepEqual(JSON.parse(storage.map.get(KEYS.cache)).tasks.map(item => item.id), ['alternate-save-dirty']);
+  assert.equal(JSON.parse(storage.map.get(KEYS.legacyMeta)).dirty, false);
+  assert.equal(JSON.parse(storage.map.get(KEYS.sharedMeta)).dirtyService, false);
 });
 
 test('journal is removed only after both dirty metadata values are confirmed and removeItem read-back succeeds', () => {
