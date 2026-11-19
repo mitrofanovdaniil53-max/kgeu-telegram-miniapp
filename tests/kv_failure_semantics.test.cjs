@@ -153,16 +153,16 @@ test('KV put/delete errors are propagated and not reported as successful operati
   const tg = loadWorker(tgPath), vk = loadWorker(vkPath);
   const tgPut = makeKv({ failPut: () => true });
   const vkPut = makeKv({ failPut: () => true });
-  await assert.rejects(tg.saveUser({ KGEU_SCHEDULE: tgPut }, { telegramId: '1' }), /injected put failure/);
-  await assert.rejects(vk.saveUser({ KGEU_VK_USERS: vkPut }, { vkId: 1 }), /injected put failure/);
+  await assert.rejects(tg.saveUser({ KGEU_SCHEDULE: tgPut }, { telegramId: '1' }), /KGEU_STORAGE_UNAVAILABLE/);
+  await assert.rejects(vk.saveUser({ KGEU_VK_USERS: vkPut }, { vkId: 1 }), /KGEU_STORAGE_UNAVAILABLE/);
 
   const now = Date.now();
   const oldTg = 'telegram:personal-reminder:1:old';
   const oldVk = 'vk:personal-reminder:1:old';
   const tgDelete = makeKv({ values: { [oldTg]: JSON.stringify({ telegramId: '1', fireAt: now - 20 * 60 * 1000 }) }, failDelete: () => true });
   const vkDelete = makeKv({ values: { [oldVk]: JSON.stringify({ vkId: '1', fireAt: now - 20 * 60 * 1000 }) }, failDelete: () => true });
-  await assert.rejects(tg.processPersonalReminders({ KGEU_SCHEDULE: tgDelete }, now), /injected delete failure/);
-  await assert.rejects(vk.processPersonalReminders({ KGEU_VK_USERS: vkDelete }, now), /injected delete failure/);
+  await assert.rejects(tg.processPersonalReminders({ KGEU_SCHEDULE: tgDelete }, now), /KGEU_STORAGE_UNAVAILABLE/);
+  await assert.rejects(vk.processPersonalReminders({ KGEU_VK_USERS: vkDelete }, now), /KGEU_STORAGE_UNAVAILABLE/);
 });
 
 test('VK cron performs only one complete user scan and shares its snapshot across notification jobs', async () => {
