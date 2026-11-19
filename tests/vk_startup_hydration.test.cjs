@@ -142,7 +142,7 @@ function createHarness(options = {}) {
 test('empty clean cache hydrates non-empty cloud state at the same revision', async () => {
   const h = createHarness();
   await h.syncNow('startup');
-  assert.equal(h.state.applyCount, 1);
+  assert.equal(h.state.applyCount, 1, JSON.stringify(h.state.statuses));
   assert.deepEqual(h.state.cache.tasks.map(item => item.id), ['cloud-1']);
   assert.ok(h.state.storage.has('kgeu_vk_service_before_hydration_v1'), 'the prior local cache must be backed up');
 });
@@ -184,7 +184,7 @@ test('conflicting shared and legacy dirty metadata blocks hydration and POST', a
   assert.equal(h.state.applyCount, 0);
   assert.deepEqual(h.state.cache, local);
   assert.equal(h.state.postCount, 0);
-  assert.ok(h.state.statuses.some(item => /метаданные синхронизации/.test(item.message)));
+  assert.ok(h.state.statuses.some(item => /метаданные синхронизации/.test(item.message)), JSON.stringify(h.state.statuses));
 });
 
 test('remote.found=false preserves local state and does not POST', async () => {
