@@ -5553,6 +5553,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let timer = null;
   let snapshot = { serviceData: DEFAULT_SERVICE, personalData: { version: 1, notes: {} }, profileData: {} };
 
+  let sharedSyncMetadataWriteFailed = false;
   function readMeta() {
     const defaults = { deviceId: '', lastServerRevision: 0, lastSyncAt: 0, initialized: false, dirty: false, dirtyNotes: [], dirtyProfile: false, dirtyService: false, localGroupChangeVersion: 0, localChangeVersion: 0 };
     const invalidMeta = state => {
@@ -5563,7 +5564,11 @@ document.addEventListener("DOMContentLoaded", () => {
     };
     try {
       const raw = localStorage.getItem(META_KEY);
-      if (raw === null) return Object.assign({}, defaults);
+      if (raw === null) {
+        const missing = Object.assign({}, defaults);
+        Object.defineProperty(missing, '__storageState', { value: 'missing' });
+        return missing;
+      }
       const parsed = JSON.parse(raw);
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return invalidMeta('malformed');
       const required = ['initialized', 'dirty', 'dirtyNotes', 'dirtyProfile', 'dirtyService', 'lastServerRevision', 'lastSyncAt'];
@@ -5584,8 +5589,15 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const value = JSON.stringify(meta);
       localStorage.setItem(META_KEY, value);
-      return localStorage.getItem(META_KEY) === value;
-    } catch (e) { return false; }
+      if (localStorage.getItem(META_KEY) !== value) {
+        sharedSyncMetadataWriteFailed = true;
+        return false;
+      }
+      return true;
+    } catch (e) {
+      sharedSyncMetadataWriteFailed = true;
+      return false;
+    }
   }
   function getDeviceId() {
     const meta = readMeta();
@@ -5989,11 +6001,11 @@ document.addEventListener("DOMContentLoaded", () => {
   };
   function readLegacyServiceSyncMetaForSharedSync() {
     const raw = localStorage.getItem('kgeu_student_service_sync_v1');
-    if (raw == null) return { exists: false, valid: true, dirty: false };
+    if (raw == null) return { exists: false, status: 'missing', valid: true, dirty: false };
     try {
       const value = JSON.parse(raw);
       if (!value || typeof value !== 'object' || Array.isArray(value)) {
-        return { exists: true, valid: false, dirty: false };
+        return { exists: true, status: 'malformed', valid: false, dirty: false };
       }
       if (!Object.prototype.hasOwnProperty.call(value, 'dirty')) {
         return { exists: true, valid: false, status: 'partial', dirty: false };
@@ -6007,9 +6019,9 @@ document.addEventListener("DOMContentLoaded", () => {
           throw new Error('invalid_legacy_service_meta_' + key);
         }
       });
-      return { exists: true, valid: true, dirty: value.dirty === true };
+      return { exists: true, status: 'valid', valid: true, dirty: value.dirty === true };
     } catch (e) {
-      return { exists: true, valid: false, dirty: false };
+      return { exists: true, status: 'malformed', valid: false, dirty: false };
     }
   }
 
@@ -6098,8 +6110,14 @@ document.addEventListener("DOMContentLoaded", () => {
       const rollback = restoreVkServiceCacheAfterFailedHydration(backupKey);
       let memoryRestored = true;
       if (typeof window.kgeuSetSharedServiceDataInMemory === 'function') {
-        try { memoryRestored = window.kgeuSetSharedServiceDataInMemory(previous) === true; }
-        catch (restoreError) { memoryRestored = false; }
+        try {
+          memoryRestored = window.kgeuSetSharedServiceDataInMemory(previous) === true;
+          if (memoryRestored && typeof window.kgeuGetSharedServiceDataInMemory === 'function') {
+            memoryRestored = sameServiceContent(window.kgeuGetSharedServiceDataInMemory(), previous);
+          } else if (memoryRestored) {
+            memoryRestored = false;
+          }
+        } catch (restoreError) { memoryRestored = false; }
       } else if (applyCalled) {
         memoryRestored = false;
       }
@@ -6119,6 +6137,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (busy || navigator.onLine === false || document.visibilityState !== 'visible') return;
     if (serviceHydrationUnsafe) {
       setStatus('Автоматическая синхронизация заблокирована после неподтверждённого восстановления Student Service.');
+      return;
+    }
+    if (sharedSyncMetadataWriteFailed) {
+      setStatus('Не удалось надёжно сохранить метаданные синхронизации. Автоматическая hydration и отправка заблокированы.');
       return;
     }
     busy = true;
@@ -6141,8 +6163,8 @@ document.addEventListener("DOMContentLoaded", () => {
       // Refresh metadata and cache after the pull: edits made while the GET was in flight
       // must be included in the snapshot that is about to be pushed or protected from hydration.
       meta = readMeta();
-      if (meta.__storageInvalid) {
-        setStatus('Метаданные синхронизации повреждены. Автоматическая синхронизация приостановлена; локальные данные сохранены.');
+      if (meta.__storageInvalid || sharedSyncMetadataWriteFailed) {
+        setStatus('Метаданные синхронизации повреждены или не удалось сохранить изменения. Автоматическая синхронизация приостановлена; локальные данные сохранены.');
         return;
       }
       const localChangeVersionAtPayload = Number(meta.localChangeVersion || 0);
@@ -6294,7 +6316,11 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      if (serviceHydrationBlocked || serviceHydrationUnsafe) shouldPush = false;
+      if (serviceHydrationBlocked || serviceHydrationUnsafe || sharedSyncMetadataWriteFailed) shouldPush = false;
+      if (sharedSyncMetadataWriteFailed) {
+        setStatus('Не удалось сохранить метаданные синхронизации. POST отменён; локальные данные сохранены.');
+        return;
+      }
       if (shouldPush) {
         const result = await request('/api/sync', { method: 'POST', body: JSON.stringify(payloadForSync(personal, profile, Number(remote && remote.revision || 0))) });
         const latestMetaAfterPush = readMeta();
