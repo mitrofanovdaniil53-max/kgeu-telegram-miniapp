@@ -533,3 +533,50 @@ test('actual cloud apply does not start when mandatory internal backup cannot be
     assert.equal(storage.writes.get(KEYS.student) || 0, 0, 'cloud apply must not write primary cache before backup verification');
   }
 });
+
+
+test('H09 real cache parser treats absent primary plus meaningful secondary as degraded', () => {
+  const local = withTask('secondary-only', 'Secondary only');
+  const h = createHarness({ local });
+  h.storage.map.delete(KEYS.student);
+  h.storage.map.set(KEYS.cache, JSON.stringify(local));
+  const state = h.readCachedServiceState();
+  assert.equal(state.valid, true);
+  assert.equal(state.degraded, true);
+  assert.equal(state.reason, 'primary_cache_missing');
+  assert.deepEqual(state.data, local);
+});
+
+test('H09 real cache parser rejects empty primary that conflicts with meaningful secondary', () => {
+  const local = withTask('secondary-meaningful', 'Secondary meaningful');
+  const h = createHarness({ local });
+  h.storage.map.set(KEYS.student, JSON.stringify(emptyService()));
+  h.storage.map.set(KEYS.cache, JSON.stringify(local));
+  const state = h.readCachedServiceState();
+  assert.equal(state.valid, false);
+  assert.equal(state.degraded, true);
+  assert.equal(state.reason, 'cache_key_conflict');
+});
+
+test('H17 real cache parser covers remaining malformed primary/secondary combinations', () => {
+  const local = withTask('cache-valid', 'Valid fallback');
+  const cases = [
+    { name: 'primary malformed / secondary valid', primary: '{broken', secondary: JSON.stringify(local), valid: true, degraded: true, reason: 'primary_cache_malformed' },
+    { name: 'primary valid / secondary malformed', primary: JSON.stringify(local), secondary: '{broken', valid: true, degraded: true, reason: 'secondary_cache_malformed' },
+    { name: 'both malformed', primary: '{broken-primary', secondary: '{broken-secondary', valid: false, degraded: true, reason: 'invalid_cache_json' },
+    { name: 'primary malformed / secondary absent', primary: '{broken-primary', secondary: null, valid: false, degraded: true, reason: 'invalid_cache_json' },
+    { name: 'primary absent / secondary malformed', primary: null, secondary: '{broken-secondary', valid: false, degraded: true, reason: 'invalid_cache_json' }
+  ];
+  for (const item of cases) {
+    const h = createHarness({ local });
+    if (item.primary === null) h.storage.map.delete(KEYS.student);
+    else h.storage.map.set(KEYS.student, item.primary);
+    if (item.secondary === null) h.storage.map.delete(KEYS.cache);
+    else h.storage.map.set(KEYS.cache, item.secondary);
+    const state = h.readCachedServiceState();
+    assert.equal(state.valid, item.valid, item.name);
+    assert.equal(state.degraded, item.degraded, item.name);
+    assert.equal(state.reason, item.reason, item.name);
+    if (item.valid) assert.deepEqual(state.data, local, item.name);
+  }
+});
