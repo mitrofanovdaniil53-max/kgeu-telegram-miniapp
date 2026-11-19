@@ -201,7 +201,7 @@ test('rollback attempts every key independently and reports a failed key', () =>
         ? JSON.stringify(withTask('local-1', 'Local before'))
         : key === KEYS.legacyMeta || key === KEYS.serviceMeta
           ? JSON.stringify({ dirty: false, lastServerSync: 10 })
-          : JSON.stringify({ initialized: true, lastServerRevision: 7, dirty: false, dirtyService: false });
+          : JSON.stringify({ initialized: true, lastServerRevision: 7, lastSyncAt: 10, dirty: false, dirtyNotes: [], dirtyProfile: false, dirtyService: false, localGroupChangeVersion: 0, localChangeVersion: 0 });
       assert.equal(h.storage.map.get(key), expected, 'other key should still restore: ' + key);
     }
   }
