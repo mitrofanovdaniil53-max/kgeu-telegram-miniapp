@@ -6015,7 +6015,9 @@ document.addEventListener("DOMContentLoaded", () => {
       if (remote && remote.found) {
         const remoteRevision = Number(remote.revision || 0);
         const cachedService = readCachedService();
-        const legacyServiceMeta = readLegacyServiceSyncMetaForSharedSync();
+        const legacyServiceMeta = typeof readLegacyServiceSyncMetaForSharedSync === 'function'
+          ? readLegacyServiceSyncMetaForSharedSync()
+          : { exists: false, valid: true, dirty: false };
         const serviceMetadataConflict = legacyServiceMeta.exists
           && (!legacyServiceMeta.valid || legacyServiceMeta.dirty !== !!meta.dirtyService);
         let mergedFirstLink = false;
