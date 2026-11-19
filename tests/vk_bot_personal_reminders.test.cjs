@@ -112,7 +112,7 @@ test('VK personal reminders can be created, listed and deleted for the authentic
   const created = await create.json();
   assert.equal(created.reminder.vkId, '424242');
   assert.equal(created.reminder.title, 'Подготовить доклад');
-  assert.ok(kv.values.has('vk:vk:personal-reminder:424242:' + created.reminder.id));
+  assert.ok(kv.values.has('vk:personal-reminder:424242:' + created.reminder.id));
 
   const list = await sandbox.__worker.fetch(request('GET'), env, {});
   const listed = await list.json();
@@ -126,7 +126,7 @@ test('VK personal reminders can be created, listed and deleted for the authentic
   );
   assert.equal(remove.status, 200);
   assert.equal((await remove.json()).deleted, true);
-  assert.equal(kv.values.has('vk:vk:personal-reminder:424242:' + created.reminder.id), false);
+  assert.equal(kv.values.has('vk:personal-reminder:424242:' + created.reminder.id), false);
 });
 
 test('VK personal reminder API rejects invalid date/time and expired reminders', async () => {
