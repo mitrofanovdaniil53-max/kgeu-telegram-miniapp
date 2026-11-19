@@ -18,7 +18,7 @@ function between(start, end) {
 
 const sharedMetaSource = between('  function readMeta()', '  function getDeviceId()');
 const legacyMetaSource = between('  function readLegacyServiceSyncMetaForSharedSync()', '  function backupVkServiceCacheBeforeHydration()');
-const cacheSource = between('  function readCachedService()', '  function hasMeaningfulServiceData(data)');
+const cacheSource = between('  function readCachedServiceState()', '  function hasMeaningfulServiceData(data)');
 const stableCompareSource = between('  function stableServiceValue(value)', '  // Merge pre-existing VK-local records');
 const hydrationSource = between('  function backupVkServiceCacheBeforeHydration()', '  async function syncNow(reason)');
 const serviceMetaSource = between('  function serviceSyncMeta()', '  let serviceLocalRevision=0');
@@ -86,7 +86,7 @@ function createHarness(options = {}) {
     [KEYS.student]: JSON.stringify(local),
     [KEYS.cache]: JSON.stringify(local),
     [KEYS.legacyMeta]: JSON.stringify({ dirty: false, lastServerSync: 10 }),
-    [KEYS.sharedMeta]: JSON.stringify({ initialized: true, lastServerRevision: 7, dirty: false, dirtyService: false })
+    [KEYS.sharedMeta]: JSON.stringify({ initialized: true, lastServerRevision: 7, lastSyncAt: 10, dirty: false, dirtyNotes: [], dirtyProfile: false, dirtyService: false, localGroupChangeVersion: 0, localChangeVersion: 0 })
   }, options.faults || {});
   const factory = new Function('storage', 'local', [
     "const localStorage = storage;",
@@ -245,4 +245,42 @@ test('rollback detects a silent restore write that fails read-back', () => {
   const result = h.restoreVkServiceCacheAfterFailedHydration(KEYS.backup);
   assert.equal(result.ok, false);
   assert.ok(result.errors.some(item => item.key === KEYS.sharedMeta));
+});
+
+
+test('shared metadata distinguishes valid, partial, malformed and absent states', () => {
+  const h = createHarness();
+  assert.equal(h.readMeta().__storageInvalid, undefined);
+  assert.equal(h.readMeta().__storageState, 'valid');
+  h.storage.map.delete(KEYS.sharedMeta);
+  assert.equal(h.readMeta().__storageInvalid, undefined);
+  h.storage.map.set(KEYS.sharedMeta, JSON.stringify({ initialized: true, dirty: false }));
+  assert.equal(h.readMeta().__storageInvalid, true);
+  assert.equal(h.readMeta().__storageState, 'partial');
+  h.storage.map.set(KEYS.sharedMeta, '{not-json');
+  assert.equal(h.readMeta().__storageState, 'malformed');
+});
+
+test('malformed primary cache falls back to a valid secondary cache without hiding local data', () => {
+  const local = withTask('secondary-1', 'Secondary survives');
+  const h = createHarness({ local });
+  h.storage.map.set(KEYS.student, '{broken-primary');
+  h.storage.map.set(KEYS.cache, JSON.stringify(local));
+  const state = h.readCachedServiceState();
+  assert.equal(state.valid, true);
+  assert.equal(state.degraded, true);
+  assert.equal(state.reason, 'primary_cache_malformed');
+  assert.deepEqual(state.data, local);
+  assert.deepEqual(h.readCachedService(), local);
+});
+
+test('each cache write is attempted and verified independently', () => {
+  const value = withTask('write-1', 'Write test');
+  for (const key of [KEYS.student, KEYS.cache]) {
+    const h = createHarness({ faults: { failWrites: { [key]: [1] } } });
+    const result = h.writeCachedService(value);
+    assert.equal(result.ok, false);
+    assert.ok(result.errors.some(item => item.key === key));
+    assert.ok(result.keys.length >= 1);
+  }
 });
