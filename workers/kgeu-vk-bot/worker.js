@@ -27,6 +27,7 @@ const GROUP_CACHE_KEY = "cache:groups";
 const GROUP_CACHE_TTL = 6 * 60 * 60 * 1000;
 
 // Explicit KV read states; READ_ERROR must never be interpreted as NOT_FOUND.
+function stableRandomId(seed){let hash=2166136261;for(const char of String(seed)){hash^=char.charCodeAt(0);hash=Math.imul(hash,16777619);}return(hash>>>0)%2147483647||1;}
 async function readKvState(kv,key,type){try{const value=type?await kv.get(key,type):await kv.get(key);return value===null||value===undefined?{status:"NOT_FOUND"}:{status:"FOUND",value};}catch(error){return{status:"READ_ERROR",error};}}
 function requireKvRead(state,key){if(state.status==="READ_ERROR"){const error=new Error("KV_READ_ERROR: "+key);error.code="KV_READ_ERROR";error.cause=state.error;throw error;}return state;}
 async function listKvKeys(kv,prefix,maxKeys=10000){const names=[],seen=new Set();let cursor;do{const page=await kv.list({prefix,cursor,limit:1000});if(!page||!Array.isArray(page.keys)||typeof page.list_complete!=="boolean")throw new Error("KV_LIST_INCOMPLETE: "+prefix);for(const item of page.keys){if(!item||typeof item.name!=="string"||!item.name.startsWith(prefix))throw new Error("KV_LIST_INCOMPLETE: "+prefix);names.push(item.name);if(names.length>maxKeys)throw new Error("KV_SCAN_BOUND_EXCEEDED: "+prefix);}if(page.list_complete)break;if(!page.cursor||seen.has(page.cursor))throw new Error("KV_LIST_INCOMPLETE: "+prefix);seen.add(page.cursor);cursor=page.cursor;}while(true);return names;}
@@ -241,14 +242,14 @@ async function sendMessage(
   env,
   peerId,
   message,
-  keyboard = null
+  keyboard = null,
+  randomId = null
 ) {
   const params = {
     peer_id: Number(peerId),
-    random_id:
-      Math.floor(
-        Math.random() * 2147483647
-      ),
+    random_id: Number.isSafeInteger(randomId) && randomId > 0
+      ? randomId
+      : Math.floor(Math.random() * 2147483647),
     message: String(message),
   };
 
@@ -1743,7 +1744,8 @@ async function sendDailyNotifications(
 
           `🌅 Доброе утро!\n\n${text}`,
 
-          mainKeyboard(user)
+          mainKeyboard(user),
+          stableRandomId(`daily:${user.vkId}:${date}`)
         );
 
         await env.KGEU_VK_USERS.put(
@@ -1917,7 +1919,8 @@ async function sendReminders(
                   : ""
               }`,
 
-            mainKeyboard(user)
+            mainKeyboard(user),
+            stableRandomId(`reminder:${user.vkId}:${today}:${lessonCode(lesson)}`)
           );
 
           await env.KGEU_VK_USERS.put(
@@ -2106,7 +2109,7 @@ async function processPersonalReminders(env,now=Date.now()){
   if(fireAt<now-10*60*1000){await env.KGEU_VK_USERS.delete(name);continue;}
   const message="🔔 Напоминание\\n\\n"+String(reminder.title||"Напоминание")+"\\n📅 "+formatPersonalReminderDate(reminder.date)+" · "+String(reminder.time||"");
   const full=reminder.note?message+"\\n\\n"+String(reminder.note):message;
-  await sendMessage(env,Number(reminder.vkId),full);
+  await sendMessage(env,Number(reminder.vkId),full,null,stableRandomId(`personal-reminder:${name}`));
   await env.KGEU_VK_USERS.delete(name);
  }
 }
@@ -2242,7 +2245,8 @@ async function sendChangeNotifications(
           } обнаружены изменения.\n\n` +
             "Открой Mini App, чтобы посмотреть актуальное расписание.",
 
-          mainKeyboard(user)
+          mainKeyboard(user),
+          stableRandomId(`change:${user.vkId}:${date}:${scheduleSignature(lessons)}`)
         );
 
         await env.KGEU_VK_USERS.put(
