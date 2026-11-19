@@ -6056,18 +6056,28 @@ document.addEventListener("DOMContentLoaded", () => {
       result.errors.push({ key: backupKey, error: String(e && e.message || e) });
       return result;
     }
+
+    // A null snapshot means the key was absent and must be removed. A missing
+    // property or non-string value is not a trustworthy snapshot and must fail closed.
+    const hasOwn = (name) => Object.prototype.hasOwnProperty.call(backup, name);
+    const syncField = hasOwn('serviceSyncMeta') ? 'serviceSyncMeta'
+      : (hasOwn('legacySyncMeta') ? 'legacySyncMeta' : null);
     const entries = [
-      [STUDENT_SERVICE_KEY, backup.studentService],
-      [SERVICE_CACHE_KEY, backup.serviceCache],
-      [STUDENT_SERVICE_SYNC_KEY, backup.serviceSyncMeta !== undefined ? backup.serviceSyncMeta : backup.legacySyncMeta],
-      [META_KEY, backup.sharedSyncMeta]
+      [STUDENT_SERVICE_KEY, 'studentService'],
+      [SERVICE_CACHE_KEY, 'serviceCache'],
+      [STUDENT_SERVICE_SYNC_KEY, syncField],
+      [META_KEY, 'sharedSyncMeta']
     ];
-    entries.forEach(([key, value]) => {
+
+    entries.forEach(([key, field]) => {
       try {
-        if (value === undefined) throw new Error('backup_value_missing');
+        if (!field || !hasOwn(field)) throw new Error('backup_value_missing');
+        const value = backup[field];
+        if (value !== null && typeof value !== 'string') throw new Error('backup_value_invalid');
         if (value === null) localStorage.removeItem(key);
         else localStorage.setItem(key, value);
-        if (localStorage.getItem(key) !== value) throw new Error('restore_read_back_mismatch');
+        const restoredValue = localStorage.getItem(key);
+        if (restoredValue !== value) throw new Error('restore_read_back_mismatch');
         result.restored.push(key);
       } catch (e) {
         result.errors.push({ key, error: String(e && e.message || e) });
