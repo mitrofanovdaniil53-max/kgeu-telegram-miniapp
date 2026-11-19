@@ -1655,13 +1655,13 @@ function notificationKey(
 
 async function sendDailyNotifications(
   env,
-  now = new Date()
+  now = new Date(),
+  usersSnapshot = null
 ) {
   const date =
     isoDateInMoscow(now);
 
-  const users =
-    await listUsers(env);
+  const users = usersSnapshot || await listUsers(env);
 
   const byGroup =
     new Map();
@@ -1781,7 +1781,8 @@ function isReminderDue(diff) {
 
 async function sendReminders(
   env,
-  now = new Date()
+  now = new Date(),
+  usersSnapshot = null
 ) {
   const parts =
     moscowParts(now);
@@ -1793,8 +1794,7 @@ async function sendReminders(
     parts.hour * 60 +
     parts.minute;
 
-  const users =
-    await listUsers(env);
+  const users = usersSnapshot || await listUsers(env);
 
   const byGroup =
     new Map();
@@ -2117,13 +2117,13 @@ async function processPersonalReminders(env,now=Date.now()){
 
 async function sendChangeNotifications(
   env,
-  now = new Date()
+  now = new Date(),
+  usersSnapshot = null
 ) {
   const date =
     isoDateInMoscow(now);
 
-  const users =
-    await listUsers(env);
+  const users = usersSnapshot || await listUsers(env);
 
   const byGroup =
     new Map();
@@ -2294,41 +2294,27 @@ async function listUsers(env){
 ========================================================= */
 
 async function runCron(env) {
-  const now =
-    new Date();
+  const now = new Date();
+  const parts = moscowParts(now);
+  console.log("CRON RUN:", JSON.stringify(parts));
 
-  const parts =
-    moscowParts(now);
-
-  console.log(
-    "CRON RUN:",
-    JSON.stringify(parts)
-  );
-
-  if (
-    parts.hour === DAILY_HOUR &&
-    parts.minute < CRON_MINUTES
-  ) {
-    await sendDailyNotifications(
-      env,
-      now
-    );
+  let users = null;
+  try {
+    users = await listUsers(env);
+  } catch (error) {
+    console.error("CRON USER SCAN INCOMPLETE; all broadcasts skipped", error?.stack || error);
   }
 
-  await sendReminders(
-    env,
-    now
-  );
+  if (users) {
+    if (parts.hour === DAILY_HOUR && parts.minute < CRON_MINUTES) {
+      await sendDailyNotifications(env, now, users);
+    }
+    await sendReminders(env, now, users);
+    await sendChangeNotifications(env, now, users);
+  }
 
-  await sendChangeNotifications(
-    env,
-    now
-  );
-
-  await processPersonalReminders(
-    env,
-    now.getTime()
-  );
+  // Reminder processing is independent; it also fails closed on any KV scan/read error.
+  await processPersonalReminders(env, now.getTime());
 }
 
 
