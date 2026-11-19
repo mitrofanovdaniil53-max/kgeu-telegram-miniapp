@@ -135,7 +135,6 @@ function createHarness(options = {}) {
     function applyPersonal() {}
     function setLinkUiState() {}
     function setStatus(message, error) { state.statuses.push({ message, error }); }
-    function serviceDirtyJournalBlocksSync() { return false; }
     function renderSharedServiceView() { state.renderCount += 1; }
     function scheduleSync() {}
     function payloadForSync(personal, profile, expectedRevision) { return { expectedRevision, serviceData: readCachedService() || snapshot.serviceData, personalData: personal, profileData: profile }; }
