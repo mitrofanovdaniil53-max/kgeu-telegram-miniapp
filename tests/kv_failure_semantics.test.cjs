@@ -188,19 +188,10 @@ test('KV put/delete errors are propagated and not reported as successful operati
   await assert.rejects(vk.processPersonalReminders({ KGEU_VK_USERS: vkDelete }, now), /KGEU_STORAGE_UNAVAILABLE/);
 });
 
-test('VK cron performs only one complete user scan and shares its snapshot across notification jobs', async () => {
-  const vk = loadWorker(vkPath);
-  const kv = makeKv();
-  await vk.runCron({ KGEU_VK_USERS: kv, VK_TOKEN: 'test-token' });
-  assert.equal(kv.calls.list.filter(prefix => prefix === 'user:').length, 1);
-  assert.equal(kv.calls.list.filter(prefix => prefix === 'user:').length, 1);
-});
-
 test('VK cron performs one complete user scan and reuses the snapshot', async () => {
   const vk = loadWorker(vkPath);
   const kv = makeKv();
   await vk.runCron({ KGEU_VK_USERS: kv, VK_TOKEN: 'test-token' });
-  assert.equal(kv.calls.list.filter(prefix => prefix === 'user:').length, 1);
   assert.equal(kv.calls.list.filter(prefix => prefix === 'user:').length, 1);
 });
 
