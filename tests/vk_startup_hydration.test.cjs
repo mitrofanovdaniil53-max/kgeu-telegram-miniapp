@@ -184,7 +184,7 @@ test('conflicting shared and legacy dirty metadata blocks hydration and POST', a
   assert.equal(h.state.applyCount, 0);
   assert.deepEqual(h.state.cache, local);
   assert.equal(h.state.postCount, 0);
-  assert.ok(h.state.statuses.some(item => /метаданные синхронизации/.test(item.message)), JSON.stringify(h.state.statuses));
+  assert.ok(h.state.statuses.some(item => /метаданные синхронизации/i.test(item.message)), JSON.stringify(h.state.statuses));
 });
 
 test('remote.found=false preserves local state and does not POST', async () => {
