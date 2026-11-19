@@ -54,8 +54,8 @@ const vkPath = 'workers/kgeu-vk-bot/worker.js';
 test('Telegram and VK numeric ID 12345 map to distinct namespaced profile keys', () => {
   const tg = loadWorker(tgPath);
   const vk = loadWorker(vkPath);
-  assert.equal(tg.userKey('12345'), 'telegram:user:12345');
-  assert.equal(vk.userKey('12345'), 'vk:user:12345');
+  assert.equal(tg.userKey('12345'), 'user:telegram:12345');
+  assert.equal(vk.userKey('12345'), 'user:vk:12345');
   assert.notEqual(tg.userKey('12345'), vk.userKey('12345'));
 });
 
@@ -87,8 +87,8 @@ test('NOT_FOUND does not auto-create profiles without an atomic coordinator', as
 
 test('KV get error while processing personal reminders never calls delete (Telegram and VK)', async () => {
   const tg = loadWorker(tgPath), vk = loadWorker(vkPath);
-  const tgKey = 'telegram:personal-reminder:42:rem-1';
-  const vkKey = 'vk:personal-reminder:42:rem-1';
+  const tgKey = 'personal-reminder:telegram:42:rem-1';
+  const vkKey = 'personal-reminder:vk:42:rem-1';
   const tgKv = makeKv({ values: { [tgKey]: '{}' }, failGet: key => key === tgKey });
   const vkKv = makeKv({ values: { [vkKey]: '{}' }, failGet: key => key === vkKey });
   await assert.rejects(tg.processPersonalReminders({ KGEU_SCHEDULE: tgKv }), /KGEU_STORAGE_UNAVAILABLE/);
@@ -109,8 +109,8 @@ test('list() errors and truncated pages fail closed for both user scanners', asy
 
 test('get() error during listUsers fails the complete scan instead of returning partial users', async () => {
   const tg = loadWorker(tgPath), vk = loadWorker(vkPath);
-  const tgKv = makeKv({ values: { 'telegram:user:1': JSON.stringify({ telegramId: '1' }) }, failGet: () => true });
-  const vkKv = makeKv({ values: { 'vk:user:1': JSON.stringify({ vkId: 1 }) }, failGet: () => true });
+  const tgKv = makeKv({ values: { 'user:telegram:1': JSON.stringify({ telegramId: '1' }) }, failGet: () => true });
+  const vkKv = makeKv({ values: { 'user:vk:1': JSON.stringify({ vkId: 1 }) }, failGet: () => true });
   await assert.rejects(tg.listUsers({ KGEU_SCHEDULE: tgKv }), /KGEU_STORAGE_UNAVAILABLE/);
   await assert.rejects(vk.listUsers({ KGEU_VK_USERS: vkKv }), /KGEU_STORAGE_UNAVAILABLE/);
 });
@@ -180,8 +180,8 @@ test('KV put/delete errors are propagated and not reported as successful operati
   await assert.rejects(vk.saveUser({ KGEU_VK_USERS: vkPut }, { vkId: 1 }), /KGEU_STORAGE_UNAVAILABLE/);
 
   const now = Date.now();
-  const oldTg = 'telegram:personal-reminder:1:old';
-  const oldVk = 'vk:personal-reminder:1:old';
+  const oldTg = 'personal-reminder:telegram:1:old';
+  const oldVk = 'personal-reminder:vk:1:old';
   const tgDelete = makeKv({ values: { [oldTg]: JSON.stringify({ telegramId: '1', fireAt: now - 20 * 60 * 1000 }) }, failDelete: () => true });
   const vkDelete = makeKv({ values: { [oldVk]: JSON.stringify({ vkId: '1', fireAt: now - 20 * 60 * 1000 }) }, failDelete: () => true });
   await assert.rejects(tg.processPersonalReminders({ KGEU_SCHEDULE: tgDelete }, now), /KGEU_STORAGE_UNAVAILABLE/);
