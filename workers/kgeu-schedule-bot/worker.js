@@ -224,44 +224,6 @@ async function listUsers(env){
  await scan("telegram:user:");await scan("user:",true);return [...users.values()];
 }
 
-async function listUsers(env) {
-  const users = [];
-  let cursor;
-
-  do {
-    const page = await env.KGEU_SCHEDULE.list({
-      prefix: 'user:',
-      cursor,
-      limit: 1000
-    });
-
-    for (const key of page.keys) {
-      const raw = await env.KGEU_SCHEDULE.get(key.name);
-
-      if (!raw) {
-        continue;
-      }
-
-      try {
-        const u = JSON.parse(raw);
-
-        if (u && u.telegramId) {
-          users.push(u);
-        }
-      } catch {
-        // skip invalid records
-      }
-    }
-
-    cursor = page.list_complete
-      ? undefined
-      : page.cursor;
-
-  } while (cursor);
-
-  return users;
-}
-
 async function wasSent(env, key) {
   return !!(await env.KGEU_SCHEDULE.get(key));
 }
