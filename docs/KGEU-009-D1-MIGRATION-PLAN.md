@@ -8,9 +8,9 @@
 
 | Entity | Source data | Proposed destination |
 |---|---|---|
-| Bot profiles | `user:<id>` JSON; legacy Telegram `user:<id>:group` and `user:<id>:notify` | `bot_profiles` |
+| Bot profiles | new `user:telegram:<id>` / `user:vk:<id>` JSON; legacy `user:<id>` JSON and Telegram `user:<id>:group` / `user:<id>:notify` | `bot_profiles` |
 | Notification preferences | Profile flags `notifications`, `dailyNotifications`, `reminderNotifications`, `changeNotifications` | Columns in `bot_profiles` |
-| Personal reminders | `personal-reminder:<platformId>:<uuid>` | `personal_reminders` |
+| Personal reminders | new `personal-reminder:telegram:<id>:<uuid>` / `personal-reminder:vk:<id>:<uuid>`; legacy `personal-reminder:<id>:<uuid>` | `personal_reminders` |
 | Notification dedupe / delivery | Telegram `notification:`, VK `sent:` prefixes | `notification_deliveries` |
 | Schedule snapshots | `snapshot:<groupId>:<date>` | `schedule_snapshots` |
 | Group directory cache | `cache:groups` | Not migrated; use HTTP/Workers Cache or upstream API |
@@ -98,10 +98,12 @@ Use explicit UTC Unix milliseconds for timestamps. Keep provider IDs as TEXT to 
 
 ## 3. Legacy key mapping
 
-- `user:<numericId>`: parse JSON and infer platform only from exactly one of `telegramId` or `vkId`. If both are present, both absent, or the embedded ID differs from the key suffix, quarantine the row; do not guess.
+- `user:telegram:<numericId>` and `user:vk:<numericId>`: new platform-scoped profile keys; validate that the embedded platform ID matches the key.
+- `user:<numericId>`: legacy shared key. Parse JSON and infer platform only from exactly one of `telegramId` or `vkId`. If both are present, both absent, or the embedded ID differs from the key suffix, quarantine the row; do not guess.
 - `user:<numericId>:group`: Telegram profile group fields. Import only when the value parses and the matching Telegram profile is not ambiguous.
 - `user:<numericId>:notify`: Telegram notification preference. Missing means legacy default; malformed values are quarantined.
-- `personal-reminder:<numericId>:<uuid>`: infer platform from exactly one of `telegramId` or `vkId`; verify that embedded owner matches the key.
+- `personal-reminder:telegram:<numericId>:<uuid>` and `personal-reminder:vk:<numericId>:<uuid>`: new platform-scoped reminder keys; verify the embedded owner.
+- `personal-reminder:<numericId>:<uuid>`: legacy shared reminder key; infer platform from exactly one of `telegramId` or `vkId` and verify the owner.
 - `notification:` and `sent:`: map to `notification_deliveries` with explicit platform and a deterministic event key. Unparseable keys remain in backup/quarantine.
 - `snapshot:`: map group/date/signature to `schedule_snapshots`.
 - `replacement:` and unknown prefixes: inventory separately before mapping; do not bulk-delete or silently discard.
