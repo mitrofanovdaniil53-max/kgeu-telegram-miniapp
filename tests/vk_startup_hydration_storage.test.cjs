@@ -91,6 +91,7 @@ function createHarness(options = {}) {
   }, options.faults || {});
   const factory = new Function('storage', 'local', [
     "const localStorage = storage;",
+    "const API = 'https://test.invalid';",
     "const META_KEY = 'kgeu_vk_shared_sync_meta_v1';",
     "const SERVICE_CACHE_KEY = 'kgeu_vk_shared_service_cache_v1';",
     "const STUDENT_SERVICE_KEY = 'kgeu_student_service_v1';",
@@ -343,6 +344,8 @@ const servicePushSource = between('  async function servicePushToBackend(expecte
 const manualPushSource = between('  async function serviceManualSyncPush(){', '  function serviceEsc(s)');
 const sharedDirtySource = between('  function scheduleSync() {', '  kgeuFlushMigratedNoteSync();');
 const sharedSyncNowSource = between('  async function syncNow(reason)', '  async function linkAccount()');
+const sharedRequestSource = between('  async function request(path, options)', '  function readProfile()');
+
 const cloudApplySource = between('  function serviceApplyCloudSnapshot(snapshot, expectedLocalChangeVersion)', '  async function serviceManualSyncPush(){');
 const JOURNAL_KEY = 'kgeu_vk_service_dirty_journal_v1';
 
@@ -384,7 +387,9 @@ function createDirtyJournalRuntime(storage, options = {}) {
     "function renderSharedServiceView() {}",
     "function setTimeout() { state.scheduled++; return state.scheduled; }",
     "function clearTimeout() {}",
-    "function request() { state.requests++; return Promise.resolve(state.remote); }",
+    "function launchParams() { return 'vk_user_id=1&sign=test'; }",
+    "function fetch() { state.requests++; return Promise.resolve({ ok: true, text: async () => JSON.stringify(state.remote) }); }",
+    sharedRequestSource,
     "function serviceSyncPackage() { return {}; }",
     "function serviceSyncRequest() { state.serviceRequests++; return Promise.resolve({ revision: 100, updatedAt: 10000 }); }",
     "function servicePullFromBackend() { state.serviceRequests++; return Promise.resolve(state.remote); }",
@@ -418,7 +423,7 @@ function createDirtyJournalRuntime(storage, options = {}) {
     servicePushSource,
     manualPushSource,
     sharedSyncNowSource,
-    "return { serviceSave, serviceMarkDirty, saveSharedServiceData, syncNow, servicePushToBackend, serviceManualSyncPush, setServiceData(value) { serviceData = serviceNormalizeData(value); }, getServiceData() { return serviceData; }, readMeta, readServiceDirtyJournal, canSync: window.kgeuCanStudentServiceSync, window };"
+    "return { serviceSave, serviceMarkDirty, saveSharedServiceData, syncNow, request, servicePushToBackend, serviceManualSyncPush, setServiceData(value) { serviceData = serviceNormalizeData(value); }, getServiceData() { return serviceData; }, readMeta, readServiceDirtyJournal, canSync: window.kgeuCanStudentServiceSync, window };"
   ].join('\n'));
   return { state, ...factory(storage, state) };
 }
@@ -477,6 +482,7 @@ test('real serviceSave leaves durable journal after both legacy and shared metad
   assert.equal(storage.map.get(KEYS.student), JSON.stringify(localChanged), 'meaningful local primary cache survives reload');
   assert.ok(storage.map.has(JOURNAL_KEY), 'startup must not auto-clear uncertainty');
   await assert.rejects(() => h2.servicePushToBackend(), /student_service_dirty_journal_blocked/);
+  await assert.rejects(() => h2.request('/api/sync', { method: 'POST', body: '{}' }), /student_service_dirty_journal_blocked/);
   await assert.rejects(() => h2.serviceManualSyncPush(), /student_service_dirty_journal_blocked/);
   assert.equal(h2.state.serviceRequests, 0, 'manual paths must be blocked before GET/POST');
 });
