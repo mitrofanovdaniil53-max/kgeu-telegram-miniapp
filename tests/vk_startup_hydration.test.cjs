@@ -42,6 +42,8 @@ function createHarness(options = {}) {
     postCount: 0,
     statuses: [],
     failBackup: !!options.failBackup,
+    metaInvalid: !!options.metaInvalid,
+    cacheState: options.cacheState || null,
     remoteGate: options.remoteGate || null,
     storage: new Map()
   };
@@ -84,10 +86,14 @@ function createHarness(options = {}) {
       kgeuSetSharedServiceDataInMemory(data) { state.cache = clone(data); return true; },
       kgeuGetSharedServiceData() { return clone(state.cache); }
     };
-    function readMeta() { return Object.assign({}, state.meta, { dirtyNotes: [...(state.meta.dirtyNotes || [])] }); }
+    function readMeta() {
+      const meta = Object.assign({}, state.meta, { dirtyNotes: [...(state.meta.dirtyNotes || [])] });
+      if (state.metaInvalid) Object.defineProperty(meta, '__storageInvalid', { value: true });
+      return meta;
+    }
     function writeMeta(meta) { state.meta = Object.assign({}, meta, { dirtyNotes: [...(meta.dirtyNotes || [])] }); }
     function readCachedService() { return state.cache == null ? null : clone(state.cache); }
-    function readCachedServiceState() { return { valid: true, exists: state.cache != null, data: readCachedService() }; }
+    function readCachedServiceState() { return state.cacheState || { valid: true, exists: state.cache != null, data: readCachedService() }; }
     function writeCachedService(data) {
       state.cache = clone(data);
       const value = JSON.stringify(data);
@@ -274,4 +280,45 @@ test('local edit during pending startup GET is preserved and not overwritten by 
   assert.equal(h.state.applyCount, 0);
   assert.deepEqual(h.state.cache, local);
   assert.equal(h.state.postCount, 0);
+});
+
+
+test('absent local cache hydrates a confirmed non-empty cloud snapshot', async () => {
+  const h = createHarness({ cache: null });
+  await h.syncNow('startup');
+  assert.equal(h.state.applyCount, 1);
+  assert.deepEqual(h.state.cache.tasks.map(item => item.id), ['cloud-1']);
+});
+
+test('degraded cache from malformed primary with valid secondary blocks hydration and POST', async () => {
+  const secondary = serviceWithTask('secondary-valid', 'Secondary data');
+  const h = createHarness({
+    cache: secondary,
+    cacheState: { valid: true, exists: true, data: secondary, degraded: true, reason: 'primary_cache_malformed' }
+  });
+  await h.syncNow('startup');
+  assert.equal(h.state.applyCount, 0);
+  assert.equal(h.state.postCount, 0);
+  assert.deepEqual(h.state.cache, secondary);
+});
+
+test('partial or malformed shared metadata blocks startup GET, hydration and POST', async () => {
+  const h = createHarness({ metaInvalid: true });
+  await h.syncNow('startup');
+  assert.equal(h.state.applyCount, 0);
+  assert.equal(h.state.postCount, 0);
+  assert.ok(h.state.statuses.some(item => /метаданные синхронизации повреждены/.test(item.message)));
+});
+
+test('dirty local service state is preserved when the cloud revision is newer', async () => {
+  const local = serviceWithTask('local-newer-conflict', 'Local dirty');
+  const h = createHarness({
+    cache: local,
+    meta: { dirty: true, dirtyService: true, localChangeVersion: 1 },
+    remote: { found: true, revision: 8, updatedAt: 800, serviceData: serviceWithTask('cloud-newer', 'Cloud newer'), personalData: { version: 1, notes: {} }, profileData: {} }
+  });
+  await h.syncNow('startup');
+  assert.equal(h.state.applyCount, 0);
+  assert.equal(h.state.postCount, 0);
+  assert.deepEqual(h.state.cache, local);
 });
