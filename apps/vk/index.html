@@ -4031,6 +4031,8 @@ html.vk-light .kgeu-note-icon { color:#667085; }
       if(!raw) return fallback;
       const x=JSON.parse(raw);
       if(!x || typeof x!=='object') return fallback;
+      const dirtyJournalBlocksStartupWrite=window.KGEU_VK_PLATFORM?(()=>{try{return localStorage.getItem('kgeu_vk_service_dirty_journal_v1')!==null;}catch(e){return true;}})():false;
+      if(dirtyJournalBlocksStartupWrite)return serviceNormalizeData(x);
       const oldVersion=Number(x.schemaVersion||x.version||1);
       if(oldVersion<STUDENT_SERVICE_SCHEMA){
         try{localStorage.setItem(STUDENT_SERVICE_BACKUP_KEY,raw);}catch(e){}
