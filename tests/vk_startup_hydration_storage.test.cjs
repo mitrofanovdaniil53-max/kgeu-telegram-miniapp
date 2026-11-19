@@ -124,6 +124,7 @@ function createHarness(options = {}) {
 
 test('readMeta distinguishes absent metadata from corrupt or invalid metadata and refuses overwrite', () => {
   const absent = createHarness();
+  absent.storage.map.delete(KEYS.sharedMeta);
   assert.equal(absent.readMeta().initialized, false);
   assert.equal(absent.readMeta().__storageInvalid, undefined);
 
