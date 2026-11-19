@@ -5973,7 +5973,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return true;
     } catch (e) {
       try {
-        if (typeof window.kgeuApplySharedServiceData === 'function') {
+        if (applied && typeof window.kgeuApplySharedServiceData === 'function') {
           const raw = localStorage.getItem(backupKey);
           const backup = raw ? JSON.parse(raw) : null;
           const previous = backup && backup.studentService
