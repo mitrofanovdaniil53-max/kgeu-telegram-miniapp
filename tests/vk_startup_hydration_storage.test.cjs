@@ -472,6 +472,18 @@ test('primary cache read-back failure returns false and leaves the durable journ
   assert.ok(storage.map.has(JOURNAL_KEY));
 });
 
+test('shared-cache mirror failure leaves journal and makes serviceSave return false', () => {
+  const storage = createStorage(cleanDirtyJournalSeed(), { failWrites: { [KEYS.cache]: [1] } });
+  const h = createDirtyJournalRuntime(storage);
+  const changed = withTask('mirror-failed', 'Mirror failed');
+  h.setServiceData(changed);
+  assert.equal(h.serviceSave(), false);
+  assert.equal(JSON.parse(storage.map.get(KEYS.student)).tasks[0].id, 'mirror-failed');
+  assert.equal(JSON.parse(storage.map.get(KEYS.cache)).tasks[0].id, 'local-before');
+  assert.ok(storage.map.has(JOURNAL_KEY));
+  assert.equal(JSON.parse(storage.map.get(KEYS.legacyMeta)).dirty, false, 'dirty metadata is not claimed after mirror failure');
+});
+
 test('real serviceSave leaves durable journal after both legacy and shared metadata writes fail; reload blocks hydration and every POST route', async () => {
   const storage = createStorage(cleanDirtyJournalSeed(), {
     failWrites: {
@@ -484,6 +496,7 @@ test('real serviceSave leaves durable journal after both legacy and shared metad
   h1.setServiceData(localChanged);
   assert.equal(h1.serviceSave(), false);
   assert.equal(storage.map.get(KEYS.student), JSON.stringify(localChanged), 'primary cache write succeeded before metadata failure');
+  assert.equal(JSON.parse(storage.map.get(KEYS.cache)).tasks[0].id, 'local-dirty-survives', 'secondary shared cache is mirrored before metadata confirmation');
   assert.ok(storage.map.has(JOURNAL_KEY), 'journal remains durable');
   assert.deepEqual(JSON.parse(storage.map.get(KEYS.legacyMeta)), { dirty: false, lastLocalSave: 10, lastServerSync: 10 }, 'old clean legacy metadata remains');
   assert.equal(JSON.parse(storage.map.get(KEYS.sharedMeta)).dirtyService, false, 'old clean shared metadata remains');
