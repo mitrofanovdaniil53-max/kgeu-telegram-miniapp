@@ -112,7 +112,7 @@ test('VK personal reminders can be created, listed and deleted for the authentic
   const created = await create.json();
   assert.equal(created.reminder.vkId, '424242');
   assert.equal(created.reminder.title, 'Подготовить доклад');
-  assert.ok(kv.values.has('personal-reminder:424242:' + created.reminder.id));
+  assert.ok(kv.values.has('vk:vk:personal-reminder:424242:' + created.reminder.id));
 
   const list = await sandbox.__worker.fetch(request('GET'), env, {});
   const listed = await list.json();
@@ -126,7 +126,7 @@ test('VK personal reminders can be created, listed and deleted for the authentic
   );
   assert.equal(remove.status, 200);
   assert.equal((await remove.json()).deleted, true);
-  assert.equal(kv.values.has('personal-reminder:424242:' + created.reminder.id), false);
+  assert.equal(kv.values.has('vk:vk:personal-reminder:424242:' + created.reminder.id), false);
 });
 
 test('VK personal reminder API rejects invalid date/time and expired reminders', async () => {
@@ -148,7 +148,7 @@ test('VK personal reminder API caps active reminders at 50', async () => {
   const initial = { 'user:424242': JSON.stringify({ vkId: 424242 }) };
   for (let i = 0; i < 50; i++) {
     const id = String(i).padStart(8, '0') + '-0000-4000-8000-000000000000';
-    initial['personal-reminder:424242:' + id] = JSON.stringify({ id, vkId: '424242', fireAt: Date.now() + 60000 });
+    initial['vk:personal-reminder:424242:' + id] = JSON.stringify({ id, vkId: '424242', fireAt: Date.now() + 60000 });
   }
   const env = { KGEU_VK_USERS: makeKv(initial) };
   const response = await sandbox.__worker.fetch(request('POST', '/api/reminders', {
@@ -161,7 +161,7 @@ test('VK personal reminder API caps active reminders at 50', async () => {
 test('due VK personal reminder is sent once and removed only after successful VK API response', async () => {
   const now = Date.now();
   const id = '123e4567-e89b-42d3-a456-426614174000';
-  const key = 'personal-reminder:424242:' + id;
+  const key = 'vk:personal-reminder:424242:' + id;
   const kv = makeKv({
     [key]: JSON.stringify({
       id, vkId: '424242', title: 'Проверить расписание',
@@ -180,7 +180,7 @@ test('due VK personal reminder is sent once and removed only after successful VK
 test('overdue VK personal reminders older than ten minutes are discarded without sending', async () => {
   const now = Date.now();
   const id = '123e4567-e89b-42d3-a456-426614174001';
-  const key = 'personal-reminder:424242:' + id;
+  const key = 'vk:personal-reminder:424242:' + id;
   const kv = makeKv({
     [key]: JSON.stringify({
       id, vkId: '424242', title: 'Устаревшее',
