@@ -31,6 +31,7 @@ function harness(options = {}) {
     "let busy = false;",
     "let serviceHydrationUnsafe = false;",
     "let sharedSyncMetadataWriteFailed = state.metadataWriteFailed;",
+    "function serviceDirtyJournalBlocksSync() { return false; }",
     "const navigator = { onLine: true };",
     "const document = { visibilityState: state.visibilityState };",
     "const window = { kgeuMarkStudentServiceSynced() {} };",
