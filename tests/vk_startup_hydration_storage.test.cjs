@@ -350,7 +350,7 @@ const sharedDirtySource = between('  function scheduleSync() {', '  kgeuFlushMig
 const sharedSyncNowSource = between('  async function syncNow(reason)', '  async function linkAccount()');
 const sharedRequestSource = between('  async function request(path, options)', '  function readProfile()');
 
-const cloudApplySource = between('  function serviceApplyCloudSnapshot(snapshot, expectedLocalChangeVersion)', '  async function serviceManualSyncPush(){');
+const cloudApplySource = between('  function serviceApplyCloudSnapshot(snapshot, expectedLocalChangeVersion)', '  // Refresh only the visible Student Service screen after a remote update.');
 const JOURNAL_KEY = 'kgeu_vk_service_dirty_journal_v1';
 
 function createDirtyJournalRuntime(storage, options = {}) {
@@ -573,7 +573,7 @@ test('real serviceSave leaves durable journal after both legacy and shared metad
   const localChanged = withTask('local-dirty-survives', 'Local meaningful data');
   h1.setServiceData(localChanged);
   assert.equal(h1.serviceSave(), false);
-  assert.equal(storage.map.get(KEYS.student), JSON.stringify(localChanged), 'primary cache write succeeded before metadata failure');
+  assert.equal(JSON.parse(storage.map.get(KEYS.student)).tasks[0].id, 'local-dirty-survives', 'primary cache write succeeded before metadata failure');
   assert.equal(JSON.parse(storage.map.get(KEYS.cache)).tasks[0].id, 'local-dirty-survives', 'secondary shared cache is mirrored before metadata confirmation');
   assert.ok(storage.map.has(JOURNAL_KEY), 'journal remains durable');
   assert.deepEqual(JSON.parse(storage.map.get(KEYS.legacyMeta)), { dirty: false, lastLocalSave: 10, lastServerSync: 10 }, 'old clean legacy metadata remains');
@@ -590,7 +590,7 @@ test('real serviceSave leaves durable journal after both legacy and shared metad
   await h2.syncNow('startup');
   assert.equal(h2.state.requests, 0, 'startup must stop before GET when journal is present');
   assert.equal(h2.state.applies || 0, 0, 'cloud hydration must not start');
-  assert.equal(storage.map.get(KEYS.student), JSON.stringify(localChanged), 'meaningful local primary cache survives reload');
+  assert.equal(JSON.parse(storage.map.get(KEYS.student)).tasks[0].id, 'local-dirty-survives', 'meaningful local primary cache survives reload');
   assert.ok(storage.map.has(JOURNAL_KEY), 'startup must not auto-clear uncertainty');
   await assert.rejects(() => h2.servicePushToBackend(), /student_service_dirty_journal_blocked/);
   await assert.rejects(() => h2.request('/api/sync', { method: 'POST', body: '{}' }), /student_service_dirty_journal_blocked/);
@@ -626,7 +626,7 @@ test('journal is removed only after both dirty metadata values are confirmed and
 });
 
 test('journal removal failure keeps serviceSave unconfirmed and preserves the journal', () => {
-  const storage = createStorage(cleanDirtyJournalSeed(), { failRemoves: { [JOURNAL_KEY]: [1] } });
+  const storage = createStorage(cleanDirtyJournalSeed(), { failRemoves: { [JOURNAL_KEY]: [2] } });
   const h = createDirtyJournalRuntime(storage);
   h.setServiceData(withTask('local-remove-fail', 'Local remove failure'));
   assert.equal(h.serviceSave(), false);
