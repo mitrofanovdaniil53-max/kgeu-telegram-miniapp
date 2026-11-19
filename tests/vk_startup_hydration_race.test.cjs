@@ -23,13 +23,16 @@ function harness(options = {}) {
     meta: { initialized: true, lastServerRevision: 7, lastSyncAt: 10, dirty: false, dirtyNotes: [], dirtyProfile: false, dirtyService: false, localGroupChangeVersion: 0, localChangeVersion: 0 },
     cache: options.cache || emptyService(),
     requests: [], posts: 0, applies: 0, statuses: [], renders: 0,
+    metadataWriteFailed: options.metadataWriteFailed === true,
+    visibilityState: options.visibilityState || 'visible',
     resolveGet: null
   };
   const factory = new Function('state', 'syncSource', 'emptyService', 'task', [
     "let busy = false;",
     "let serviceHydrationUnsafe = false;",
+    "let sharedSyncMetadataWriteFailed = state.metadataWriteFailed;",
     "const navigator = { onLine: true };",
-    "const document = { visibilityState: 'visible' };",
+    "const document = { visibilityState: state.visibilityState };",
     "const window = { kgeuMarkStudentServiceSynced() {} };",
     "let snapshot = { serviceData: emptyService(), personalData: {version:1,notes:{}}, profileData:{} };",
     "function readMeta(){ return Object.assign({}, state.meta, { dirtyNotes: state.meta.dirtyNotes.slice() }); }",
@@ -107,4 +110,20 @@ test('offline and hidden startup states do not issue requests', async () => {
   const off = {state:{requests:[]},...offlineFactory({requests:[]},source,emptyService,task)};
   await off.syncNow('startup');
   assert.equal(off.state.requests.length,0);
+});
+
+
+test('a failed metadata persistence check blocks all sync requests', async () => {
+  const h = harness({ metadataWriteFailed: true });
+  await h.syncNow('startup');
+  assert.equal(h.state.requests.length, 0);
+  assert.equal(h.state.posts, 0);
+  assert.ok(h.state.statuses.some(message => /метаданные синхронизации/.test(message)));
+});
+
+test('hidden startup state does not issue requests', async () => {
+  const h = harness({ visibilityState: 'hidden' });
+  await h.syncNow('startup');
+  assert.equal(h.state.requests.length, 0);
+  assert.equal(h.state.posts, 0);
 });
