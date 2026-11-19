@@ -2029,6 +2029,7 @@ async function handlePersonalReminders(request, env) {
       const state = requireKvRead(await readKvState(env.KGEU_VK_USERS, name, "json"), name);
       if (state.status === "NOT_FOUND") throw new Error("KV_SCAN_INCOMPLETE: " + name);
       const reminder = state.value;
+      if (reminder && reminder.telegramId != null && reminder.vkId == null) continue;
       if (!reminder || String(reminder.vkId) !== String(vkId) || !Number.isFinite(Number(reminder.fireAt))) throw new Error("PERSONAL_REMINDER_STATE_INVALID: " + name);
       if (Number(reminder.fireAt) > Date.now()) reminders.push(reminder);
     }
@@ -2102,7 +2103,7 @@ async function processPersonalReminders(env,now=Date.now()){
  const names=[...await listKvKeys(env.KGEU_VK_USERS,PERSONAL_REMINDER_PREFIX),...await listKvKeys(env.KGEU_VK_USERS,LEGACY_PERSONAL_REMINDER_PREFIX)];
  for(const name of [...new Set(names)]){
   const state=requireKvRead(await readKvState(env.KGEU_VK_USERS,name,"json"),name);if(state.status==="NOT_FOUND")continue;
-  const reminder=state.value;if(!reminder||!/^\\d+$/.test(String(reminder.vkId||""))||!Number.isFinite(Number(reminder.fireAt)))throw new Error("PERSONAL_REMINDER_STATE_INVALID: "+name);
+  const reminder=state.value;if(reminder&&reminder.telegramId!=null&&reminder.vkId==null)continue;if(!reminder||!/^\\d+$/.test(String(reminder.vkId||""))||!Number.isFinite(Number(reminder.fireAt)))throw new Error("PERSONAL_REMINDER_STATE_INVALID: "+name);
   const expected=name.startsWith(PERSONAL_REMINDER_PREFIX)?name.slice(PERSONAL_REMINDER_PREFIX.length).split(":")[0]:name.slice(LEGACY_PERSONAL_REMINDER_PREFIX.length).split(":")[0];
   if(String(reminder.vkId)!==expected)throw new Error("PERSONAL_REMINDER_ID_MISMATCH: "+name);
   const fireAt=Number(reminder.fireAt);if(fireAt>now)continue;
@@ -2287,7 +2288,7 @@ async function listUsers(env){
    if(user.vkId==null)throw new Error("KV_SCAN_UNVERIFIABLE_USER: "+name);
    const id=String(user.vkId),expected=legacy?name.slice(5):name.slice(USER_PREFIX.length);
    if(id!==expected)throw new Error("KV_SCAN_ID_MISMATCH: "+name);
-   users.set(id,user);
+   if(!users.has(id))users.set(id,user);
   }
  };
  await scan(USER_PREFIX);await scan(LEGACY_USER_PREFIX,true);return [...users.values()];
