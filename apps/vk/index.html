@@ -3660,6 +3660,7 @@ html.vk-light .kgeu-note-icon { color:#667085; }
     return data;
   }
   async function servicePushToBackend(expectedRevision){
+    if(window.KGEU_VK_PLATFORM&&(typeof window.kgeuCanStudentServiceSync!=='function'||!window.kgeuCanStudentServiceSync()))throw new Error('student_service_dirty_journal_blocked');
     const payload=serviceSyncPackage(expectedRevision);
     return await serviceSyncRequest('/api/sync',{method:'POST',body:JSON.stringify(payload)});
   }
@@ -3687,6 +3688,7 @@ html.vk-light .kgeu-note-icon { color:#667085; }
     }
   }
   function serviceApplyCloudSnapshot(snapshot, expectedLocalChangeVersion){
+    if(window.KGEU_VK_PLATFORM&&(typeof window.kgeuCanStudentServiceSync!=='function'||!window.kgeuCanStudentServiceSync()))throw new Error('student_service_dirty_journal_blocked');
     if(!snapshot||!snapshot.found||!snapshot.serviceData||typeof snapshot.serviceData!=='object')throw new Error('cloud_data_not_found');
     if(window.KGEU_VK_PLATFORM && expectedLocalChangeVersion != null
         && Number(readMeta().localChangeVersion || 0) !== Number(expectedLocalChangeVersion)) {
@@ -3876,15 +3878,27 @@ html.vk-light .kgeu-note-icon { color:#667085; }
     serviceAutoSyncTimer=setTimeout(function(){serviceAutoSync('local-change');},SERVICE_AUTO_SYNC_DELAY);
   }
   function serviceMarkDirty(){
+    const isVk=!!window.KGEU_VK_PLATFORM;
+    if(isVk&&(typeof window.kgeuBeginStudentServiceSave!=='function'||!window.kgeuBeginStudentServiceSave()))return false;
     const meta=serviceSyncMeta();
     meta.dirty=true;meta.lastLocalSave=Date.now();
     serviceLocalRevision++;
-    try{localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(meta));}catch(e){}
-    if(window.KGEU_VK_PLATFORM && typeof window.kgeuSharedSyncMarkDirty==='function'){
-      window.kgeuSharedSyncMarkDirty('service');
-    }else{
-      serviceScheduleAutoSync();
+    let legacyOk=false;
+    try{
+      const raw=JSON.stringify(meta);
+      localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,raw);
+      legacyOk=!isVk||localStorage.getItem(STUDENT_SERVICE_SYNC_KEY)===raw;
+    }catch(e){legacyOk=false;}
+    let sharedOk=true;
+    if(isVk){
+      try{sharedOk=typeof window.kgeuSharedSyncMarkDirty==='function'&&window.kgeuSharedSyncMarkDirty('service')===true;}catch(e){sharedOk=false;}
+      if(legacyOk&&sharedOk){
+        try{return typeof window.kgeuConfirmStudentServiceDirtyMetadata==='function'&&window.kgeuConfirmStudentServiceDirtyMetadata()===true;}catch(e){return false;}
+      }
+      return false;
     }
+    serviceScheduleAutoSync();
+    return legacyOk;
   }
   // Used by the separate subject-notes script without coupling the two modules.
   try{window.kgeuMarkStudentServiceDirty=serviceMarkDirty;}catch(e){}
@@ -4096,7 +4110,18 @@ html.vk-light .kgeu-note-icon { color:#667085; }
       '<button type="submit" class="service-btn primary" '+(vkPersonalRemindersState==='loading'?'disabled':'')+'>Создать напоминание</button></form>'+
       '<div class="service-list" style="margin-top:12px">'+list+'</div></section>';
   }
-  function serviceSave(){try{serviceData=serviceNormalizeData(serviceData);serviceData.updatedAt=Date.now();localStorage.setItem(STUDENT_SERVICE_KEY,JSON.stringify(serviceData));serviceMarkDirty();return true;}catch(e){toast('Не удалось сохранить данные');return false;}}
+  function serviceSave(){
+    try{
+      serviceData=serviceNormalizeData(serviceData);
+      serviceData.updatedAt=Date.now();
+      if(window.KGEU_VK_PLATFORM&&(typeof window.kgeuBeginStudentServiceSave!=='function'||!window.kgeuBeginStudentServiceSave()))throw new Error('student_service_dirty_journal_write_failed');
+      const raw=JSON.stringify(serviceData);
+      localStorage.setItem(STUDENT_SERVICE_KEY,raw);
+      if(localStorage.getItem(STUDENT_SERVICE_KEY)!==raw)throw new Error('student_service_cache_read_back_failed');
+      if(serviceMarkDirty()!==true)throw new Error('student_service_dirty_state_unconfirmed');
+      return true;
+    }catch(e){toast('Не удалось надёжно сохранить данные и статус синхронизации');return false;}
+  }
   window.kgeuUpdateSharedServiceDataLocal=function(data){
     try{
       serviceData=serviceNormalizeData(data||serviceEmptyData());
@@ -4142,9 +4167,11 @@ html.vk-light .kgeu-note-icon { color:#667085; }
     try{return serviceNormalizeData(serviceData);}catch(e){return serviceEmptyData();}
   };
   window.kgeuMarkStudentServiceSynced=function(updatedAt){
+    if(window.KGEU_VK_PLATFORM&&typeof window.kgeuHasStudentServiceDirtyJournal==='function'&&window.kgeuHasStudentServiceDirtyJournal())return false;
     try{const meta=serviceSyncMeta();meta.dirty=false;meta.lastServerSync=Number(updatedAt||Date.now());meta.lastLocalSave=Number(serviceData.updatedAt||Date.now());localStorage.setItem(STUDENT_SERVICE_SYNC_KEY,JSON.stringify(meta));}catch(e){}
   };
   async function serviceManualSyncPush(){
+    if(window.KGEU_VK_PLATFORM&&(typeof window.kgeuCanStudentServiceSync!=='function'||!window.kgeuCanStudentServiceSync()))throw new Error('student_service_dirty_journal_blocked');
     let meta=serviceSyncMeta();
     const remote=await servicePullFromBackend();
     meta=serviceSyncMeta();
@@ -5546,6 +5573,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const SETTINGS_KEY = 'kgeu_vk_settings_v1';
   const BACKUP_KEY = 'kgeu_vk_notes_conflict_backup_v1';
   const HYDRATION_UNSAFE_KEY = 'kgeu_vk_service_hydration_unsafe_v1';
+  const SERVICE_DIRTY_JOURNAL_KEY = 'kgeu_vk_service_dirty_journal_v1';
   const DEFAULT_SERVICE = { schemaVersion: 4, version: 4, tasks: [], deadlines: [], events: [], hostel: { work: [], social: [] } };
   let busy = false;
   let serviceHydrationUnsafe = false;
@@ -5554,6 +5582,76 @@ document.addEventListener("DOMContentLoaded", () => {
   let snapshot = { serviceData: DEFAULT_SERVICE, personalData: { version: 1, notes: {} }, profileData: {} };
 
   let sharedSyncMetadataWriteFailed = false;
+  let serviceDirtyJournalBlocked = false;
+  function readServiceDirtyJournal() {
+    try {
+      const raw = localStorage.getItem(SERVICE_DIRTY_JOURNAL_KEY);
+      if (raw === null) return { present: false, valid: true, blocked: false };
+      const value = JSON.parse(raw);
+      if (!value || typeof value !== 'object' || Array.isArray(value)
+          || value.version !== 1 || value.dirty !== true
+          || typeof value.createdAt !== 'number' || !Number.isFinite(value.createdAt) || value.createdAt < 0) {
+        return { present: true, valid: false, blocked: true, reason: 'malformed' };
+      }
+      return { present: true, valid: true, blocked: true, value: value };
+    } catch (e) {
+      return { present: true, valid: false, blocked: true, reason: 'unreadable' };
+    }
+  }
+  function serviceDirtyJournalBlocksSync() {
+    const state = readServiceDirtyJournal();
+    serviceDirtyJournalBlocked = state.blocked;
+    return state.blocked;
+  }
+  function beginStudentServiceDirtyJournal() {
+    const current = readServiceDirtyJournal();
+    if (current.present) {
+      serviceDirtyJournalBlocked = true;
+      return current.valid;
+    }
+    const value = JSON.stringify({ version: 1, dirty: true, createdAt: Date.now(), reason: 'student-service-save' });
+    try {
+      localStorage.setItem(SERVICE_DIRTY_JOURNAL_KEY, value);
+      if (localStorage.getItem(SERVICE_DIRTY_JOURNAL_KEY) !== value) throw new Error('dirty_journal_read_back_failed');
+      serviceDirtyJournalBlocked = true;
+      return true;
+    } catch (e) {
+      serviceDirtyJournalBlocked = true;
+      sharedSyncMetadataWriteFailed = true;
+      return false;
+    }
+  }
+  function clearStudentServiceDirtyJournalAfterMetadata() {
+    const journal = readServiceDirtyJournal();
+    if (!journal.present) {
+      serviceDirtyJournalBlocked = journal.blocked;
+      return !journal.blocked;
+    }
+    if (!journal.valid) { serviceDirtyJournalBlocked = true; return false; }
+    try {
+      const legacy = readLegacyServiceSyncMetaForSharedSync();
+      const shared = readMeta();
+      if (!legacy.exists || !legacy.valid || legacy.dirty !== true
+          || shared.__storageInvalid || shared.dirty !== true || shared.dirtyService !== true) {
+        serviceDirtyJournalBlocked = true;
+        return false;
+      }
+      localStorage.removeItem(SERVICE_DIRTY_JOURNAL_KEY);
+      if (localStorage.getItem(SERVICE_DIRTY_JOURNAL_KEY) !== null) throw new Error('dirty_journal_remove_read_back_failed');
+      serviceDirtyJournalBlocked = false;
+      sharedSyncMetadataWriteFailed = false;
+      return true;
+    } catch (e) {
+      serviceDirtyJournalBlocked = true;
+      return false;
+    }
+  }
+  window.kgeuBeginStudentServiceSave = beginStudentServiceDirtyJournal;
+  window.kgeuHasStudentServiceDirtyJournal = serviceDirtyJournalBlocksSync;
+  window.kgeuCanStudentServiceSync = function () {
+    return !serviceDirtyJournalBlocksSync() && !sharedSyncMetadataWriteFailed;
+  };
+  window.kgeuConfirmStudentServiceDirtyMetadata = clearStudentServiceDirtyJournalAfterMetadata;
   function readMeta() {
     const defaults = { deviceId: '', lastServerRevision: 0, lastSyncAt: 0, initialized: false, dirty: false, dirtyNotes: [], dirtyProfile: false, dirtyService: false, localGroupChangeVersion: 0, localChangeVersion: 0 };
     const invalidMeta = state => {
@@ -5633,6 +5731,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
   async function request(path, options) {
+    if (path === '/api/sync' && options && String(options.method || 'GET').toUpperCase() === 'POST'
+        && serviceDirtyJournalBlocksSync()) throw new Error('student_service_dirty_journal_blocked');
     const raw = launchParams();
     if (!raw || !/(^|&)vk_user_id=/.test(raw) || !/(^|&)sign=/.test(raw)) throw new Error('Открой мини-приложение внутри VK, чтобы подтвердить аккаунт.');
     const opts = Object.assign({}, options || {});
@@ -5977,6 +6077,7 @@ document.addEventListener("DOMContentLoaded", () => {
     timer = setTimeout(function () { syncNow('local-change').catch(function (e) { setStatus('Ожидает синхронизации', e.message); }); }, 1200);
   }
   window.kgeuSharedSyncMarkDirty = function (kind, key) {
+    if (kind === 'service' && !beginStudentServiceDirtyJournal()) return false;
     const meta = readMeta();
     meta.dirty = true;
     meta.localChangeVersion = Number(meta.localChangeVersion || 0) + 1;
@@ -5984,11 +6085,13 @@ document.addEventListener("DOMContentLoaded", () => {
     if (kind === 'group') meta.localGroupChangeVersion = Number(meta.localGroupChangeVersion || 0) + 1;
     if (kind === 'service') meta.dirtyService = true;
     if (kind === 'note' && key && meta.dirtyNotes.indexOf(key) < 0) meta.dirtyNotes.push(key);
-    writeMeta(meta);
+    if (!writeMeta(meta)) return false;
     scheduleSync();
+    return true;
   };
   kgeuFlushMigratedNoteSync();
   window.kgeuSharedSyncMarkClean = function(result) {
+    if (serviceDirtyJournalBlocksSync()) return false;
     const meta = readMeta();
     meta.lastServerRevision = Number(result && result.revision || meta.lastServerRevision || 0);
     meta.lastSyncAt = Date.now();
@@ -5997,7 +6100,7 @@ document.addEventListener("DOMContentLoaded", () => {
     meta.dirtyNotes = [];
     meta.dirtyProfile = false;
     meta.dirtyService = false;
-    writeMeta(meta);
+    return writeMeta(meta);
   };
   function readLegacyServiceSyncMetaForSharedSync() {
     const raw = localStorage.getItem('kgeu_student_service_sync_v1');
@@ -6145,6 +6248,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function syncNow(reason) {
     if (busy || navigator.onLine === false || document.visibilityState !== 'visible') return;
+    if (serviceDirtyJournalBlocksSync()) {
+      setStatus('Обнаружен неподтверждённый локальный dirty-state Student Service. Hydration и отправка заблокированы; локальные данные сохранены.');
+      return;
+    }
     if (serviceHydrationUnsafe) {
       setStatus('Автоматическая синхронизация заблокирована после неподтверждённого восстановления Student Service.');
       return;
