@@ -43,7 +43,7 @@ function createManualPushHarness(options = {}) {
     'let activeGroupId = 14541, GROUP_NAME = "М-1-25", INSTITUTE_NAME = "ИЦТЭ";',
     'let settings = { theme: "light" };',
     'const STUDENT_SERVICE_SYNC_KEY = "student-service-sync";',
-    'const window = { KGEU_VK_PLATFORM: true, kgeuSharedSyncMarkClean(result) { state.markedClean += 1; state.meta.lastServerRevision = result.revision; state.meta.dirty = false; } };',
+    'const window = { KGEU_VK_PLATFORM: true, kgeuCanStudentServiceSync() { return true; }, kgeuSharedSyncMarkClean(result) { state.markedClean += 1; state.meta.lastServerRevision = result.revision; state.meta.dirty = false; } };',
     'const localStorage = { setItem(key, value) { if (key === STUDENT_SERVICE_SYNC_KEY) state.storedServiceMeta = JSON.parse(value); } };',
     'function serviceSyncMeta() { return state.serviceMeta; }',
     'function readMeta() { return state.meta; }',
@@ -67,7 +67,7 @@ function createManualPushHarness(options = {}) {
 test('VK service sync package includes the expected CAS revision', () => {
   const factorySource = [
     'const STUDENT_SERVICE_SCHEMA = 4;',
-    'const window = { KGEU_VK_PLATFORM: true };',
+    'const window = { KGEU_VK_PLATFORM: true, kgeuCanStudentServiceSync() { return true; } };',
     'const serviceData = { tasks: [] };',
     'const kgeuPersonalData = { version: 1, notes: {} };',
     'const activeGroupId = 14541, DEFAULT_GROUP_ID = 14541, GROUP_NAME = "М-1-25", DEFAULT_GROUP_NAME = "М-1-25", INSTITUTE_NAME = "ИЦТЭ", DEFAULT_INSTITUTE_NAME = "ИЦТЭ";',
@@ -121,7 +121,7 @@ test('manual VK push keeps newer local edits dirty when an edit arrives during P
 test('cloud restore rejects before backup or mutation when VK local generation changed', () => {
   const state = { meta: { localChangeVersion: 5 }, backupCalls: 0, writes: 0, serviceData: { tasks: [{ id: 'local' }] } };
   const factorySource = [
-    'const window = { KGEU_VK_PLATFORM: true };',
+    'const window = { KGEU_VK_PLATFORM: true, kgeuCanStudentServiceSync() { return true; } };',
     'const localStorage = { setItem() { state.writes += 1; } };',
     'const STUDENT_SERVICE_KEY = "service";',
     'let serviceData = state.serviceData;',
@@ -156,7 +156,7 @@ test('cloud restore aborts before replacing local data when both backups cannot 
     store: { 'service-data': JSON.stringify({ tasks: [{ id: 'local' }] }) }
   };
   const factorySource = [
-    'const window = { KGEU_VK_PLATFORM: true };',
+    'const window = { KGEU_VK_PLATFORM: true, kgeuCanStudentServiceSync() { return true; } };',
     'const STUDENT_SERVICE_BACKUP_KEY = "service-backup";',
     'const STUDENT_SERVICE_KEY = "service-data";',
     'const PERSONAL_BACKUP_KEY = "kgeu_student_personal_backup_before_cloud_restore_v1";',
@@ -198,7 +198,7 @@ test('cloud snapshot restore rolls back service state if personal notes cannot b
     'const STUDENT_SERVICE_SYNC_KEY = "service-sync";',
     'const KGEU_PERSONAL_DATA_KEY = "personal-data";',
     'const ACTIVE_GROUP_KEY = "active-group";',
-    'const window = { KGEU_VK_PLATFORM: true, __kgeuApplyingSharedProfile: false };',
+    'const window = { KGEU_VK_PLATFORM: true, kgeuCanStudentServiceSync() { return true; }, __kgeuApplyingSharedProfile: false };',
     'const hasExplicitGroupFromLaunch = false;',
     'let serviceData = state.serviceData;',
     'let kgeuPersonalData = state.personalData;',
@@ -248,7 +248,7 @@ test('cloud restore rolls back service and personal data when sync metadata cann
     failSyncMetaWrite: true
   };
   const factorySource = [
-    'const window = { KGEU_VK_PLATFORM: true, __kgeuApplyingSharedProfile: false };',
+    'const window = { KGEU_VK_PLATFORM: true, kgeuCanStudentServiceSync() { return true; }, __kgeuApplyingSharedProfile: false };',
     'const STUDENT_SERVICE_BACKUP_KEY = "service-backup";',
     'const STUDENT_SERVICE_KEY = "service-data";',
     'const STUDENT_SERVICE_SYNC_KEY = "service-sync";',
@@ -318,7 +318,7 @@ test('cloud restore detects a silently dropped service-data write', () => {
     dropServiceWrite: true
   };
   const factorySource = [
-    'const window = { KGEU_VK_PLATFORM: true, __kgeuApplyingSharedProfile: false };',
+    'const window = { KGEU_VK_PLATFORM: true, kgeuCanStudentServiceSync() { return true; }, __kgeuApplyingSharedProfile: false };',
     'const STUDENT_SERVICE_BACKUP_KEY = "service-backup";',
     'const STUDENT_SERVICE_KEY = "service-data";',
     'const STUDENT_SERVICE_SYNC_KEY = "service-sync";',
@@ -373,7 +373,7 @@ test('cloud restore detects a silently dropped personal-data write', () => {
     dropPersonalWrite: true
   };
   const factorySource = [
-    'const window = { KGEU_VK_PLATFORM: true, __kgeuApplyingSharedProfile: false };',
+    'const window = { KGEU_VK_PLATFORM: true, kgeuCanStudentServiceSync() { return true; }, __kgeuApplyingSharedProfile: false };',
     'const STUDENT_SERVICE_BACKUP_KEY = "service-backup";',
     'const STUDENT_SERVICE_KEY = "service-data";',
     'const STUDENT_SERVICE_SYNC_KEY = "service-sync";',
@@ -437,7 +437,7 @@ test('cloud restore reports rollback failure when a rollback write is silently d
     dropServiceRollback: true
   };
   const factorySource = [
-    'const window = { KGEU_VK_PLATFORM: true, __kgeuApplyingSharedProfile: false };',
+    'const window = { KGEU_VK_PLATFORM: true, kgeuCanStudentServiceSync() { return true; }, __kgeuApplyingSharedProfile: false };',
     'const STUDENT_SERVICE_BACKUP_KEY = "service-backup";',
     'const STUDENT_SERVICE_KEY = "service-data";',
     'const STUDENT_SERVICE_SYNC_KEY = "service-sync";',
