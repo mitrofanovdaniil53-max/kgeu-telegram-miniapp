@@ -5647,6 +5647,13 @@ document.addEventListener("DOMContentLoaded", () => {
       sharedSyncMetadataWriteFailed = false;
       return true;
     } catch (e) {
+      // If deletion happened but its read-back could not be verified, restore the
+      // durable blocker before returning. A failed verification must never release sync.
+      try {
+        const retained = JSON.stringify(journal.value);
+        localStorage.setItem(SERVICE_DIRTY_JOURNAL_KEY, retained);
+        if (localStorage.getItem(SERVICE_DIRTY_JOURNAL_KEY) !== retained) sharedSyncMetadataWriteFailed = true;
+      } catch (restoreError) {}
       serviceDirtyJournalBlocked = true;
       return false;
     }
