@@ -16,7 +16,7 @@ function between(start, end) {
   return html.slice(from, to);
 }
 
-const sharedMetaSource = between('  function readMeta()', '  function getDeviceId()');
+const sharedMetaSource = between('  let sharedSyncMetadataWriteFailed = false;', '  function getDeviceId()');
 const legacyMetaSource = between('  function readLegacyServiceSyncMetaForSharedSync()', '  function backupVkServiceCacheBeforeHydration()');
 const cacheSource = between('  function readCachedServiceState()', '  function hasMeaningfulServiceData(data)');
 const stableCompareSource = between('  function stableServiceValue(value)', '  // Merge pre-existing VK-local records');
@@ -118,7 +118,7 @@ function createHarness(options = {}) {
     legacyMetaSource,
     cacheSource,
     hydrationSource,
-    "return { readMeta, writeMeta, readLegacyServiceSyncMetaForSharedSync, readCachedService, readCachedServiceState, writeCachedService, backupVkServiceCacheBeforeHydration, restoreVkServiceCacheAfterFailedHydration, applyCloudServiceDataSafely, getMemory:()=>serviceData, statuses, unsafe:()=>serviceHydrationUnsafe, failMemoryRestore:()=>{failMemoryRestore=true;}, window };"
+    "return { readMeta, writeMeta, readLegacyServiceSyncMetaForSharedSync, readCachedService, readCachedServiceState, writeCachedService, backupVkServiceCacheBeforeHydration, restoreVkServiceCacheAfterFailedHydration, applyCloudServiceDataSafely, getMemory:()=>serviceData, statuses, unsafe:()=>serviceHydrationUnsafe, metadataWriteFailed:()=>sharedSyncMetadataWriteFailed, failMemoryRestore:()=>{failMemoryRestore=true;}, window };"
   ].join('\n'));
   return { storage, ...factory(storage, local) };
 }
@@ -128,6 +128,7 @@ test('readMeta distinguishes absent metadata from corrupt or invalid metadata an
   absent.storage.map.delete(KEYS.sharedMeta);
   assert.equal(absent.readMeta().initialized, false);
   assert.equal(absent.readMeta().__storageInvalid, undefined);
+  assert.equal(absent.readMeta().__storageState, 'missing');
 
   const corrupt = createHarness();
   corrupt.storage.map.set(KEYS.sharedMeta, '{broken');
@@ -295,4 +296,25 @@ test('failed in-memory restoration marks the app unsafe even when persistent rol
   assert.deepEqual(h.getMemory(), before);
   assert.equal(h.unsafe(), true);
   assert.equal(h.storage.map.get(KEYS.unsafe), '1');
+});
+
+
+test('shared metadata write failure is sticky and detectable by sync preflight', () => {
+  const h = createHarness({ faults: { failWrites: { [KEYS.sharedMeta]: [1] } } });
+  const next = Object.assign({}, h.readMeta(), { dirty: true, localChangeVersion: 1 });
+  assert.equal(h.writeMeta(next), false);
+  assert.equal(h.metadataWriteFailed(), true);
+  h.storage.setFaults({});
+  assert.equal(h.writeMeta(next), true);
+  assert.equal(h.metadataWriteFailed(), true, 'a later successful write must not erase uncertainty from the failed write');
+});
+
+test('actual apply path handles failure of the primary cache key write before the secondary write', () => {
+  const h = createHarness({ faults: { failWrites: { [KEYS.student]: [1] } } });
+  const before = h.getMemory();
+  assert.equal(h.applyCloudServiceDataSafely(withTask('cloud-primary-fail', 'Cloud'), 90), false);
+  assert.deepEqual(h.getMemory(), before);
+  assert.equal(h.storage.map.get(KEYS.student), JSON.stringify(before));
+  assert.equal(h.storage.map.get(KEYS.cache), JSON.stringify(before));
+  assert.equal(h.unsafe(), false);
 });
