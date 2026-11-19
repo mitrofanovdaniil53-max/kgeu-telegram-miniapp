@@ -94,7 +94,7 @@ async function getUser(env, vkId) {
     return JSON.parse(raw);
   } catch (e) {
     console.error("getUser ERROR:", e?.stack || e);
-    return null;
+    throw new Error("KGEU_STORAGE_UNAVAILABLE: VK profile read failed");
   }
 }
 
@@ -597,10 +597,12 @@ async function loadGroups(env) {
     );
   }
 
-  const cached =
-    await env.KGEU_VK_USERS.get(
-      GROUP_CACHE_KEY
-    );
+  let cached = null;
+  try {
+    cached = await env.KGEU_VK_USERS.get(GROUP_CACHE_KEY);
+  } catch (e) {
+    console.warn("GROUP CACHE READ UNAVAILABLE; using source API:", e?.message || e);
+  }
 
   if (cached) {
     try {
@@ -651,17 +653,21 @@ async function loadGroups(env) {
     );
   }
 
-  await env.KGEU_VK_USERS.put(
-    GROUP_CACHE_KEY,
-    JSON.stringify({
-      ts: Date.now(),
-      groups,
-    }),
-    {
-      expirationTtl:
-        12 * 60 * 60,
-    }
-  );
+  try {
+    await env.KGEU_VK_USERS.put(
+      GROUP_CACHE_KEY,
+      JSON.stringify({
+        ts: Date.now(),
+        groups,
+      }),
+      {
+        expirationTtl:
+          12 * 60 * 60,
+      }
+    );
+  } catch (e) {
+    console.warn("GROUP CACHE WRITE SKIPPED:", e?.message || e);
+  }
 
   return groups;
 }
@@ -3017,11 +3023,23 @@ export default {
         handleMessageNew(
           env,
           msg
-        ).catch((e) => {
+        ).catch(async (e) => {
           console.error(
             "MESSAGE_NEW ERROR STACK:",
             e?.stack || e
           );
+          const peerId = msg?.peer_id || msg?.from_id;
+          if (peerId) {
+            try {
+              await sendMessage(
+                env,
+                peerId,
+                "Сервис временно перегружен. Данные группы не изменены. Попробуй ещё раз немного позже."
+              );
+            } catch (sendError) {
+              console.error("VK STORAGE OUTAGE NOTICE FAILED:", sendError?.stack || sendError);
+            }
+          }
         })
       );
 

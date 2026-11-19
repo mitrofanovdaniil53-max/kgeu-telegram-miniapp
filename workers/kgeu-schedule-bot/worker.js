@@ -198,7 +198,7 @@ async function getUser(env, telegramId) {
 
   } catch (e) {
     console.error('getUser error:', key, e);
-    return null;
+    throw new Error('KGEU_STORAGE_UNAVAILABLE: user profile read failed');
   }
 }
 
@@ -218,13 +218,7 @@ async function saveUser(env, user) {
     createdAt: user.createdAt || Date.now()
   };
   await env.KGEU_SCHEDULE.put(key, JSON.stringify(data));
-  const savedRaw = await env.KGEU_SCHEDULE.get(key);
-  if (!savedRaw) throw new Error(`KV save verification failed: ${key}`);
-  const savedUser = JSON.parse(savedRaw);
-  if (data.groupId != null && Number(savedUser.groupId) !== Number(data.groupId)) {
-    throw new Error(`KV group verification failed: expected ${data.groupId}, got ${savedUser.groupId}`);
-  }
-  return savedUser;
+  return data;
 }
 
 // ──────────────────── Legacy migration (добавлено) ────────────────────
@@ -2007,6 +2001,19 @@ async function handleWebhook(
       'update handler error',
       e
     );
+
+    const unavailableText = 'Сервис временно перегружен. Данные группы не изменены. Попробуй ещё раз немного позже.';
+    try {
+      if (update.callback_query) {
+        await answerCallback(env, update.callback_query.id, 'Временно недоступно');
+        const chatId = update.callback_query.message?.chat?.id;
+        if (chatId) await sendMessage(env, chatId, unavailableText);
+      } else if (update.message?.chat?.id) {
+        await sendMessage(env, update.message.chat.id, unavailableText);
+      }
+    } catch (notifyError) {
+      console.error('storage outage notification failed', notifyError);
+    }
   }
 
   return new Response(
