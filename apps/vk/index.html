@@ -4132,6 +4132,9 @@ html.vk-light .kgeu-note-icon { color:#667085; }
       return false;
     }
   };
+  window.kgeuGetSharedServiceDataInMemory=function(){
+    try{return JSON.parse(JSON.stringify(serviceData));}catch(e){return serviceEmptyData();}
+  };
   window.kgeuSetSharedServiceDataInMemory=function(data){
     try{serviceData=serviceNormalizeData(data||serviceEmptyData());return true;}catch(e){return false;}
   };
@@ -5548,37 +5551,30 @@ document.addEventListener("DOMContentLoaded", () => {
   let snapshot = { serviceData: DEFAULT_SERVICE, personalData: { version: 1, notes: {} }, profileData: {} };
 
   function readMeta() {
-    const defaults = { deviceId: '', lastServerRevision: 0, lastSyncAt: 0, initialized: false, dirty: false, dirtyNotes: [], dirtyProfile: false, dirtyService: false, localGroupChangeVersion: 0 };
+    const defaults = { deviceId: '', lastServerRevision: 0, lastSyncAt: 0, initialized: false, dirty: false, dirtyNotes: [], dirtyProfile: false, dirtyService: false, localGroupChangeVersion: 0, localChangeVersion: 0 };
+    const invalidMeta = state => {
+      const invalid = Object.assign({}, defaults);
+      Object.defineProperty(invalid, '__storageInvalid', { value: true });
+      Object.defineProperty(invalid, '__storageState', { value: state });
+      return invalid;
+    };
     try {
       const raw = localStorage.getItem(META_KEY);
       if (raw === null) return Object.assign({}, defaults);
       const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('invalid_shared_sync_meta_shape');
-      const numeric = ['lastServerRevision', 'lastSyncAt', 'localGroupChangeVersion'];
-      numeric.forEach(key => {
-        if (Object.prototype.hasOwnProperty.call(parsed, key)
-            && (typeof parsed[key] !== 'number' || !Number.isFinite(parsed[key]) || parsed[key] < 0)) {
-          throw new Error('invalid_shared_sync_meta_' + key);
-        }
-      });
-      ['initialized', 'dirty', 'dirtyProfile', 'dirtyService'].forEach(key => {
-        if (Object.prototype.hasOwnProperty.call(parsed, key) && typeof parsed[key] !== 'boolean') {
-          throw new Error('invalid_shared_sync_meta_' + key);
-        }
-      });
-      if (Object.prototype.hasOwnProperty.call(parsed, 'deviceId') && typeof parsed.deviceId !== 'string') {
-        throw new Error('invalid_shared_sync_meta_deviceId');
-      }
-      if (Object.prototype.hasOwnProperty.call(parsed, 'dirtyNotes')
-          && (!Array.isArray(parsed.dirtyNotes) || parsed.dirtyNotes.some(item => typeof item !== 'string'))) {
-        throw new Error('invalid_shared_sync_meta_dirtyNotes');
-      }
-      return Object.assign({}, defaults, parsed);
-    } catch (e) {
-      const invalid = Object.assign({}, defaults);
-      Object.defineProperty(invalid, '__storageInvalid', { value: true });
-      return invalid;
-    }
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return invalidMeta('malformed');
+      const required = ['initialized', 'dirty', 'dirtyNotes', 'dirtyProfile', 'dirtyService', 'lastServerRevision', 'lastSyncAt'];
+      if (required.some(key => !Object.prototype.hasOwnProperty.call(parsed, key))) return invalidMeta('partial');
+      const numeric = ['lastServerRevision', 'lastSyncAt', 'localGroupChangeVersion', 'localChangeVersion'];
+      if (numeric.some(key => Object.prototype.hasOwnProperty.call(parsed, key)
+          && (typeof parsed[key] !== 'number' || !Number.isFinite(parsed[key]) || parsed[key] < 0))) return invalidMeta('malformed');
+      if (['initialized', 'dirty', 'dirtyProfile', 'dirtyService'].some(key => typeof parsed[key] !== 'boolean')) return invalidMeta('malformed');
+      if (typeof parsed.deviceId !== 'undefined' && typeof parsed.deviceId !== 'string') return invalidMeta('malformed');
+      if (!Array.isArray(parsed.dirtyNotes) || parsed.dirtyNotes.some(item => typeof item !== 'string')) return invalidMeta('malformed');
+      const value = Object.assign({}, defaults, parsed);
+      Object.defineProperty(value, '__storageState', { value: 'valid' });
+      return value;
+    } catch (e) { return invalidMeta('malformed'); }
   }
   function writeMeta(meta) {
     if (meta && meta.__storageInvalid) return false;
@@ -5747,11 +5743,20 @@ document.addEventListener("DOMContentLoaded", () => {
       };
       const primary = parse(primaryRaw);
       const secondary = parse(secondaryRaw);
-      if (!primary.valid || !secondary.valid) return { valid: false, exists: primary.exists || secondary.exists, data: null, reason: 'invalid_cache_json' };
-      if (primary.exists && secondary.exists && !sameServiceContent(primary.value, secondary.value)) {
-        return { valid: false, exists: true, data: null, reason: 'cache_key_conflict' };
+      if (primary.valid && secondary.valid && primary.exists && secondary.exists
+          && !sameServiceContent(primary.value, secondary.value)) {
+        return { valid: false, exists: true, data: null, degraded: true, reason: 'cache_key_conflict' };
       }
-      return { valid: true, exists: primary.exists || secondary.exists, data: primary.exists ? primary.value : secondary.value, reason: '' };
+      if (!primary.valid && secondary.valid && secondary.exists) {
+        return { valid: true, exists: true, data: secondary.value, degraded: true, reason: 'primary_cache_malformed' };
+      }
+      if (primary.valid && primary.exists && !secondary.valid) {
+        return { valid: true, exists: true, data: primary.value, degraded: true, reason: 'secondary_cache_malformed' };
+      }
+      if (!primary.valid || !secondary.valid) {
+        return { valid: false, exists: primary.exists || secondary.exists, data: null, degraded: true, reason: 'invalid_cache_json' };
+      }
+      return { valid: true, exists: primary.exists || secondary.exists, data: primary.exists ? primary.value : secondary.value, degraded: false, reason: '' };
     } catch (e) { return { valid: false, exists: true, data: null, reason: 'cache_read_failed' }; }
   }
   function readCachedService() {
@@ -6011,7 +6016,10 @@ document.addEventListener("DOMContentLoaded", () => {
         serviceCache: localStorage.getItem(SERVICE_CACHE_KEY),
         legacySyncMeta: localStorage.getItem('kgeu_student_service_sync_v1'),
         serviceSyncMeta: localStorage.getItem(STUDENT_SERVICE_SYNC_KEY),
-        sharedSyncMeta: localStorage.getItem(META_KEY)
+        sharedSyncMeta: localStorage.getItem(META_KEY),
+        inMemoryService: typeof window.kgeuGetSharedServiceDataInMemory === 'function'
+          ? window.kgeuGetSharedServiceDataInMemory()
+          : null
       });
       localStorage.setItem(key, backup);
       return localStorage.getItem(key) === backup;
@@ -6057,8 +6065,12 @@ document.addEventListener("DOMContentLoaded", () => {
     let previous = DEFAULT_SERVICE;
     try {
       const backup = JSON.parse(localStorage.getItem(backupKey) || 'null');
-      const raw = backup && (backup.studentService !== null ? backup.studentService : backup.serviceCache);
-      if (raw !== null && raw !== undefined) previous = JSON.parse(raw);
+      if (backup && backup.inMemoryService && typeof backup.inMemoryService === 'object') {
+        previous = backup.inMemoryService;
+      } else {
+        const raw = backup && (backup.studentService !== null ? backup.studentService : backup.serviceCache);
+        if (raw !== null && raw !== undefined) previous = JSON.parse(raw);
+      }
     } catch (e) { return false; }
     let applyCalled = false;
     try {
@@ -6115,6 +6127,7 @@ document.addEventListener("DOMContentLoaded", () => {
         setStatus('Метаданные синхронизации повреждены. Автоматическая синхронизация приостановлена; локальные данные сохранены.');
         return;
       }
+      const localChangeVersionBeforeGet = Number(meta.localChangeVersion || 0);
       const remote = await request('/api/sync', { method: 'GET' });
       // Refresh metadata and cache after the pull: edits made while the GET was in flight
       // must be included in the snapshot that is about to be pushed or protected from hydration.
@@ -6124,6 +6137,11 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
       const localChangeVersionAtPayload = Number(meta.localChangeVersion || 0);
+      if (localChangeVersionAtPayload !== localChangeVersionBeforeGet) {
+        setStatus('Во время загрузки облачной версии появились локальные изменения. Локальные данные сохранены; повтори синхронизацию.');
+        renderSharedServiceView();
+        return;
+      }
       const local = localPersonal();
       const localProfile = readProfile();
       let shouldPush = !!meta.dirty;
@@ -6138,7 +6156,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const legacyServiceMeta = typeof readLegacyServiceSyncMetaForSharedSync === 'function'
           ? readLegacyServiceSyncMetaForSharedSync()
           : { exists: false, valid: true, dirty: false };
-        const serviceMetadataConflict = !cacheState.valid || (legacyServiceMeta.exists
+        const serviceMetadataConflict = !cacheState.valid || !!cacheState.degraded || (legacyServiceMeta.exists
           && (!legacyServiceMeta.valid || legacyServiceMeta.dirty !== !!meta.dirtyService));
         let mergedFirstLink = false;
         // First link is an identity merge, not permission to discard pre-existing VK-local Student Service data.
