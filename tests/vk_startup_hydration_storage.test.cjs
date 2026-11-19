@@ -474,6 +474,27 @@ test('startup serviceLoad does not rewrite primary cache when journal is present
   }
 });
 
+test('startup serviceLoad does not promote secondary-only meaningful data into primary cache', () => {
+  const secondary = Object.assign(withTask('secondary-startup', 'Secondary only'), { version: 1, schemaVersion: 1 });
+  const raw = JSON.stringify(secondary);
+  const storage = createStorage({ [KEYS.cache]: raw });
+  const factory = new Function('storage', [
+    'const localStorage = storage;',
+    "const STUDENT_SERVICE_KEY = 'kgeu_student_service_v1';",
+    "const STUDENT_SERVICE_BACKUP_KEY = 'kgeu_student_service_backup_v1';",
+    "const STUDENT_SERVICE_SCHEMA = 4;",
+    "const window = { KGEU_VK_PLATFORM: true };",
+    "function serviceEmptyData() { return " + JSON.stringify(emptyService()) + "; }",
+    "function serviceNormalizeData(value) { return Object.assign({}, value, { schemaVersion: 4 }); }",
+    serviceLoadSource,
+    "return serviceLoad();"
+  ].join('\n'));
+  const loaded = factory(storage);
+  assert.equal(loaded.tasks[0].id, 'secondary-startup');
+  assert.equal(storage.map.has(KEYS.student), false, 'secondary-only meaningful data must remain detectable as degraded');
+  assert.equal(storage.map.get(KEYS.cache), raw);
+});
+
 test('real serviceSave aborts before primary cache write when durable journal write cannot be verified', () => {
   const storage = createStorage(cleanDirtyJournalSeed(), { failWrites: { [JOURNAL_KEY]: [1] } });
   const before = storage.map.get(KEYS.student);
