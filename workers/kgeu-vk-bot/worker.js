@@ -2055,8 +2055,18 @@ async function handlePersonalReminders(request, env) {
       return personalReminderJson(request, { ok: false, error: "reminder_time_out_of_range" }, 400);
     }
 
-    const existingNames = [...await listKvKeys(env.KGEU_VK_USERS, prefix), ...await listKvKeys(env.KGEU_VK_USERS, LEGACY_PERSONAL_REMINDER_PREFIX + vkId + ":")];
-    if (existingNames.length >= 50) {
+    const newNames = await listKvKeys(env.KGEU_VK_USERS, prefix);
+    const legacyNames = await listKvKeys(env.KGEU_VK_USERS, LEGACY_PERSONAL_REMINDER_PREFIX + vkId + ":");
+    let legacyCount = 0;
+    for (const name of legacyNames) {
+      const state = requireKvRead(await readKvState(env.KGEU_VK_USERS, name, "json"), name);
+      if (state.status === "NOT_FOUND") throw new Error("KV_SCAN_INCOMPLETE: " + name);
+      const reminder = state.value;
+      if (reminder && reminder.telegramId != null && reminder.vkId == null) continue;
+      if (!reminder || String(reminder.vkId) !== String(vkId)) throw new Error("PERSONAL_REMINDER_STATE_INVALID: " + name);
+      legacyCount++;
+    }
+    if (newNames.length + legacyCount >= 50) {
       return personalReminderJson(request, { ok: false, error: "reminder_limit_reached" }, 429);
     }
 
