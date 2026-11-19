@@ -49,7 +49,7 @@ test('sendReminders uses the expanded window and retains send deduplication', ()
   assert.match(source, /if \(!isReminderDue\(diff\)\)/);
   const dedupeRead = source.indexOf('env.KGEU_VK_USERS.get(');
   const send = source.indexOf('await sendMessage(');
-  const dedupeWrite = source.indexOf('env.KGEU_VK_USERS.put(');
+  const dedupeWrite = source.indexOf('kvPut(env.KGEU_VK_USERS,');
   assert.ok(dedupeRead >= 0 && dedupeRead < send, 'dedupe must be checked before sending');
   assert.ok(send >= 0 && send < dedupeWrite, 'dedupe marker must be written only after successful sending');
 });
