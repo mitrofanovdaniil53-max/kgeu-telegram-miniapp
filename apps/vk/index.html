@@ -4856,7 +4856,7 @@ html.vk-light .kgeu-note-icon { color:#667085; }
       };
       if(!serviceBackupCurrent()){toast('Не удалось создать резервную копию текущих данных. Восстановление отменено.');return;}
       serviceData=serviceNormalizeData(incoming);
-      const serviceSaved=if(!serviceSave())return;
+      const serviceSaved=serviceSave();
       const serviceRaw=localStorage.getItem(STUDENT_SERVICE_KEY);
       if(!serviceSaved||serviceRaw!==JSON.stringify(serviceData)){
         const rollbackSaved=rollback();
