@@ -322,3 +322,80 @@ test('dirty local service state is preserved when the cloud revision is newer', 
   assert.equal(h.state.postCount, 0);
   assert.deepEqual(h.state.cache, local);
 });
+
+
+test('H04: meaningful local cache identical to remote is not hydrated or redundantly posted', async () => {
+  const local = serviceWithTask('same-local-cloud', 'Same meaningful record');
+  const h = createHarness({
+    cache: local,
+    remote: { found: true, revision: 99, updatedAt: 9900, serviceData: clone(local), personalData: { version: 1, notes: {} }, profileData: {} }
+  });
+  await h.syncNow('startup');
+  assert.equal(h.state.applyCount, 0);
+  assert.equal(h.state.postCount, 0);
+  assert.deepEqual(h.state.cache, local);
+});
+
+test('H09: meaningful secondary cache with absent or empty primary blocks newer cloud hydration', async () => {
+  const secondary = serviceWithTask('secondary-meaningful', 'Secondary must survive');
+  for (const primaryState of ['absent', 'empty']) {
+    const h = createHarness({
+      cache: secondary,
+      cacheState: { valid: true, exists: true, data: secondary, degraded: true, reason: primaryState === 'absent' ? 'primary_cache_missing' : 'cache_key_conflict' },
+      remote: { found: true, revision: 99, updatedAt: 9900, serviceData: serviceWithTask('cloud-newer', 'Cloud newer'), personalData: { version: 1, notes: {} }, profileData: {} }
+    });
+    await h.syncNow('startup');
+    assert.equal(h.state.applyCount, 0, primaryState);
+    assert.equal(h.state.postCount, 0, primaryState);
+    assert.deepEqual(h.state.cache, secondary, primaryState);
+  }
+});
+
+test('H08: all legacy/shared dirty flag combinations are handled without clean hydration bypass', async () => {
+  const local = serviceWithTask('h08-local', 'Local H08');
+  for (const legacyDirty of [false, true]) {
+    for (const sharedDirty of [false, true]) {
+      const h = createHarness({
+        cache: local,
+        legacyMeta: { dirty: legacyDirty, lastServerSync: 700 },
+        meta: { dirty: sharedDirty, dirtyService: sharedDirty },
+        remote: { found: true, revision: 99, updatedAt: 9900, serviceData: serviceWithTask('h08-cloud', 'Cloud H08'), personalData: { version: 1, notes: {} }, profileData: {} }
+      });
+      await h.syncNow('startup');
+      if (legacyDirty === sharedDirty) {
+        if (legacyDirty) {
+          assert.equal(h.state.applyCount, 0, 'both dirty flags must protect local data');
+          assert.equal(h.state.postCount, 0, 'newer remote revision must not trigger an automatic dirty POST');
+        } else {
+          assert.equal(h.state.applyCount, 1, 'both clean flags permit normal newer-cloud hydration');
+        }
+      } else {
+        assert.equal(h.state.applyCount, 0, 'mixed dirty flags must block hydration');
+        assert.equal(h.state.postCount, 0, 'mixed dirty flags must block POST');
+      }
+      if (h.state.applyCount === 0) assert.deepEqual(h.state.cache, local);
+    }
+  }
+});
+
+test('H17: malformed primary/secondary cache combinations never hydrate or POST', async () => {
+  const local = serviceWithTask('h17-local', 'Recoverable local');
+  const cases = [
+    { name: 'primary malformed, secondary valid', state: { valid: true, exists: true, data: local, degraded: true, reason: 'primary_cache_malformed' } },
+    { name: 'primary valid, secondary malformed', state: { valid: true, exists: true, data: local, degraded: true, reason: 'secondary_cache_malformed' } },
+    { name: 'both malformed', state: { valid: false, exists: true, data: null, degraded: true, reason: 'invalid_cache_json' } },
+    { name: 'primary malformed, secondary absent', state: { valid: false, exists: true, data: null, degraded: true, reason: 'invalid_cache_json' } },
+    { name: 'primary absent, secondary malformed', state: { valid: false, exists: true, data: null, degraded: true, reason: 'invalid_cache_json' } }
+  ];
+  for (const item of cases) {
+    const h = createHarness({
+      cache: local,
+      cacheState: item.state,
+      remote: { found: true, revision: 99, updatedAt: 9900, serviceData: serviceWithTask('h17-cloud', 'Cloud H17'), personalData: { version: 1, notes: {} }, profileData: {} }
+    });
+    await h.syncNow('startup');
+    assert.equal(h.state.applyCount, 0, item.name);
+    assert.equal(h.state.postCount, 0, item.name);
+    assert.deepEqual(h.state.cache, local, item.name);
+  }
+});
