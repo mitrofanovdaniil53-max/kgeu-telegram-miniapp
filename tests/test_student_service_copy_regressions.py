@@ -962,6 +962,7 @@ class VkSyncInFlightEditRegressionTest(unittest.TestCase):
             "let busy = false, scheduled = 0, resolvePost, postedPayload = null;",
             "let serviceHydrationUnsafe = false;",
             "let sharedSyncMetadataWriteFailed = false;",
+            "function serviceDirtyJournalBlocksSync() { return false; }",
             "let kgeuPersonalData = { version: 1, notes: { keep: 'old value' } };",
             "let metaStore = { deviceId: 'vk-test', lastServerRevision: 1, lastSyncAt: 1, initialized: true, dirty: true, dirtyNotes: [], dirtyProfile: false, dirtyService: true, localChangeVersion: 0 };",
             "const serviceCache = { tasks: [], deadlines: [], events: [], hostel: { work: [], social: [] } };",
