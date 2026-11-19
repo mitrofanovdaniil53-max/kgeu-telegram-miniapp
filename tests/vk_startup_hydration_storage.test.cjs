@@ -489,7 +489,7 @@ test('journal removal failure keeps serviceSave unconfirmed and preserves the jo
 test('malformed or unreadable dirty journal blocks real startup sync without clearing it', async () => {
   for (const mode of ['malformed', 'unreadable']) {
     const seed = cleanDirtyJournalSeed();
-    if (mode === 'malformed') seed[JOURNAL_KEY] = '{broken';
+    seed[JOURNAL_KEY] = mode === 'malformed' ? '{broken' : JSON.stringify({ version: 1, dirty: true, createdAt: 10, reason: 'test' });
     const faults = mode === 'unreadable' ? { failReads: { [JOURNAL_KEY]: [1] } } : {};
     const storage = createStorage(seed, faults);
     const h = createDirtyJournalRuntime(storage);
