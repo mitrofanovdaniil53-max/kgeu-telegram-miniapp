@@ -181,6 +181,12 @@ test('VK cron performs one complete user scan and reuses the snapshot', async ()
   assert.equal(kv.calls.list.filter(prefix => prefix === 'user:').length, 1);
 });
 
+test('VK stable notification id is deterministic across retries', () => {
+  const vk = loadWorker(vkPath);
+  assert.equal(vk.stableRandomId('reminder:424242:2026-11-20:lesson-1'), vk.stableRandomId('reminder:424242:2026-11-20:lesson-1'));
+  assert.notEqual(vk.stableRandomId('reminder:424242:2026-11-20:lesson-1'), vk.stableRandomId('reminder:424242:2026-11-20:lesson-2'));
+});
+
 test('VK cron skips all broadcasts when the complete user scan fails', async () => {
   let externalFetches = 0;
   const vk = loadWorker(vkPath, { fetch: async () => { externalFetches++; throw new Error('broadcast must not run'); } });
