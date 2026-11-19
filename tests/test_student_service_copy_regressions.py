@@ -973,7 +973,7 @@ class VkSyncInFlightEditRegressionTest(unittest.TestCase):
             "const document = { visibilityState: 'visible' };",
             "const localStorage = { setItem() {}, getItem() { return null; } };",
             "function readMeta() { return JSON.parse(JSON.stringify(metaStore)); }",
-            "function writeMeta(value) { metaStore = JSON.parse(JSON.stringify(value)); }",
+            "function writeMeta(value) { metaStore = JSON.parse(JSON.stringify(value)); return true; }",
             "function scheduleSync() { scheduled++; }",
             "function setLinkUiState() {}",
             "function setStatus() {}",
