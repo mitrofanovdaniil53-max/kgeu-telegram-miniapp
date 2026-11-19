@@ -1998,8 +1998,11 @@ async function handleMiniAppReminders(request, env) {
       return miniAppJson(request, { ok: false, error: 'reminder_time_out_of_range' }, 400);
     }
     if (!await getUser(env, tgUser.id)) return miniAppJson(request, { ok: false, error: 'start_bot_first' }, 409);
-    const existingNames=[...await listKvKeys(env.KGEU_SCHEDULE,prefix),...await listKvKeys(env.KGEU_SCHEDULE,legacyPrefix)];
-    if(existingNames.length>=50)return miniAppJson(request,{ok:false,error:'reminder_limit_reached'},429);
+    const newNames=await listKvKeys(env.KGEU_SCHEDULE,prefix);
+    const legacyNames=await listKvKeys(env.KGEU_SCHEDULE,legacyPrefix);
+    let legacyCount=0;
+    for(const name of legacyNames){const state=requireKvRead(await readKvState(env.KGEU_SCHEDULE,name,'json'),name);if(state.status==='NOT_FOUND')throw new Error('KV_SCAN_INCOMPLETE: '+name);const reminder=state.value;if(reminder&&reminder.vkId!=null&&reminder.telegramId==null)continue;if(!reminder||String(reminder.telegramId)!==String(tgUser.id))throw new Error('PERSONAL_REMINDER_STATE_INVALID: '+name);legacyCount++;}
+    if(newNames.length+legacyCount>=50)return miniAppJson(request,{ok:false,error:'reminder_limit_reached'},429);
     const id = crypto.randomUUID();
     const reminder = { id, telegramId: String(tgUser.id), title, note, date, time, fireAt, createdAt: Date.now() };
     await env.KGEU_SCHEDULE.put(personalReminderKey(tgUser.id, id), JSON.stringify(reminder), { expirationTtl: 366 * 24 * 60 * 60 });
