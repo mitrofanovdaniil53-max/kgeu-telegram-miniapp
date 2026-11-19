@@ -4509,7 +4509,7 @@ html.vk-light .kgeu-note-icon { color:#667085; }
     if(due && !serviceDateKey(due)){toast('Укажи корректную дату в формате YYYY-MM-DD');return;}
     const subject=servicePromptSubject();
     const note=prompt('Комментарий (необязательно):')||'';
-    serviceData.tasks.push({id:'t_'+Date.now(),title:title.trim(),dueDate:due||'',subject:subject,note:note.trim(),done:false,createdAt:Date.now()});serviceSave();render();
+    serviceData.tasks.push({id:'t_'+Date.now(),title:title.trim(),dueDate:due||'',subject:subject,note:note.trim(),done:false,createdAt:Date.now()});if(!serviceSave())return;render();
   }
   function servicePromptDeadline(){
     const title=prompt('Название дедлайна:');if(!title)return;
@@ -4517,7 +4517,7 @@ html.vk-light .kgeu-note-icon { color:#667085; }
     if(!serviceDateKey(date)){toast('Укажи корректную дату в формате YYYY-MM-DD');return;}
     const subject=servicePromptSubject();
     const note=prompt('Комментарий (необязательно):')||'';
-    serviceData.deadlines.push({id:'d_'+Date.now(),title:title.trim(),date:date,subject:subject,note:note.trim(),done:false});serviceSave();render();
+    serviceData.deadlines.push({id:'d_'+Date.now(),title:title.trim(),date:date,subject:subject,note:note.trim(),done:false});if(!serviceSave())return;render();
   }
   function servicePromptEvent(){
     const title=prompt('Название мероприятия:'); if(!title)return;
@@ -4527,7 +4527,7 @@ html.vk-light .kgeu-note-icon { color:#667085; }
     serviceData.events.push({id:'e_'+Date.now(),title:title.trim(),date:date,points:points});
     // Also create a social record, so one input immediately participates in the report.
     serviceData.hostel.social.push({id:'s_'+Date.now(),title:title.trim(),date:date,points:points,note:'Добавлено из раздела мероприятий',fileName:''});
-    serviceSave();render();
+    if(!serviceSave())return;render();
   }
   function serviceCompressImage(file){
     return new Promise(function(resolve){
@@ -4856,7 +4856,7 @@ html.vk-light .kgeu-note-icon { color:#667085; }
       };
       if(!serviceBackupCurrent()){toast('Не удалось создать резервную копию текущих данных. Восстановление отменено.');return;}
       serviceData=serviceNormalizeData(incoming);
-      const serviceSaved=serviceSave();
+      const serviceSaved=if(!serviceSave())return;
       const serviceRaw=localStorage.getItem(STUDENT_SERVICE_KEY);
       if(!serviceSaved||serviceRaw!==JSON.stringify(serviceData)){
         const rollbackSaved=rollback();
@@ -4999,7 +4999,7 @@ html.vk-light .kgeu-note-icon { color:#667085; }
         serviceData.events.push({id:'e_'+Date.now(),title:title,date:date,points:points});
         serviceData.hostel.social.push({id:'s_'+Date.now(),title:title,date:date,points:points,note:note||subject||'Добавлено из раздела мероприятий',fileName:''});
       }
-      serviceSave();
+      if(!serviceSave())return;
       document.getElementById('app').innerHTML=serviceRenderToday();
       serviceBind();
       toast('Запись сохранена');
@@ -5020,7 +5020,7 @@ html.vk-light .kgeu-note-icon { color:#667085; }
     if(subjectSelect){subjectSelect.addEventListener('change',function(){serviceStudySubject=subjectSelect.value;serviceApplyStudyFilters();});}
     document.querySelectorAll('[data-study-filter]').forEach(function(b){b.addEventListener('click',function(){serviceStudyFilter=b.getAttribute('data-study-filter')||'all';document.querySelectorAll('[data-study-filter]').forEach(function(x){x.classList.toggle('active',x===b);});serviceApplyStudyFilters();});});
     const reminderToggle=document.querySelector('[data-reminders-toggle]');
-    if(reminderToggle) reminderToggle.addEventListener('click',function(){serviceData.reminders=serviceData.reminders||{taskDays:1,deadlineDays:1,eventDays:1};serviceData.reminders.enabled=!serviceData.reminders.enabled;serviceSave();document.getElementById('app').innerHTML=serviceRenderReminders();serviceBind();});
+    if(reminderToggle) reminderToggle.addEventListener('click',function(){serviceData.reminders=serviceData.reminders||{taskDays:1,deadlineDays:1,eventDays:1};serviceData.reminders.enabled=!serviceData.reminders.enabled;if(!serviceSave())return;document.getElementById('app').innerHTML=serviceRenderReminders();serviceBind();});
 
     const personalReminderForm=document.querySelector('[data-vk-personal-reminder-form]');
     if(personalReminderForm)personalReminderForm.addEventListener('submit',async function(event){
@@ -5163,14 +5163,14 @@ html.vk-light .kgeu-note-icon { color:#667085; }
         serviceData.hostel.adminGoal=serviceNonNegativeNumber(document.getElementById('hostel-admin-goal').value,serviceNonNegativeNumber(serviceData.hostel.adminGoal,100));
         serviceData.hostel.socialGoal=serviceNonNegativeNumber(document.getElementById('hostel-social-goal').value,serviceNonNegativeNumber(serviceData.hostel.socialGoal,150));
         serviceData.hostel.totalGoal=serviceData.hostel.adminGoal+serviceData.hostel.socialGoal;
-        serviceSave();document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();return;
+        if(!serviceSave())return;document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();return;
       }
       if(a==='add-work'){
         const date=document.getElementById('work-date').value||isoDate(new Date()),minutes=Math.floor(serviceNonNegativeNumber(document.getElementById('work-minutes').value,0));
         if(!minutes){toast('Укажи количество минут');return;}
         const title=document.getElementById('work-title').value.trim()||'Работа';
         serviceData.hostel.work.push({id:'w_'+Date.now(),date:date,minutes:minutes,points:Math.floor(minutes/10),title:title});
-        serviceSave();document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();toast('Работа ЖБС добавлена');return;
+        if(!serviceSave())return;document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();toast('Работа ЖБС добавлена');return;
       }
       if(a==='add-social'){
         const file=document.getElementById('social-file').files[0];
@@ -5185,21 +5185,21 @@ html.vk-light .kgeu-note-icon { color:#667085; }
             attachmentSkipped=true;
           }
         }
-        serviceData.hostel.social.push(rec);serviceSave();document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();
+        serviceData.hostel.social.push(rec);if(!serviceSave())return;document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();
         toast(attachmentSkipped
           ? 'Мероприятие ССО добавлено; вложение не сохранено из-за общего лимита облачной синхронизации. Название файла сохранено.'
           : 'Мероприятие ССО добавлено');return;
       }
       if(a==='export-word')return serviceExportWord();
     });});
-    document.querySelectorAll('[data-service-toggle-task]').forEach(function(b){b.addEventListener('click',function(){const x=serviceData.tasks.find(x=>x.id===b.getAttribute('data-service-toggle-task'));if(x)x.done=!x.done;serviceSave();document.getElementById('app').innerHTML=serviceRenderStudy();serviceBind();});});
-    document.querySelectorAll('[data-service-toggle-deadline]').forEach(function(b){b.addEventListener('click',function(){const x=serviceData.deadlines.find(x=>x.id===b.getAttribute('data-service-toggle-deadline'));if(x)x.done=!x.done;serviceSave();document.getElementById('app').innerHTML=serviceRenderStudy();serviceBind();});});
+    document.querySelectorAll('[data-service-toggle-task]').forEach(function(b){b.addEventListener('click',function(){const x=serviceData.tasks.find(x=>x.id===b.getAttribute('data-service-toggle-task'));if(x)x.done=!x.done;if(!serviceSave())return;document.getElementById('app').innerHTML=serviceRenderStudy();serviceBind();});});
+    document.querySelectorAll('[data-service-toggle-deadline]').forEach(function(b){b.addEventListener('click',function(){const x=serviceData.deadlines.find(x=>x.id===b.getAttribute('data-service-toggle-deadline'));if(x)x.done=!x.done;if(!serviceSave())return;document.getElementById('app').innerHTML=serviceRenderStudy();serviceBind();});});
     document.querySelectorAll('[data-service-note-subject]').forEach(function(b){b.addEventListener('click',function(){serviceOpenSubjectNote(b.getAttribute('data-service-note-subject'));});});
     document.querySelectorAll('[data-service-subject]').forEach(function(b){b.addEventListener('click',function(){document.getElementById('app').innerHTML=serviceOpenSubject(b.getAttribute('data-service-subject'));serviceBind();window.scrollTo({top:0,behavior:'smooth'});});});
-    document.querySelectorAll('[data-service-del-task]').forEach(function(b){b.addEventListener('click',function(){serviceData.tasks=serviceData.tasks.filter(x=>x.id!==b.getAttribute('data-service-del-task'));serviceSave();document.getElementById('app').innerHTML=serviceRenderStudy();serviceBind();});});
-    document.querySelectorAll('[data-service-del-deadline]').forEach(function(b){b.addEventListener('click',function(){serviceData.deadlines=serviceData.deadlines.filter(x=>x.id!==b.getAttribute('data-service-del-deadline'));serviceSave();document.getElementById('app').innerHTML=serviceRenderStudy();serviceBind();});});
-    document.querySelectorAll('[data-service-del-work]').forEach(function(b){b.addEventListener('click',function(){serviceData.hostel.work=serviceData.hostel.work.filter(x=>x.id!==b.getAttribute('data-service-del-work'));serviceSave();document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();});});
-    document.querySelectorAll('[data-service-del-social]').forEach(function(b){b.addEventListener('click',function(){serviceData.hostel.social=serviceData.hostel.social.filter(x=>x.id!==b.getAttribute('data-service-del-social'));serviceSave();document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();});});
+    document.querySelectorAll('[data-service-del-task]').forEach(function(b){b.addEventListener('click',function(){serviceData.tasks=serviceData.tasks.filter(x=>x.id!==b.getAttribute('data-service-del-task'));if(!serviceSave())return;document.getElementById('app').innerHTML=serviceRenderStudy();serviceBind();});});
+    document.querySelectorAll('[data-service-del-deadline]').forEach(function(b){b.addEventListener('click',function(){serviceData.deadlines=serviceData.deadlines.filter(x=>x.id!==b.getAttribute('data-service-del-deadline'));if(!serviceSave())return;document.getElementById('app').innerHTML=serviceRenderStudy();serviceBind();});});
+    document.querySelectorAll('[data-service-del-work]').forEach(function(b){b.addEventListener('click',function(){serviceData.hostel.work=serviceData.hostel.work.filter(x=>x.id!==b.getAttribute('data-service-del-work'));if(!serviceSave())return;document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();});});
+    document.querySelectorAll('[data-service-del-social]').forEach(function(b){b.addEventListener('click',function(){serviceData.hostel.social=serviceData.hostel.social.filter(x=>x.id!==b.getAttribute('data-service-del-social'));if(!serviceSave())return;document.getElementById('app').innerHTML=serviceRenderHostel();serviceBind();});});
     if(document.getElementById('service-study-search')) serviceApplyStudyFilters();
   }
 
