@@ -5865,6 +5865,9 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!primary.valid && secondary.valid && secondary.exists) {
         return { valid: true, exists: true, data: secondary.value, degraded: true, reason: 'primary_cache_malformed' };
       }
+      if (!primary.exists && secondary.valid && secondary.exists && hasMeaningfulServiceData(secondary.value)) {
+        return { valid: true, exists: true, data: secondary.value, degraded: true, reason: 'primary_cache_missing' };
+      }
       if (primary.valid && primary.exists && !secondary.valid) {
         return { valid: true, exists: true, data: primary.value, degraded: true, reason: 'secondary_cache_malformed' };
       }
