@@ -6287,6 +6287,10 @@ document.addEventListener("DOMContentLoaded", () => {
     busy = true;
     try {
       const me = await request('/api/account/me', { method: 'GET' });
+      if (serviceDirtyJournalBlocksSync()) {
+        setStatus('Во время проверки аккаунта появился неподтверждённый локальный dirty-state Student Service. Синхронизация остановлена.');
+        return;
+      }
       const linked = Array.isArray(me.linkedProviders) && me.linkedProviders.indexOf('telegram') >= 0 && me.linkedProviders.indexOf('vk') >= 0;
       setLinkUiState(linked);
       if (!linked) {
@@ -6301,6 +6305,10 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       const localChangeVersionBeforeGet = Number(meta.localChangeVersion || 0);
       const remote = await request('/api/sync', { method: 'GET' });
+      if (serviceDirtyJournalBlocksSync()) {
+        setStatus('Во время загрузки облачной версии появился неподтверждённый локальный dirty-state Student Service. Hydration и отправка остановлены.');
+        return;
+      }
       // Refresh metadata and cache after the pull: edits made while the GET was in flight
       // must be included in the snapshot that is about to be pushed or protected from hydration.
       meta = readMeta();
