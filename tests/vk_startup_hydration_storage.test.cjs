@@ -486,6 +486,15 @@ test('journal removal failure keeps serviceSave unconfirmed and preserves the jo
   assert.equal(JSON.parse(storage.map.get(KEYS.sharedMeta)).dirtyService, true);
 });
 
+test('journal read-back failure after remove restores a durable blocker and returns false', () => {
+  const storage = createStorage(cleanDirtyJournalSeed(), { failReads: { [JOURNAL_KEY]: [6] } });
+  const h = createDirtyJournalRuntime(storage);
+  h.setServiceData(withTask('local-journal-readback', 'Local journal readback'));
+  assert.equal(h.serviceSave(), false);
+  assert.ok(storage.map.has(JOURNAL_KEY), 'journal must be restored when deletion cannot be verified');
+  assert.equal(h.canSync(), false);
+});
+
 test('malformed or unreadable dirty journal blocks real startup sync without clearing it', async () => {
   for (const mode of ['malformed', 'unreadable']) {
     const seed = cleanDirtyJournalSeed();
