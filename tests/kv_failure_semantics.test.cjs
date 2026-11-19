@@ -192,7 +192,7 @@ test('VK cron performs only one complete user scan and shares its snapshot acros
   const vk = loadWorker(vkPath);
   const kv = makeKv();
   await vk.runCron({ KGEU_VK_USERS: kv, VK_TOKEN: 'test-token' });
-  assert.equal(kv.calls.list.filter(prefix => prefix === 'vk:user:').length, 1);
+  assert.equal(kv.calls.list.filter(prefix => prefix === 'user:').length, 1);
   assert.equal(kv.calls.list.filter(prefix => prefix === 'user:').length, 1);
 });
 
@@ -200,7 +200,7 @@ test('VK cron performs one complete user scan and reuses the snapshot', async ()
   const vk = loadWorker(vkPath);
   const kv = makeKv();
   await vk.runCron({ KGEU_VK_USERS: kv, VK_TOKEN: 'test-token' });
-  assert.equal(kv.calls.list.filter(prefix => prefix === 'vk:user:').length, 1);
+  assert.equal(kv.calls.list.filter(prefix => prefix === 'user:').length, 1);
   assert.equal(kv.calls.list.filter(prefix => prefix === 'user:').length, 1);
 });
 
@@ -213,8 +213,8 @@ test('VK stable notification id is deterministic across retries', () => {
 test('VK cron skips all broadcasts when the complete user scan fails', async () => {
   let externalFetches = 0;
   const vk = loadWorker(vkPath, { fetch: async () => { externalFetches++; throw new Error('broadcast must not run'); } });
-  const kv = makeKv({ failList: prefix => prefix === 'vk:user:' });
+  const kv = makeKv({ failList: prefix => prefix === 'user:' });
   await vk.runCron({ KGEU_VK_USERS: kv, VK_TOKEN: 'test-token' });
   assert.equal(externalFetches, 0);
-  assert.equal(kv.calls.list.includes('vk:user:'), true);
+  assert.equal(kv.calls.list.includes('user:'), true);
 });
