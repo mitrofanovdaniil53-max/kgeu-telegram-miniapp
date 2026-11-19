@@ -951,6 +951,9 @@ class VkSyncInFlightEditRegressionTest(unittest.TestCase):
         if not node:
             self.skipTest("Node.js is required to execute VK sync")
         source = (ROOT / "apps/vk/index.html").read_text(encoding="utf-8")
+        journal_start = source.index("function readServiceDirtyJournal()")
+        journal_end = source.index("function beginStudentServiceDirtyJournal()", journal_start)
+        journal_helpers = source[journal_start:journal_end]
         dirty_start = source.index("window.kgeuSharedSyncMarkDirty = function")
         dirty_end = source.index("\n  kgeuFlushMigratedNoteSync();", dirty_start)
         dirty_function = source[dirty_start:dirty_end]
@@ -962,16 +965,19 @@ class VkSyncInFlightEditRegressionTest(unittest.TestCase):
             "let busy = false, scheduled = 0, resolvePost, postedPayload = null;",
             "let serviceHydrationUnsafe = false;",
             "let sharedSyncMetadataWriteFailed = false;",
-            "const serviceDirtyJournalBlocksSync = () => false;",
+            "let serviceDirtyJournalBlocked = false;",
+            "const SERVICE_DIRTY_JOURNAL_KEY = 'kgeu_vk_service_dirty_journal_v1';",
+            "const journalStore = new Map(); // explicit clean-journal startup state",
             "let kgeuPersonalData = { version: 1, notes: { keep: 'old value' } };",
             "let metaStore = { deviceId: 'vk-test', lastServerRevision: 1, lastSyncAt: 1, initialized: true, dirty: true, dirtyNotes: [], dirtyProfile: false, dirtyService: true, localChangeVersion: 0 };",
             "const serviceCache = { tasks: [], deadlines: [], events: [], hostel: { work: [], social: [] } };",
             "const remote = { found: true, revision: 1, updatedAt: 1000, serviceData: serviceCache, personalData: { version: 1, notes: { keep: 'old value' } }, profileData: {} };",
             "const snapshot = {};",
-            "const window = { kgeuMarkStudentServiceSynced() {} };",
+            "const window = { kgeuMarkStudentServiceSynced() {}, kgeuCanStudentServiceSync() { return !serviceDirtyJournalBlocksSync() && !sharedSyncMetadataWriteFailed; } };",
             "const navigator = { onLine: true };",
             "const document = { visibilityState: 'visible' };",
-            "const localStorage = { setItem() {}, getItem() { return null; } };",
+            "const localStorage = { setItem(key, value) { journalStore.set(key, String(value)); }, getItem(key) { return journalStore.has(key) ? journalStore.get(key) : null; } };",
+            journal_helpers,
             "function readMeta() { return JSON.parse(JSON.stringify(metaStore)); }",
             "function writeMeta(value) { metaStore = JSON.parse(JSON.stringify(value)); return true; }",
             "function scheduleSync() { scheduled++; }",
