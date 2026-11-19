@@ -318,3 +318,215 @@ test('actual apply path handles failure of the primary cache key write before th
   assert.equal(h.storage.map.get(KEYS.cache), JSON.stringify(before));
   assert.equal(h.unsafe(), false);
 });
+
+
+// Durable Student Service dirty journal integration coverage.
+// These functions are extracted verbatim from apps/vk/index.html; only localStorage,
+// network, timer and DOM boundaries are deterministic test adapters.
+const serviceSaveSource = between('  function serviceSave(){', '  window.kgeuUpdateSharedServiceDataLocal=function(data){');
+const serviceDirtySource = between('  function serviceMarkDirty(){', '  // Used by the separate subject-notes script');
+const servicePushSource = between('  async function servicePushToBackend(expectedRevision){', '  async function servicePullFromBackend(){');
+const manualPushSource = between('  async function serviceManualSyncPush(){', '  function serviceEsc(s)');
+const sharedDirtySource = between('  function scheduleSync() {', '  kgeuFlushMigratedNoteSync();');
+const sharedSyncNowSource = between('  async function syncNow(reason)', '  async function linkAccount()');
+const cloudApplySource = between('  function serviceApplyCloudSnapshot(snapshot, expectedLocalChangeVersion)', '  async function serviceManualSyncPush(){');
+const JOURNAL_KEY = 'kgeu_vk_service_dirty_journal_v1';
+
+function createDirtyJournalRuntime(storage, options = {}) {
+  const state = { requests: 0, serviceRequests: 0, scheduled: 0, statuses: [], remote: options.remote || {
+    found: true, revision: 99, updatedAt: 9900, serviceData: withTask('cloud-newer', 'Cloud newer'),
+    personalData: { version: 1, notes: {} }, profileData: {}
+  } };
+  const factory = new Function('storage', 'state', [
+    'const localStorage = storage;',
+    "const STUDENT_SERVICE_KEY = 'kgeu_student_service_v1';",
+    "const SERVICE_CACHE_KEY = 'kgeu_vk_shared_service_cache_v1';",
+    "const STUDENT_SERVICE_SYNC_KEY = 'kgeu_student_service_sync_v1';",
+    "const META_KEY = 'kgeu_vk_shared_sync_meta_v1';",
+    "const SERVICE_DIRTY_JOURNAL_KEY = 'kgeu_vk_service_dirty_journal_v1';",
+    "const HYDRATION_UNSAFE_KEY = 'kgeu_vk_service_hydration_unsafe_v1';",
+    "const STUDENT_SERVICE_BACKUP_KEY = 'kgeu_student_service_backup_v1';",
+    "const KGEU_PERSONAL_DATA_KEY = 'kgeu_vk_personal_data_v1';",
+    "const DEFAULT_SERVICE = " + JSON.stringify(emptyService()) + ";",
+    "const window = { KGEU_VK_PLATFORM: true };",
+    "const navigator = { onLine: true };",
+    "const document = { visibilityState: 'visible', querySelector() { return null; } };",
+    "let serviceData = " + JSON.stringify(withTask('local-before', 'Local before')) + ";",
+    "let kgeuPersonalData = { version: 1, notes: {} };",
+    "let serviceLocalRevision = 0;",
+    "let serviceAutoSyncTimer = null;",
+    "let timer = null;",
+    "let busy = false;",
+    "let serviceHydrationUnsafe = false;",
+    "const statuses = state.statuses;",
+    "function serviceNormalizeData(value) { return JSON.parse(JSON.stringify(value || DEFAULT_SERVICE)); }",
+    "function serviceScheduleAutoSync() {}",
+    "function serviceRefreshVisibleView() {}",
+    "function toast() {}",
+    "function setStatus(message) { state.statuses.push(String(message)); }",
+    "function setLinkUiState() {}",
+    "function renderSharedServiceView() {}",
+    "function setTimeout() { state.scheduled++; return state.scheduled; }",
+    "function clearTimeout() {}",
+    "function request() { state.requests++; return Promise.resolve(state.remote); }",
+    "function serviceSyncPackage() { return {}; }",
+    "function serviceSyncRequest() { state.serviceRequests++; return Promise.resolve({ revision: 100, updatedAt: 10000 }); }",
+    "function servicePullFromBackend() { state.serviceRequests++; return Promise.resolve(state.remote); }",
+    "function serviceHasLocalContent() { return true; }",
+    "function readMeta() { return Object.assign({}, state.meta || {}); }",
+    "function writeMeta(value) { state.meta = Object.assign({}, value); return true; }",
+    "function readCachedServiceState() { return { valid: true, exists: true, data: serviceData }; }",
+    "function readCachedService() { return serviceData; }",
+    "function hasMeaningfulServiceData(data) { return !!(data && data.tasks && data.tasks.length); }",
+    "function sameServiceContent(a, b) { return JSON.stringify(a) === JSON.stringify(b); }",
+    "function mergeServiceRecords(a, b) { return Object.assign({}, a, b); }",
+    "function mergeNotes(remote, local) { return { personalData: local, addedLocalNotes: false, conflicts: 0 }; }",
+    "function localPersonal() { return { version: 1, notes: {} }; }",
+    "function readProfile() { return {}; }",
+    "async function applyProfile() { return false; }",
+    "function applyPersonal() {}",
+    "function payloadForSync() { return {}; }",
+    "function scheduleSync() {}",
+    "function applyCloudServiceDataSafely() { state.applies = (state.applies || 0) + 1; return true; }",
+    serviceMetaSource,
+    serviceDirtySource,
+    serviceSaveSource,
+    sharedMetaSource,
+    legacyMetaSource,
+    sharedDirtySource,
+    servicePushSource,
+    manualPushSource,
+    sharedSyncNowSource,
+    "return { serviceSave, serviceMarkDirty, syncNow, servicePushToBackend, serviceManualSyncPush, setServiceData(value) { serviceData = serviceNormalizeData(value); }, getServiceData() { return serviceData; }, readMeta, readServiceDirtyJournal, canSync: window.kgeuCanStudentServiceSync, window };"
+  ].join('\n'));
+  return { state, ...factory(storage, state) };
+}
+
+function cleanDirtyJournalSeed() {
+  const local = withTask('local-before', 'Local before');
+  return {
+    [KEYS.student]: JSON.stringify(local),
+    [KEYS.cache]: JSON.stringify(local),
+    [KEYS.legacyMeta]: JSON.stringify({ dirty: false, lastLocalSave: 10, lastServerSync: 10 }),
+    [KEYS.sharedMeta]: JSON.stringify({
+      initialized: true, lastServerRevision: 7, lastSyncAt: 10, dirty: false,
+      dirtyNotes: [], dirtyProfile: false, dirtyService: false,
+      localGroupChangeVersion: 0, localChangeVersion: 0
+    })
+  };
+}
+
+test('real serviceSave aborts before primary cache write when durable journal write cannot be verified', () => {
+  const storage = createStorage(cleanDirtyJournalSeed(), { failWrites: { [JOURNAL_KEY]: [1] } });
+  const before = storage.map.get(KEYS.student);
+  const h = createDirtyJournalRuntime(storage);
+  h.setServiceData(withTask('must-not-persist', 'Must not persist'));
+  assert.equal(h.serviceSave(), false);
+  assert.equal(storage.map.get(KEYS.student), before);
+  assert.equal(storage.map.has(JOURNAL_KEY), false);
+});
+
+test('real serviceSave leaves durable journal after both legacy and shared metadata writes fail; reload blocks hydration and every POST route', async () => {
+  const storage = createStorage(cleanDirtyJournalSeed(), {
+    failWrites: {
+      [KEYS.legacyMeta]: [1],
+      [KEYS.sharedMeta]: [1]
+    }
+  });
+  const h1 = createDirtyJournalRuntime(storage);
+  const localChanged = withTask('local-dirty-survives', 'Local meaningful data');
+  h1.setServiceData(localChanged);
+  assert.equal(h1.serviceSave(), false);
+  assert.equal(storage.map.get(KEYS.student), JSON.stringify(localChanged), 'primary cache write succeeded before metadata failure');
+  assert.ok(storage.map.has(JOURNAL_KEY), 'journal remains durable');
+  assert.deepEqual(JSON.parse(storage.map.get(KEYS.legacyMeta)), { dirty: false, lastLocalSave: 10, lastServerSync: 10 }, 'old clean legacy metadata remains');
+  assert.equal(JSON.parse(storage.map.get(KEYS.sharedMeta)).dirtyService, false, 'old clean shared metadata remains');
+  assert.equal(storage.writes.get(KEYS.legacyMeta), 1, 'legacy metadata write was attempted');
+  assert.equal(storage.writes.get(KEYS.sharedMeta), 1, 'shared metadata write was attempted independently');
+
+  // Destroy runtime and construct a fresh one over the same durable storage.
+  storage.setFaults({});
+  const h2 = createDirtyJournalRuntime(storage, { remote: {
+    found: true, revision: 99, updatedAt: 9900, serviceData: withTask('cloud-newer', 'Cloud newer'),
+    personalData: { version: 1, notes: {} }, profileData: {}
+  } });
+  await h2.syncNow('startup');
+  assert.equal(h2.state.requests, 0, 'startup must stop before GET when journal is present');
+  assert.equal(h2.state.applies || 0, 0, 'cloud hydration must not start');
+  assert.equal(storage.map.get(KEYS.student), JSON.stringify(localChanged), 'meaningful local primary cache survives reload');
+  assert.ok(storage.map.has(JOURNAL_KEY), 'startup must not auto-clear uncertainty');
+  await assert.rejects(() => h2.servicePushToBackend(), /student_service_dirty_journal_blocked/);
+  await assert.rejects(() => h2.serviceManualSyncPush(), /student_service_dirty_journal_blocked/);
+  assert.equal(h2.state.serviceRequests, 0, 'manual paths must be blocked before GET/POST');
+});
+
+test('journal is removed only after both dirty metadata values are confirmed and removeItem read-back succeeds', () => {
+  const storage = createStorage(cleanDirtyJournalSeed());
+  const h = createDirtyJournalRuntime(storage);
+  const localChanged = withTask('local-confirmed', 'Local confirmed');
+  h.setServiceData(localChanged);
+  assert.equal(h.serviceSave(), true);
+  assert.equal(storage.map.has(JOURNAL_KEY), false);
+  assert.equal(JSON.parse(storage.map.get(KEYS.legacyMeta)).dirty, true);
+  const shared = JSON.parse(storage.map.get(KEYS.sharedMeta));
+  assert.equal(shared.dirty, true);
+  assert.equal(shared.dirtyService, true);
+});
+
+test('journal removal failure keeps serviceSave unconfirmed and preserves the journal', () => {
+  const storage = createStorage(cleanDirtyJournalSeed(), { failRemoves: { [JOURNAL_KEY]: [1] } });
+  const h = createDirtyJournalRuntime(storage);
+  h.setServiceData(withTask('local-remove-fail', 'Local remove failure'));
+  assert.equal(h.serviceSave(), false);
+  assert.ok(storage.map.has(JOURNAL_KEY));
+  assert.equal(JSON.parse(storage.map.get(KEYS.legacyMeta)).dirty, true);
+  assert.equal(JSON.parse(storage.map.get(KEYS.sharedMeta)).dirtyService, true);
+});
+
+test('malformed or unreadable dirty journal blocks real startup sync without clearing it', async () => {
+  for (const mode of ['malformed', 'unreadable']) {
+    const seed = cleanDirtyJournalSeed();
+    if (mode === 'malformed') seed[JOURNAL_KEY] = '{broken';
+    const faults = mode === 'unreadable' ? { failReads: { [JOURNAL_KEY]: [1] } } : {};
+    const storage = createStorage(seed, faults);
+    const h = createDirtyJournalRuntime(storage);
+    await h.syncNow('startup');
+    assert.equal(h.state.requests, 0, mode);
+    assert.equal(h.state.applies || 0, 0, mode);
+    assert.ok(storage.map.has(JOURNAL_KEY), mode);
+  }
+});
+
+test('actual cloud apply does not start when mandatory internal backup cannot be persisted and verified', () => {
+  const local = withTask('local-before-cloud', 'Keep local');
+  for (const key of [KEYS.serviceBackup, KEYS.personalBackup]) {
+    const storage = createStorage({
+      [KEYS.student]: JSON.stringify(local),
+      [KEYS.serviceMeta]: JSON.stringify({ dirty: true, lastLocalSave: 20, lastServerSync: 10 }),
+      [KEYS.personalBackup]: JSON.stringify({ version: 1, notes: { keep: 'local' } })
+    }, { failWrites: { [key]: [1] } });
+    const factory = new Function('storage', [
+      'const localStorage = storage;',
+      "const STUDENT_SERVICE_KEY = 'kgeu_student_service_v1';",
+      "const STUDENT_SERVICE_SYNC_KEY = 'kgeu_student_service_sync_v1';",
+      "const STUDENT_SERVICE_BACKUP_KEY = 'kgeu_student_service_backup_v1';",
+      "const KGEU_PERSONAL_DATA_KEY = 'kgeu_vk_personal_data_v1';",
+      "let serviceData = " + JSON.stringify(local) + ";",
+      "let kgeuPersonalData = { version: 1, notes: { keep: 'local' } };",
+      "const window = { KGEU_VK_PLATFORM: true };",
+      "function serviceNormalizeData(value) { return JSON.parse(JSON.stringify(value)); }",
+      "function serviceRefreshVisibleView() {}",
+      serviceBackupSource,
+      cloudApplySource,
+      "return { serviceApplyCloudSnapshot, get serviceData() { return serviceData; } };"
+    ].join('\n'));
+    const h = factory(storage);
+    assert.throws(() => h.serviceApplyCloudSnapshot({
+      found: true, updatedAt: 999, serviceData: withTask('cloud-overwrite', 'Cloud overwrite'),
+      personalData: { version: 1, notes: { cloud: 'new' } }
+    }, null), /cloud_restore_backup_failed/);
+    assert.deepEqual(h.serviceData, local);
+    assert.equal(storage.map.get(KEYS.student), JSON.stringify(local));
+    assert.equal(storage.writes.get(KEYS.student) || 0, 0, 'cloud apply must not write primary cache before backup verification');
+  }
+});
