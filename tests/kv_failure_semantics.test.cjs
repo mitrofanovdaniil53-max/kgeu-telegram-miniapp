@@ -73,8 +73,8 @@ test('KV get READ_ERROR propagates from getUser and never becomes NOT_FOUND', as
   const tg = loadWorker(tgPath), vk = loadWorker(vkPath);
   const tgKv = makeKv({ failGet: () => true });
   const vkKv = makeKv({ failGet: () => true });
-  await assert.rejects(tg.getUser({ KGEU_SCHEDULE: tgKv }, 42), /KV_READ_ERROR/);
-  await assert.rejects(vk.getUser({ KGEU_VK_USERS: vkKv }, 42), /KV_READ_ERROR/);
+  await assert.rejects(tg.getUser({ KGEU_SCHEDULE: tgKv }, 42), /KGEU_STORAGE_UNAVAILABLE/);
+  await assert.rejects(vk.getUser({ KGEU_VK_USERS: vkKv }, 42), /KGEU_STORAGE_UNAVAILABLE/);
 });
 
 test('NOT_FOUND does not auto-create profiles without an atomic coordinator', async () => {
@@ -91,8 +91,8 @@ test('KV get error while processing personal reminders never calls delete (Teleg
   const vkKey = 'vk:personal-reminder:42:rem-1';
   const tgKv = makeKv({ values: { [tgKey]: '{}' }, failGet: key => key === tgKey });
   const vkKv = makeKv({ values: { [vkKey]: '{}' }, failGet: key => key === vkKey });
-  await assert.rejects(tg.processPersonalReminders({ KGEU_SCHEDULE: tgKv }), /KV_READ_ERROR/);
-  await assert.rejects(vk.processPersonalReminders({ KGEU_VK_USERS: vkKv }), /KV_READ_ERROR/);
+  await assert.rejects(tg.processPersonalReminders({ KGEU_SCHEDULE: tgKv }), /KGEU_STORAGE_UNAVAILABLE/);
+  await assert.rejects(vk.processPersonalReminders({ KGEU_VK_USERS: vkKv }), /KGEU_STORAGE_UNAVAILABLE/);
   assert.deepEqual(tgKv.calls.delete, []);
   assert.deepEqual(vkKv.calls.delete, []);
 });
@@ -111,8 +111,8 @@ test('get() error during listUsers fails the complete scan instead of returning 
   const tg = loadWorker(tgPath), vk = loadWorker(vkPath);
   const tgKv = makeKv({ values: { 'telegram:user:1': JSON.stringify({ telegramId: '1' }) }, failGet: () => true });
   const vkKv = makeKv({ values: { 'vk:user:1': JSON.stringify({ vkId: 1 }) }, failGet: () => true });
-  await assert.rejects(tg.listUsers({ KGEU_SCHEDULE: tgKv }), /KV_READ_ERROR/);
-  await assert.rejects(vk.listUsers({ KGEU_VK_USERS: vkKv }), /KV_READ_ERROR/);
+  await assert.rejects(tg.listUsers({ KGEU_SCHEDULE: tgKv }), /KGEU_STORAGE_UNAVAILABLE/);
+  await assert.rejects(vk.listUsers({ KGEU_VK_USERS: vkKv }), /KGEU_STORAGE_UNAVAILABLE/);
 });
 
 test('saveUser does not perform read-after-write verification that can fail after a successful put', async () => {
