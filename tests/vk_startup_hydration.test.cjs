@@ -41,6 +41,7 @@ function createHarness(options = {}) {
     renderCount: 0,
     postCount: 0,
     statuses: [],
+    failBackup: !!options.failBackup,
     storage: new Map()
   };
   if (state.cache != null) {
@@ -59,7 +60,7 @@ function createHarness(options = {}) {
     const document = { visibilityState: 'visible' };
     const localStorage = {
       getItem(key) { return state.storage.has(key) ? state.storage.get(key) : null; },
-      setItem(key, value) { state.storage.set(key, String(value)); },
+      setItem(key, value) { if (key === 'kgeu_vk_service_before_hydration_v1' && state.failBackup) throw new Error('quota'); state.storage.set(key, String(value)); },
       removeItem(key) { state.storage.delete(key); }
     };
     const window = {
@@ -145,6 +146,15 @@ test('empty clean cache hydrates non-empty cloud state at the same revision', as
   assert.equal(h.state.applyCount, 1, JSON.stringify(h.state.statuses));
   assert.deepEqual(h.state.cache.tasks.map(item => item.id), ['cloud-1']);
   assert.ok(h.state.storage.has('kgeu_vk_service_before_hydration_v1'), 'the prior local cache must be backed up');
+});
+
+test('failed local backup prevents hydration and preserves the cache', async () => {
+  const local = emptyService();
+  const h = createHarness({ cache: local, failBackup: true });
+  await h.syncNow('startup');
+  assert.equal(h.state.applyCount, 0);
+  assert.deepEqual(h.state.cache, local);
+  assert.equal(h.state.storage.has('kgeu_vk_service_before_hydration_v1'), false);
 });
 
 test('empty local and empty cloud state do not trigger unnecessary hydration', async () => {
