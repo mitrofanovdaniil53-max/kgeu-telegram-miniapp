@@ -4118,6 +4118,11 @@ html.vk-light .kgeu-note-icon { color:#667085; }
       const raw=JSON.stringify(serviceData);
       localStorage.setItem(STUDENT_SERVICE_KEY,raw);
       if(localStorage.getItem(STUDENT_SERVICE_KEY)!==raw)throw new Error('student_service_cache_read_back_failed');
+      if(window.KGEU_VK_PLATFORM){
+        if(typeof window.kgeuWriteSharedServiceCache!=='function')throw new Error('student_service_secondary_cache_writer_missing');
+        const mirrorResult=window.kgeuWriteSharedServiceCache(serviceData);
+        if(!mirrorResult||mirrorResult.ok!==true)throw new Error('student_service_secondary_cache_write_failed');
+      }
       if(serviceMarkDirty()!==true)throw new Error('student_service_dirty_state_unconfirmed');
       return true;
     }catch(e){toast('Не удалось надёжно сохранить данные и статус синхронизации');return false;}
@@ -5908,6 +5913,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     return result;
   }
+  window.kgeuWriteSharedServiceCache = writeCachedService;
   function hasMeaningfulServiceData(data) {
     if (!data || typeof data !== 'object') return false;
     const hostel = data.hostel && typeof data.hostel === 'object' ? data.hostel : {};
