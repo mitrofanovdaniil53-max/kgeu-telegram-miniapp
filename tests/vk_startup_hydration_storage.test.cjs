@@ -112,12 +112,13 @@ function createHarness(options = {}) {
     serviceBackupSource,
     serviceMetaSource,
     applySource,
-    "window.kgeuSetSharedServiceDataInMemory=function(data){try{serviceData=serviceNormalizeData(data||serviceEmptyData());return true;}catch(e){return false;}};",
+    "let failMemoryRestore = false;",
+    "window.kgeuSetSharedServiceDataInMemory=function(data){if(failMemoryRestore)return false;try{serviceData=serviceNormalizeData(data||serviceEmptyData());return true;}catch(e){return false;}};",
     sharedMetaSource,
     legacyMetaSource,
     cacheSource,
     hydrationSource,
-    "return { readMeta, writeMeta, readLegacyServiceSyncMetaForSharedSync, readCachedService, readCachedServiceState, writeCachedService, backupVkServiceCacheBeforeHydration, restoreVkServiceCacheAfterFailedHydration, applyCloudServiceDataSafely, getMemory:()=>serviceData, statuses, unsafe:()=>serviceHydrationUnsafe, window };"
+    "return { readMeta, writeMeta, readLegacyServiceSyncMetaForSharedSync, readCachedService, readCachedServiceState, writeCachedService, backupVkServiceCacheBeforeHydration, restoreVkServiceCacheAfterFailedHydration, applyCloudServiceDataSafely, getMemory:()=>serviceData, statuses, unsafe:()=>serviceHydrationUnsafe, failMemoryRestore:()=>{failMemoryRestore=true;}, window };"
   ].join('\n'));
   return { storage, ...factory(storage, local) };
 }
@@ -283,4 +284,15 @@ test('each cache write is attempted and verified independently', () => {
     assert.ok(result.errors.some(item => item.key === key));
     assert.ok(result.keys.length >= 1);
   }
+});
+
+
+test('failed in-memory restoration marks the app unsafe even when persistent rollback succeeds', () => {
+  const h = createHarness({ faults: { failWrites: { [KEYS.serviceMeta]: [1] } } });
+  const before = h.getMemory();
+  h.failMemoryRestore();
+  assert.equal(h.applyCloudServiceDataSafely(withTask('cloud-memory-fail', 'Cloud'), 90), false);
+  assert.deepEqual(h.getMemory(), before);
+  assert.equal(h.unsafe(), true);
+  assert.equal(h.storage.map.get(KEYS.unsafe), '1');
 });
