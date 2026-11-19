@@ -8,12 +8,12 @@ const frontend = fs.readFileSync('index.html', 'utf8');
 test('personal reminder API validates signed Telegram Mini App data', () => {
   assert.ok(worker.includes('validateTelegramInitData(initData, env.BOT_TOKEN)'));
   assert.ok(worker.includes('personalReminderKey(telegramId, reminderId)'));
-  assert.ok(worker.includes('personal-reminder:${telegramId}:${reminderId}'));
+  assert.ok(worker.includes('telegram:personal-reminder:${telegramId}:${reminderId}'));
 });
 
 test('personal reminders are isolated by Telegram account and capped', () => {
   assert.ok(worker.includes('personalReminderKey(tgUser.id, id)'));
-  assert.ok(worker.includes('existing.keys.length >= 50'));
+  assert.ok(worker.includes('existingNames.length >= 50'));
   assert.ok(worker.includes("!['GET', 'POST', 'DELETE'].includes(request.method)"));
 });
 
