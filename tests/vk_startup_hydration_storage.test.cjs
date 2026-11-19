@@ -91,7 +91,6 @@ function createHarness(options = {}) {
   }, options.faults || {});
   const factory = new Function('storage', 'local', [
     "const localStorage = storage;",
-    "const API = 'https://test.invalid';",
     "const META_KEY = 'kgeu_vk_shared_sync_meta_v1';",
     "const SERVICE_CACHE_KEY = 'kgeu_vk_shared_service_cache_v1';",
     "const STUDENT_SERVICE_KEY = 'kgeu_student_service_v1';",
@@ -164,6 +163,8 @@ test('backup failure prevents the real application apply function from running',
 
 test('serviceBackupBeforeCloudRestore(true) failure prevents the actual shared apply from applying cloud data', () => {
   const h = createHarness({ faults: { failWrites: { [KEYS.serviceBackup]: [1] } } });
+  h.window.KGEU_VK_PLATFORM = true;
+  h.window.kgeuCanStudentServiceSync = () => true;
   const before = h.getMemory();
   const beforeRaw = h.storage.map.get(KEYS.student);
   assert.equal(h.window.kgeuApplySharedServiceData(withTask('cloud-must-not-apply', 'Cloud must not apply'), 200), false);
@@ -564,7 +565,7 @@ test('actual cloud apply does not start when mandatory internal backup cannot be
       "const KGEU_PERSONAL_DATA_KEY = 'kgeu_vk_personal_data_v1';",
       "let serviceData = " + JSON.stringify(local) + ";",
       "let kgeuPersonalData = { version: 1, notes: { keep: 'local' } };",
-      "const window = { KGEU_VK_PLATFORM: true };",
+      "const window = { KGEU_VK_PLATFORM: true, kgeuCanStudentServiceSync() { return true; } };",
       "function serviceNormalizeData(value) { return JSON.parse(JSON.stringify(value)); }",
       "function serviceRefreshVisibleView() {}",
       serviceBackupSource,
