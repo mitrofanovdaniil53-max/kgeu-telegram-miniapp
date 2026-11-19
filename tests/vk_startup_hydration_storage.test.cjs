@@ -338,6 +338,8 @@ test('actual apply path handles failure of the primary cache key write before th
 // These functions are extracted verbatim from apps/vk/index.html; only localStorage,
 // network, timer and DOM boundaries are deterministic test adapters.
 const serviceSaveSource = between('  function serviceSave(){', '  window.kgeuUpdateSharedServiceDataLocal=function(data){');
+const serviceLoadSource = between('  function serviceLoad(){', '  let serviceData=serviceLoad();');
+
 const updateSharedLocalSource = between('  window.kgeuUpdateSharedServiceDataLocal=function(data){', '  window.kgeuApplySharedServiceData=function(data,updatedAt){');
 const saveSharedServiceSource = between('  function saveSharedServiceData(data, resetFormKind) {', '  function sharedServiceNewId(prefix) {');
 
@@ -444,6 +446,33 @@ function cleanDirtyJournalSeed() {
     })
   };
 }
+
+test('startup serviceLoad does not rewrite primary cache when journal is present or unreadable', () => {
+  const original = Object.assign(withTask('startup-dirty', 'Startup dirty'), { version: 1, schemaVersion: 1 });
+  const raw = JSON.stringify(original);
+  for (const mode of ['present', 'unreadable']) {
+    const storage = createStorage({
+      [KEYS.student]: raw,
+      [JOURNAL_KEY]: JSON.stringify({ version: 1, dirty: true, createdAt: 10, reason: 'test' })
+    }, mode === 'unreadable' ? { failReads: { [JOURNAL_KEY]: [1] } } : {});
+    const factory = new Function('storage', [
+      'const localStorage = storage;',
+      "const STUDENT_SERVICE_KEY = 'kgeu_student_service_v1';",
+      "const STUDENT_SERVICE_BACKUP_KEY = 'kgeu_student_service_backup_v1';",
+      "const STUDENT_SERVICE_SCHEMA = 4;",
+      "const window = { KGEU_VK_PLATFORM: true };",
+      "function serviceEmptyData() { return " + JSON.stringify(emptyService()) + "; }",
+      "function serviceNormalizeData(value) { return Object.assign({}, value, { schemaVersion: 4 }); }",
+      serviceLoadSource,
+      "return serviceLoad();"
+    ].join('\n'));
+    const loaded = factory(storage);
+    assert.equal(loaded.tasks[0].id, 'startup-dirty');
+    assert.equal(storage.map.get(KEYS.student), raw, mode);
+    assert.equal(storage.writes.get(KEYS.student) || 0, 0, mode);
+    assert.equal(storage.map.has(KEYS.serviceBackup), false, mode);
+  }
+});
 
 test('real serviceSave aborts before primary cache write when durable journal write cannot be verified', () => {
   const storage = createStorage(cleanDirtyJournalSeed(), { failWrites: { [JOURNAL_KEY]: [1] } });
