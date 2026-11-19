@@ -1762,13 +1762,13 @@ function notificationKey(
 
 async function sendDailyNotifications(
   env,
-  now = new Date()
+  now = new Date(),
+  users = null
 ) {
   const date =
     isoDateInMoscow(now);
 
-  const users =
-    await listUsers(env);
+  users = users || await listUsers(env);
 
   const byGroup =
     new Map();
@@ -1888,7 +1888,8 @@ function isReminderDue(diff) {
 
 async function sendReminders(
   env,
-  now = new Date()
+  now = new Date(),
+  users = null
 ) {
   const parts =
     moscowParts(now);
@@ -1900,8 +1901,7 @@ async function sendReminders(
     parts.hour * 60 +
     parts.minute;
 
-  const users =
-    await listUsers(env);
+  users = users || await listUsers(env);
 
   const byGroup =
     new Map();
@@ -2252,13 +2252,13 @@ async function processPersonalReminders(env, now = Date.now()) {
 
 async function sendChangeNotifications(
   env,
-  now = new Date()
+  now = new Date(),
+  users = null
 ) {
   const date =
     isoDateInMoscow(now);
 
-  const users =
-    await listUsers(env);
+  users = users || await listUsers(env);
 
   const byGroup =
     new Map();
@@ -2480,24 +2480,36 @@ async function runCron(env) {
     JSON.stringify(parts)
   );
 
+  // Read the user directory once per cron tick, not once per notification job.
+  let users;
+  try {
+    users = await listUsers(env);
+  } catch (e) {
+    console.error("CRON USER LOAD FAILED; notification jobs skipped:", e?.stack || e);
+    return;
+  }
+
   if (
     parts.hour === DAILY_HOUR &&
     parts.minute < CRON_MINUTES
   ) {
     await sendDailyNotifications(
       env,
-      now
+      now,
+      users
     );
   }
 
   await sendReminders(
     env,
-    now
+    now,
+    users
   );
 
   await sendChangeNotifications(
     env,
-    now
+    now,
+    users
   );
 
   await processPersonalReminders(
