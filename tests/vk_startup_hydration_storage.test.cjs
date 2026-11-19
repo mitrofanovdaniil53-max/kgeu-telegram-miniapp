@@ -17,6 +17,7 @@ function between(start, end) {
 }
 
 const sharedMetaSource = between('  function readMeta()', '  function getDeviceId()');
+const legacyMetaSource = between('  function readLegacyServiceSyncMetaForSharedSync()', '  function backupVkServiceCacheBeforeHydration()');
 const cacheSource = between('  function readCachedService()', '  function hasMeaningfulServiceData(data)');
 const stableCompareSource = between('  function stableServiceValue(value)', '  // Merge pre-existing VK-local records');
 const hydrationSource = between('  function backupVkServiceCacheBeforeHydration()', '  async function syncNow(reason)');
@@ -113,9 +114,10 @@ function createHarness(options = {}) {
     applySource,
     "window.kgeuSetSharedServiceDataInMemory=function(data){try{serviceData=serviceNormalizeData(data||serviceEmptyData());return true;}catch(e){return false;}};",
     sharedMetaSource,
+    legacyMetaSource,
     cacheSource,
     hydrationSource,
-    "return { readMeta, writeMeta, readCachedService, readCachedServiceState, writeCachedService, backupVkServiceCacheBeforeHydration, restoreVkServiceCacheAfterFailedHydration, applyCloudServiceDataSafely, getMemory:()=>serviceData, statuses, unsafe:()=>serviceHydrationUnsafe, window };"
+    "return { readMeta, writeMeta, readLegacyServiceSyncMetaForSharedSync, readCachedService, readCachedServiceState, writeCachedService, backupVkServiceCacheBeforeHydration, restoreVkServiceCacheAfterFailedHydration, applyCloudServiceDataSafely, getMemory:()=>serviceData, statuses, unsafe:()=>serviceHydrationUnsafe, window };"
   ].join('\n'));
   return { storage, ...factory(storage, local) };
 }
@@ -141,6 +143,10 @@ test('legacy metadata with valid old fields remains readable; malformed legacy m
   assert.equal(h.readCachedServiceState().valid, true);
   const raw = h.storage.map.get(KEYS.legacyMeta);
   assert.deepEqual(JSON.parse(raw), { dirty: false, lastServerSync: 10 });
+  h.storage.map.set(KEYS.legacyMeta, JSON.stringify({ dirty: 'false' }));
+  assert.equal(h.readLegacyServiceSyncMetaForSharedSync().valid, false);
+  h.storage.map.set(KEYS.legacyMeta, JSON.stringify({ dirty: false, lastServerSync: '10' }));
+  assert.equal(h.readLegacyServiceSyncMetaForSharedSync().valid, false);
 });
 
 test('backup failure prevents the real application apply function from running', () => {
@@ -181,7 +187,7 @@ test('real apply path detects silent cache writes through read-back verification
 });
 
 test('rollback attempts every key independently and reports a failed key', () => {
-  const keys = [KEYS.student, KEYS.cache, KEYS.legacyMeta, KEYS.serviceMeta, KEYS.sharedMeta];
+  const keys = [KEYS.student, KEYS.cache, KEYS.serviceMeta, KEYS.sharedMeta];
   for (const failedKey of keys) {
     const h = createHarness({ faults: { failWrites: { [failedKey]: [1] } } });
     assert.equal(h.backupVkServiceCacheBeforeHydration(), true);
@@ -227,4 +233,15 @@ test('a recoverable hydration error can be retried after storage recovers', () =
   assert.equal(h.getMemory().tasks[0].id, 'cloud-8');
   assert.equal(JSON.parse(h.storage.map.get(KEYS.student)).tasks[0].id, 'cloud-8');
   assert.equal(JSON.parse(h.storage.map.get(KEYS.cache)).tasks[0].id, 'cloud-8');
+});
+
+
+test('rollback detects a silent restore write that fails read-back', () => {
+  const h = createHarness();
+  assert.equal(h.backupVkServiceCacheBeforeHydration(), true);
+  h.storage.map.set(KEYS.sharedMeta, '"changed"');
+  h.storage.setFaults({ silentWrites: { [KEYS.sharedMeta]: [1] } });
+  const result = h.restoreVkServiceCacheAfterFailedHydration(KEYS.backup);
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.some(item => item.key === KEYS.sharedMeta));
 });
