@@ -960,6 +960,7 @@ class VkSyncInFlightEditRegressionTest(unittest.TestCase):
         script = "\n".join([
             "const assert = require('node:assert/strict');",
             "let busy = false, scheduled = 0, resolvePost, postedPayload = null;",
+            "let serviceHydrationUnsafe = false;",
             "let kgeuPersonalData = { version: 1, notes: { keep: 'old value' } };",
             "let metaStore = { deviceId: 'vk-test', lastServerRevision: 1, lastSyncAt: 1, initialized: true, dirty: true, dirtyNotes: [], dirtyProfile: false, dirtyService: true, localChangeVersion: 0 };",
             "const serviceCache = { tasks: [], deadlines: [], events: [], hostel: { work: [], social: [] } };",
@@ -977,6 +978,8 @@ class VkSyncInFlightEditRegressionTest(unittest.TestCase):
             "function localPersonal() { return JSON.parse(JSON.stringify(kgeuPersonalData)); }",
             "function readProfile() { return {}; }",
             "function readCachedService() { return serviceCache; }",
+            "function readCachedServiceState() { return { valid: true, exists: true, data: serviceCache }; }",
+            "function readLegacyServiceSyncMetaForSharedSync() { return { exists: true, valid: true, dirty: true }; }",
             "function hasMeaningfulServiceData() { return false; }",
             "function sameServiceContent() { return true; }",
             "function mergeNotes(cloud, local) { return { personalData: local, addedLocalNotes: false, conflicts: 0 }; }",
