@@ -13,7 +13,7 @@ test('personal reminder API validates signed Telegram Mini App data', () => {
 
 test('personal reminders are isolated by Telegram account and capped', () => {
   assert.ok(worker.includes('personalReminderKey(tgUser.id, id)'));
-  assert.ok(worker.includes('existingNames.length>=50'));
+  assert.ok(worker.includes('newNames.length+legacyCount>=50'));
   assert.ok(worker.includes("!['GET', 'POST', 'DELETE'].includes(request.method)"));
 });
 
