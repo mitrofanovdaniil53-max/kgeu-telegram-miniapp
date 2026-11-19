@@ -110,6 +110,7 @@ function createHarness(options = {}) {
     "function serviceNormalizeData(value) { return JSON.parse(JSON.stringify(value || serviceEmptyData())); }",
     "function serviceRefreshVisibleView() {}",
     stableCompareSource,
+    hasMeaningfulServiceSource,
     serviceBackupSource,
     serviceMetaSource,
     applySource,
