@@ -96,7 +96,7 @@ test('rollback reports missing or malformed backup without claiming success', ()
 
 test('rollback read-back failure is detected independently for every restored key', () => {
   for (const key of [keys.student, keys.cache, keys.sync, keys.meta]) {
-    const h = harness({ failGet: { key, at: 2 } });
+    const h = harness({ failGet: { key, at: key === keys.sync ? 3 : 2 } });
     assert.equal(h.api.backupVkServiceCacheBeforeHydration(), true);
     for (const target of [keys.student, keys.cache, keys.sync, keys.meta]) h.map.set(target, '"cloud"');
     const result = h.api.restoreVkServiceCacheAfterFailedHydration(keys.backup);
@@ -128,7 +128,7 @@ test('rollback continues after multiple simultaneous errors and reports each one
   const h = harness({
     failSet: { key: keys.student, at: 1 },
     silentSet: { key: keys.cache, at: 1 },
-    failGet: { key: keys.sync, at: 2 }
+    failGet: { key: keys.sync, at: 3 }
   });
   assert.equal(h.api.backupVkServiceCacheBeforeHydration(), true);
   for (const target of [keys.student, keys.cache, keys.sync, keys.meta]) h.map.set(target, '"cloud"');
