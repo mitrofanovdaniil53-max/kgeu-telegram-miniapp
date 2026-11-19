@@ -136,7 +136,7 @@ function createHarness(options = {}) {
     ${syncSource}
     return { syncNow };
   `);
-  return { state, ...factory(state, helperSource, syncSource) };
+  return { state, ...factory(state, helperSource, syncSource, clone) };
 }
 
 test('empty clean cache hydrates non-empty cloud state at the same revision', async () => {
