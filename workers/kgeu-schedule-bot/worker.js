@@ -165,6 +165,8 @@ async function answerCallback(env, id, text) {
 // ──────────────────── KV helpers ────────────────────
 
 // Explicit KV read states. READ_ERROR is never interpreted as NOT_FOUND.
+async function kvPut(kv,key,value,options){try{return await kv.put(key,value,options);}catch(error){const wrapped=new Error("KGEU_STORAGE_UNAVAILABLE: KV put failed for "+key);wrapped.code="KGEU_STORAGE_UNAVAILABLE";wrapped.cause=error;throw wrapped;}}
+async function kvDelete(kv,key){try{return await kv.delete(key);}catch(error){const wrapped=new Error("KGEU_STORAGE_UNAVAILABLE: KV delete failed for "+key);wrapped.code="KGEU_STORAGE_UNAVAILABLE";wrapped.cause=error;throw wrapped;}}
 async function readKvState(kv,key,type){try{const value=type?await kv.get(key,type):await kv.get(key);return value===null||value===undefined?{status:"NOT_FOUND"}:{status:"FOUND",value};}catch(error){return{status:"READ_ERROR",error};}}
 function requireKvRead(state,key){if(state.status==="READ_ERROR"){const error=new Error("KGEU_STORAGE_UNAVAILABLE: KV read failed for "+key);error.code="KGEU_STORAGE_UNAVAILABLE";error.cause=state.error;throw error;}return state;}
 async function listKvKeys(kv,prefix,maxKeys=10000){const names=[],seen=new Set();let cursor;do{const page=await kv.list({prefix,cursor,limit:1000});if(!page||!Array.isArray(page.keys)||typeof page.list_complete!=="boolean")throw new Error("KV_LIST_INCOMPLETE: "+prefix);for(const item of page.keys){if(!item||typeof item.name!=="string"||!item.name.startsWith(prefix))throw new Error("KV_LIST_INCOMPLETE: "+prefix);names.push(item.name);if(names.length>maxKeys)throw new Error("KV_SCAN_BOUND_EXCEEDED: "+prefix);}if(page.list_complete)break;if(!page.cursor||seen.has(page.cursor))throw new Error("KV_LIST_INCOMPLETE: "+prefix);seen.add(page.cursor);cursor=page.cursor;}while(true);return names;}
@@ -204,7 +206,7 @@ async function saveUser(env, user) {
     dailyNotifications: daily, reminderNotifications: reminder, changeNotifications: change,
     createdAt: user.createdAt || Date.now()
   };
-  await env.KGEU_SCHEDULE.put(key, JSON.stringify(data));
+  await kvPut(env.KGEU_SCHEDULE, key, JSON.stringify(data));
   return data;
 }
 
@@ -233,7 +235,7 @@ async function markSent(
   key,
   ttlSeconds = 60 * 60 * 36
 ) {
-  await env.KGEU_SCHEDULE.put(
+  await kvPut(env.KGEU_SCHEDULE, 
     key,
     '1',
     {
@@ -1016,7 +1018,7 @@ async function handleSchedule(
       }
     );
 
-  } catch (e) {
+  } catch (e) { if (e?.code === "KGEU_STORAGE_UNAVAILABLE") throw e;
     console.error(
       'schedule error',
       e
@@ -1253,7 +1255,7 @@ if (data === 'notify:daily' || data === 'notify:reminder' || data === 'notify:ch
         }
       );
 
-    } catch (e) {
+    } catch (e) { if (e?.code === "KGEU_STORAGE_UNAVAILABLE") throw e;
       console.error(
         e
       );
@@ -1298,7 +1300,7 @@ if (data === 'notify:daily' || data === 'notify:reminder' || data === 'notify:ch
         }
       );
 
-    } catch (e) {
+    } catch (e) { if (e?.code === "KGEU_STORAGE_UNAVAILABLE") throw e;
       console.error(
         e
       );
@@ -1353,7 +1355,7 @@ if (data === 'notify:daily' || data === 'notify:reminder' || data === 'notify:ch
         }
       );
 
-    } catch (e) {
+    } catch (e) { if (e?.code === "KGEU_STORAGE_UNAVAILABLE") throw e;
       console.error(
         e
       );
@@ -1441,7 +1443,7 @@ if (data === 'notify:daily' || data === 'notify:reminder' || data === 'notify:ch
         }
       );
 
-    } catch (e) {
+    } catch (e) { if (e?.code === "KGEU_STORAGE_UNAVAILABLE") throw e;
       console.error(
         e
       );
@@ -1527,7 +1529,7 @@ async function handleMessage(
         }
       );
 
-    } catch (e) {
+    } catch (e) { if (e?.code === "KGEU_STORAGE_UNAVAILABLE") throw e;
       console.error(e);
 
       await sendMessage(
@@ -1709,7 +1711,7 @@ async function processGroupNotifications(env, groupId, users, todayStr, tomorrow
     const lessons = await fetchSchedule(groupId, todayStr);
     todayLessons = lessons.filter(l => String(l['дата'] || '').slice(0, 10) === todayStr)
       .sort((a, b) => String(a['начало'] || '').localeCompare(String(b['начало'] || '')));
-  } catch (e) {
+  } catch (e) { if (e?.code === "KGEU_STORAGE_UNAVAILABLE") throw e;
     console.error('fetch today failed group', groupId, e);
     return;
   }
@@ -1720,7 +1722,7 @@ async function processGroupNotifications(env, groupId, users, todayStr, tomorrow
     const lessons = await fetchSchedule(groupId, tomorrowStr);
     tomorrowLessons = lessons.filter(l => String(l['дата'] || '').slice(0, 10) === tomorrowStr);
     tomorrowFetched = true;
-  } catch (e) {
+  } catch (e) { if (e?.code === "KGEU_STORAGE_UNAVAILABLE") throw e;
     console.error('fetch tomorrow failed group', groupId, e);
   }
 
@@ -1736,7 +1738,7 @@ async function processGroupNotifications(env, groupId, users, todayStr, tomorrow
     const snapshotKey = `schedule-snapshot:${groupId}:${dateStr}`;
     const previous = await env.KGEU_SCHEDULE.get(snapshotKey);
     if (previous === null) {
-      await env.KGEU_SCHEDULE.put(snapshotKey, signature, { expirationTtl: 3 * 24 * 60 * 60 });
+      await kvPut(env.KGEU_SCHEDULE, snapshotKey, signature, { expirationTtl: 3 * 24 * 60 * 60 });
       return;
     }
     if (previous === signature) return;
@@ -1750,12 +1752,12 @@ async function processGroupNotifications(env, groupId, users, todayStr, tomorrow
           `🔄 <b>Изменение расписания</b>\nВ расписании группы <b>${esc(user.groupName || groupId)}</b> обнаружены изменения на ${formatRuDate(dateStr)}.\n\nОткрой Mini App, чтобы посмотреть актуальное расписание.`);
         if (result && result.ok) await markSent(env, key, 3 * 24 * 60 * 60);
         else allDelivered = false;
-      } catch (error) {
+      } catch (error) { if (error?.code === "KGEU_STORAGE_UNAVAILABLE") throw error;
         allDelivered = false;
         console.error('schedule change notification failed', user.telegramId, error);
       }
     }
-    if (allDelivered) await env.KGEU_SCHEDULE.put(snapshotKey, signature, { expirationTtl: 3 * 24 * 60 * 60 });
+    if (allDelivered) await kvPut(env.KGEU_SCHEDULE, snapshotKey, signature, { expirationTtl: 3 * 24 * 60 * 60 });
   }
 
   await checkChanges(todayStr, todayLessons);
@@ -1790,7 +1792,7 @@ async function sendDailyNotifications(env, users, dateStr) {
   for (const [groupId, groupUsers] of byGroup) {
     let lessons;
     try { lessons = await fetchSchedule(Number(groupId), dateStr); }
-    catch (e) { console.error('daily schedule fetch failed', groupId, e); continue; }
+    catch (e) { if (e?.code === "KGEU_STORAGE_UNAVAILABLE") throw e; console.error('daily schedule fetch failed', groupId, e); continue; }
     const dayLessons = lessons.filter(l => String(l['дата'] || '').slice(0, 10) === dateStr)
       .sort((a, b) => String(a['начало'] || '').localeCompare(String(b['начало'] || '')));
     for (const user of groupUsers) {
@@ -1809,7 +1811,7 @@ function personalReminderKey(telegramId, reminderId) {
 
 async function processPersonalReminders(env,now=Date.now()){
  const names=[...await listKvKeys(env.KGEU_SCHEDULE,"telegram:personal-reminder:"),...await listKvKeys(env.KGEU_SCHEDULE,"personal-reminder:")];
- for(const name of [...new Set(names)]){const state=requireKvRead(await readKvState(env.KGEU_SCHEDULE,name,"json"),name);if(state.status==="NOT_FOUND")continue;const reminder=state.value;if(reminder&&reminder.vkId!=null&&reminder.telegramId==null)continue;if(!reminder||!/^\d+$/.test(String(reminder.telegramId||""))||!Number.isFinite(Number(reminder.fireAt)))throw new Error("PERSONAL_REMINDER_STATE_INVALID: "+name);const id=name.startsWith("telegram:personal-reminder:")?name.slice("telegram:personal-reminder:".length).split(":")[0]:name.slice("personal-reminder:".length).split(":")[0];if(String(reminder.telegramId)!==id)throw new Error("PERSONAL_REMINDER_ID_MISMATCH: "+name);const fireAt=Number(reminder.fireAt);if(fireAt>now)continue;if(fireAt<now-10*60*1000){await env.KGEU_SCHEDULE.delete(name);continue;}const text=`🔔 <b>Напоминание</b>\\n\\n<b>${esc(reminder.title)}</b>\\n📅 ${esc(formatRuDate(reminder.date))} · ${esc(reminder.time)}`+(reminder.note?`\\n\\n${esc(reminder.note)}`:"");const result=await sendMessage(env,reminder.telegramId,text);if(result&&result.ok)await env.KGEU_SCHEDULE.delete(name);}
+ for(const name of [...new Set(names)]){const state=requireKvRead(await readKvState(env.KGEU_SCHEDULE,name,"json"),name);if(state.status==="NOT_FOUND")continue;const reminder=state.value;if(reminder&&reminder.vkId!=null&&reminder.telegramId==null)continue;if(!reminder||!/^\d+$/.test(String(reminder.telegramId||""))||!Number.isFinite(Number(reminder.fireAt)))throw new Error("PERSONAL_REMINDER_STATE_INVALID: "+name);const id=name.startsWith("telegram:personal-reminder:")?name.slice("telegram:personal-reminder:".length).split(":")[0]:name.slice("personal-reminder:".length).split(":")[0];if(String(reminder.telegramId)!==id)throw new Error("PERSONAL_REMINDER_ID_MISMATCH: "+name);const fireAt=Number(reminder.fireAt);if(fireAt>now)continue;if(fireAt<now-10*60*1000){await kvDelete(env.KGEU_SCHEDULE, name);continue;}const text=`🔔 <b>Напоминание</b>\\n\\n<b>${esc(reminder.title)}</b>\\n📅 ${esc(formatRuDate(reminder.date))} · ${esc(reminder.time)}`+(reminder.note?`\\n\\n${esc(reminder.note)}`:"");const result=await sendMessage(env,reminder.telegramId,text);if(result&&result.ok)await kvDelete(env.KGEU_SCHEDULE, name);}
 }
 
 async function runNotificationsJob(env) {
@@ -1819,7 +1821,7 @@ async function runNotificationsJob(env) {
   console.log('cron start', todayStr, 'min', nowMin, 'hour', parts.hour);
   let users;
   try { users = await listUsers(env); }
-  catch (e) { console.error('listUsers failed', e); return; }
+  catch (e) { if (e?.code === "KGEU_STORAGE_UNAVAILABLE") throw e; console.error('listUsers failed', e); return; }
   if (parts.hour === DAILY_HOUR && parts.minute < 5) await sendDailyNotifications(env, users, todayStr);
   const byGroup = new Map();
   for (const user of users) {
@@ -1831,7 +1833,7 @@ async function runNotificationsJob(env) {
   }
   for (const [gid, groupUsers] of byGroup.entries()) {
     try { await processGroupNotifications(env, Number(gid), groupUsers, todayStr, addDaysMoscow(todayStr, 1), nowMin); }
-    catch (e) { console.error('processGroup failed', gid, e); }
+    catch (e) { if (e?.code === "KGEU_STORAGE_UNAVAILABLE") throw e; console.error('processGroup failed', gid, e); }
   }
   console.log('cron done');
 }
@@ -1885,7 +1887,7 @@ async function handleWebhook(
       );
     }
 
-  } catch (e) {
+  } catch (e) { if (e?.code === "KGEU_STORAGE_UNAVAILABLE") throw e;
     console.error(
       'update handler error',
       e
@@ -1967,7 +1969,7 @@ async function handleMiniAppReminders(request, env) {
     if(newNames.length+legacyCount>=50)return miniAppJson(request,{ok:false,error:'reminder_limit_reached'},429);
     const id = crypto.randomUUID();
     const reminder = { id, telegramId: String(tgUser.id), title, note, date, time, fireAt, createdAt: Date.now() };
-    await env.KGEU_SCHEDULE.put(personalReminderKey(tgUser.id, id), JSON.stringify(reminder), { expirationTtl: 366 * 24 * 60 * 60 });
+    await kvPut(env.KGEU_SCHEDULE, personalReminderKey(tgUser.id, id), JSON.stringify(reminder), { expirationTtl: 366 * 24 * 60 * 60 });
     return miniAppJson(request, { ok: true, reminder }, 201);
   }
   const id = String(new URL(request.url).searchParams.get('id') || '');
@@ -1976,7 +1978,7 @@ async function handleMiniAppReminders(request, env) {
   if(state.status==='NOT_FOUND'){key=legacyPrefix+id;state=requireKvRead(await readKvState(env.KGEU_SCHEDULE,key,'json'),key);}
   if(state.status==='NOT_FOUND')return miniAppJson(request,{ok:false,error:'reminder_not_found'},404);
   if(!state.value||String(state.value.telegramId)!==String(tgUser.id))throw new Error('PERSONAL_REMINDER_ID_MISMATCH: '+key);
-  await env.KGEU_SCHEDULE.delete(key);
+  await kvDelete(env.KGEU_SCHEDULE, key);
   return miniAppJson(request, { ok: true, deleted: true });
 }
 
