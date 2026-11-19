@@ -21,9 +21,16 @@ const DAILY_HOUR = 7;
 const REMINDER_MINUTES = 15;
 const CRON_MINUTES = 5;
 
-const USER_PREFIX = "user:";
+const USER_PREFIX = "vk:user:";
+const LEGACY_USER_PREFIX = "user:";
 const GROUP_CACHE_KEY = "cache:groups";
 const GROUP_CACHE_TTL = 6 * 60 * 60 * 1000;
+
+// Explicit KV read states; READ_ERROR must never be interpreted as NOT_FOUND.
+async function readKvState(kv,key,type){try{const value=type?await kv.get(key,type):await kv.get(key);return value===null||value===undefined?{status:"NOT_FOUND"}:{status:"FOUND",value};}catch(error){return{status:"READ_ERROR",error};}}
+function requireKvRead(state,key){if(state.status==="READ_ERROR"){const error=new Error("KV_READ_ERROR: "+key);error.code="KV_READ_ERROR";error.cause=state.error;throw error;}return state;}
+async function listKvKeys(kv,prefix,maxKeys=10000){const names=[],seen=new Set();let cursor;do{const page=await kv.list({prefix,cursor,limit:1000});if(!page||!Array.isArray(page.keys)||typeof page.list_complete!=="boolean")throw new Error("KV_LIST_INCOMPLETE: "+prefix);for(const item of page.keys){if(!item||typeof item.name!=="string"||!item.name.startsWith(prefix))throw new Error("KV_LIST_INCOMPLETE: "+prefix);names.push(item.name);if(names.length>maxKeys)throw new Error("KV_SCAN_BOUND_EXCEEDED: "+prefix);}if(page.list_complete)break;if(!page.cursor||seen.has(page.cursor))throw new Error("KV_LIST_INCOMPLETE: "+prefix);seen.add(page.cursor);cursor=page.cursor;}while(true);return names;}
+
 
 
 /* =========================================================
@@ -79,23 +86,16 @@ function userKey(vkId) {
   return `${USER_PREFIX}${vkId}`;
 }
 
-async function getUser(env, vkId) {
-  if (!env.KGEU_VK_USERS) {
-    throw new Error("KV binding KGEU_VK_USERS is missing");
-  }
-
-  try {
-    const raw = await env.KGEU_VK_USERS.get(userKey(vkId));
-
-    if (!raw) {
-      return null;
-    }
-
-    return JSON.parse(raw);
-  } catch (e) {
-    console.error("getUser ERROR:", e?.stack || e);
-    return null;
-  }
+async function getUser(env,vkId){
+ if(!env.KGEU_VK_USERS)throw new Error("KV binding KGEU_VK_USERS is missing");
+ const id=String(vkId),key=userKey(id),current=requireKvRead(await readKvState(env.KGEU_VK_USERS,key),key);
+ if(current.status==="FOUND"){const user=JSON.parse(current.value);if(!user||String(user.vkId)!==id)throw new Error("USER_PROFILE_ID_MISMATCH: "+key);return user;}
+ const legacyKey=`user:${id}`,legacy=requireKvRead(await readKvState(env.KGEU_VK_USERS,legacyKey),legacyKey);
+ if(legacy.status==="NOT_FOUND")return null;
+ const user=JSON.parse(legacy.value);
+ if(user&&String(user.vkId)===id)return user;
+ if(user&&user.telegramId!=null&&user.vkId==null)return null;
+ throw new Error("LEGACY_USER_PROFILE_UNVERIFIABLE: "+legacyKey);
 }
 
 async function saveUser(env, user) {
@@ -149,51 +149,13 @@ async function saveUser(env, user) {
   return clean;
 }
 
-async function ensureUser(env, msg) {
-  const vkId = Number(msg.from_id);
-
-  if (!Number.isFinite(vkId) || vkId <= 0) {
-    throw new Error(
-      `Invalid VK user id: ${msg.from_id}`
-    );
-  }
-
-  let user = await getUser(env, vkId);
-
-  if (!user) {
-    user = await saveUser(env, {
-      vkId,
-
-      firstName:
-        msg.first_name || null,
-
-      lastName:
-        msg.last_name || null,
-
-      username: null,
-
-      notifications: true,
-      dailyNotifications: true,
-      reminderNotifications: true,
-      changeNotifications: true,
-    });
-  } else {
-    user.firstName =
-      msg.first_name || user.firstName;
-
-    user.lastName =
-      msg.last_name || user.lastName;
-
-    user = await saveUser(env, user);
-  }
-
-  return user;
+async function ensureUser(env,msg){
+ const vkId=Number(msg.from_id);if(!Number.isFinite(vkId)||vkId<=0)throw new Error(`Invalid VK user id: ${msg.from_id}`);
+ const user=await getUser(env,vkId);
+ if(!user){const error=new Error("PROFILE_CREATE_REQUIRES_ATOMIC_COORDINATOR");error.code="PROFILE_CREATE_REQUIRES_ATOMIC_COORDINATOR";throw error;}
+ user.firstName=msg.first_name||user.firstName;user.lastName=msg.last_name||user.lastName;
+ return await saveUser(env,user);
 }
-
-
-/* =========================================================
-   VK API
-========================================================= */
 
 async function vkApi(env, method, params = {}) {
   if (!env.VK_TOKEN) {
@@ -590,80 +552,17 @@ function normalizeGroups(raw) {
     );
 }
 
-async function loadGroups(env) {
-  if (!env.KGEU_VK_USERS) {
-    throw new Error(
-      "KV binding KGEU_VK_USERS is missing"
-    );
-  }
-
-  const cached =
-    await env.KGEU_VK_USERS.get(
-      GROUP_CACHE_KEY
-    );
-
-  if (cached) {
-    try {
-      const obj =
-        JSON.parse(cached);
-
-      if (
-        obj.ts &&
-        Date.now() - obj.ts <
-          GROUP_CACHE_TTL &&
-        Array.isArray(obj.groups)
-      ) {
-        return obj.groups;
-      }
-    } catch (e) {
-      console.error(
-        "GROUP CACHE PARSE ERROR:",
-        e
-      );
-    }
-  }
-
-  const response = await fetch(
-    API_GROUPS,
-    {
-      cf: {
-        cacheTtl: 3600,
-        cacheEverything: true,
-      },
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      `Groups API HTTP ${response.status}`
-    );
-  }
-
-  const json =
-    await response.json();
-
-  const groups =
-    normalizeGroups(json);
-
-  if (!groups.length) {
-    throw new Error(
-      "Group directory is empty"
-    );
-  }
-
-  await env.KGEU_VK_USERS.put(
-    GROUP_CACHE_KEY,
-    JSON.stringify({
-      ts: Date.now(),
-      groups,
-    }),
-    {
-      expirationTtl:
-        12 * 60 * 60,
-    }
-  );
-
-  return groups;
+async function loadGroups(env){
+ if(!env.KGEU_VK_USERS)throw new Error("KV binding KGEU_VK_USERS is missing");
+ const cache=await readKvState(env.KGEU_VK_USERS,GROUP_CACHE_KEY);
+ if(cache.status==="FOUND"){try{const obj=JSON.parse(cache.value);if(obj&&obj.ts&&Array.isArray(obj.groups)&&Date.now()-obj.ts<GROUP_CACHE_TTL)return obj.groups;}catch(error){console.error("GROUP CACHE INVALID; using upstream",error);}}
+ else if(cache.status==="READ_ERROR")console.error("GROUP CACHE READ_ERROR; using upstream",cache.error);
+ const response=await fetch(API_GROUPS,{cf:{cacheTtl:3600,cacheEverything:true}});
+ if(!response.ok)throw new Error(`Groups API HTTP ${response.status}`);
+ const groups=normalizeGroups(await response.json());
+ if(!groups.length)throw new Error("Group directory is empty");
+ // KV has no conditional put: never write a cache entry after a racy miss.
+ return groups;
 }
 
 function uniqueFaculties(groups) {
@@ -2122,15 +2021,14 @@ async function handlePersonalReminders(request, env) {
   const prefix = PERSONAL_REMINDER_PREFIX + vkId + ":";
   if (request.method === "GET") {
     const reminders = [];
-    let cursor;
-    do {
-      const page = await env.KGEU_VK_USERS.list({ prefix, cursor, limit: 1000 });
-      for (const item of page.keys || []) {
-        const reminder = await env.KGEU_VK_USERS.get(item.name, "json");
-        if (reminder && Number(reminder.fireAt) > Date.now()) reminders.push(reminder);
-      }
-      cursor = page.list_complete ? undefined : page.cursor;
-    } while (cursor);
+    const names = [...await listKvKeys(env.KGEU_VK_USERS, prefix), ...await listKvKeys(env.KGEU_VK_USERS, LEGACY_PERSONAL_REMINDER_PREFIX + vkId + ":")];
+    for (const name of [...new Set(names)]) {
+      const state = requireKvRead(await readKvState(env.KGEU_VK_USERS, name, "json"), name);
+      if (state.status === "NOT_FOUND") throw new Error("KV_SCAN_INCOMPLETE: " + name);
+      const reminder = state.value;
+      if (!reminder || String(reminder.vkId) !== String(vkId) || !Number.isFinite(Number(reminder.fireAt))) throw new Error("PERSONAL_REMINDER_STATE_INVALID: " + name);
+      if (Number(reminder.fireAt) > Date.now()) reminders.push(reminder);
+    }
     reminders.sort((a, b) => Number(a.fireAt) - Number(b.fireAt));
     return personalReminderJson(request, { ok: true, reminders });
   }
@@ -2157,8 +2055,8 @@ async function handlePersonalReminders(request, env) {
       return personalReminderJson(request, { ok: false, error: "reminder_time_out_of_range" }, 400);
     }
 
-    const existing = await env.KGEU_VK_USERS.list({ prefix, limit: 100 });
-    if ((existing.keys || []).length >= 50) {
+    const existingNames = [...await listKvKeys(env.KGEU_VK_USERS, prefix), ...await listKvKeys(env.KGEU_VK_USERS, LEGACY_PERSONAL_REMINDER_PREFIX + vkId + ":")];
+    if (existingNames.length >= 50) {
       return personalReminderJson(request, { ok: false, error: "reminder_limit_reached" }, 429);
     }
 
@@ -2185,59 +2083,32 @@ async function handlePersonalReminders(request, env) {
   if (!/^[0-9a-f-]{36}$/i.test(id)) {
     return personalReminderJson(request, { ok: false, error: "invalid_reminder_id" }, 400);
   }
-  const key = personalReminderKey(vkId, id);
-  if (!await env.KGEU_VK_USERS.get(key)) {
-    return personalReminderJson(request, { ok: false, error: "reminder_not_found" }, 404);
+  let key = personalReminderKey(vkId, id);
+  let state = requireKvRead(await readKvState(env.KGEU_VK_USERS, key, "json"), key);
+  if (state.status === "NOT_FOUND") {
+    key = LEGACY_PERSONAL_REMINDER_PREFIX + vkId + ":" + id;
+    state = requireKvRead(await readKvState(env.KGEU_VK_USERS, key, "json"), key);
   }
+  if (state.status === "NOT_FOUND") return personalReminderJson(request, { ok: false, error: "reminder_not_found" }, 404);
+  if (!state.value || String(state.value.vkId) !== String(vkId)) throw new Error("PERSONAL_REMINDER_ID_MISMATCH: " + key);
   await env.KGEU_VK_USERS.delete(key);
   return personalReminderJson(request, { ok: true, deleted: true });
 }
 
-async function processPersonalReminders(env, now = Date.now()) {
-  let cursor;
-  do {
-    const page = await env.KGEU_VK_USERS.list({
-      prefix: PERSONAL_REMINDER_PREFIX,
-      cursor,
-      limit: 1000,
-    });
-    for (const item of page.keys || []) {
-      let reminder;
-      try {
-        reminder = await env.KGEU_VK_USERS.get(item.name, "json");
-      } catch (_) {
-        reminder = null;
-      }
-      if (!reminder || !/^\d+$/.test(String(reminder.vkId || "")) ||
-          !Number.isFinite(Number(reminder.fireAt))) {
-        await env.KGEU_VK_USERS.delete(item.name);
-        continue;
-      }
-      const fireAt = Number(reminder.fireAt);
-      if (fireAt > now) continue;
-      if (fireAt < now - 10 * 60 * 1000) {
-        await env.KGEU_VK_USERS.delete(item.name);
-        continue;
-      }
-
-      const message =
-        "🔔 Напоминание\n\n" +
-        String(reminder.title || "Напоминание") +
-        "\n📅 " + formatPersonalReminderDate(reminder.date) +
-        " · " + String(reminder.time || "");
-      const fullMessage = reminder.note
-        ? message + "\n\n" + String(reminder.note)
-        : message;
-
-      try {
-        await sendMessage(env, Number(reminder.vkId), fullMessage);
-        await env.KGEU_VK_USERS.delete(item.name);
-      } catch (error) {
-        console.error("PERSONAL REMINDER SEND ERROR", reminder.vkId, error?.stack || error);
-      }
-    }
-    cursor = page.list_complete ? undefined : page.cursor;
-  } while (cursor);
+async function processPersonalReminders(env,now=Date.now()){
+ const names=[...await listKvKeys(env.KGEU_VK_USERS,PERSONAL_REMINDER_PREFIX),...await listKvKeys(env.KGEU_VK_USERS,LEGACY_PERSONAL_REMINDER_PREFIX)];
+ for(const name of [...new Set(names)]){
+  const state=requireKvRead(await readKvState(env.KGEU_VK_USERS,name,"json"),name);if(state.status==="NOT_FOUND")continue;
+  const reminder=state.value;if(!reminder||!/^\\d+$/.test(String(reminder.vkId||""))||!Number.isFinite(Number(reminder.fireAt)))throw new Error("PERSONAL_REMINDER_STATE_INVALID: "+name);
+  const expected=name.startsWith(PERSONAL_REMINDER_PREFIX)?name.slice(PERSONAL_REMINDER_PREFIX.length).split(":")[0]:name.slice(LEGACY_PERSONAL_REMINDER_PREFIX.length).split(":")[0];
+  if(String(reminder.vkId)!==expected)throw new Error("PERSONAL_REMINDER_ID_MISMATCH: "+name);
+  const fireAt=Number(reminder.fireAt);if(fireAt>now)continue;
+  if(fireAt<now-10*60*1000){await env.KGEU_VK_USERS.delete(name);continue;}
+  const message="🔔 Напоминание\\n\\n"+String(reminder.title||"Напоминание")+"\\n📅 "+formatPersonalReminderDate(reminder.date)+" · "+String(reminder.time||"");
+  const full=reminder.note?message+"\\n\\n"+String(reminder.note):message;
+  await sendMessage(env,Number(reminder.vkId),full);
+  await env.KGEU_VK_USERS.delete(name);
+ }
 }
 
 /* =========================================================
@@ -2398,65 +2269,25 @@ async function sendChangeNotifications(
    USER LIST
 ========================================================= */
 
-async function listUsers(env) {
-  if (!env.KGEU_VK_USERS) {
-    throw new Error(
-      "KV binding KGEU_VK_USERS is missing"
-    );
+async function listUsers(env){
+ if(!env.KGEU_VK_USERS)throw new Error("KV binding KGEU_VK_USERS is missing");
+ const users=new Map();
+ const scan=async(prefix,legacy=false)=>{
+  const names=await listKvKeys(env.KGEU_VK_USERS,prefix);
+  for(const name of names){
+   if(legacy&&!/^user:\\d+$/.test(name))continue;
+   const state=requireKvRead(await readKvState(env.KGEU_VK_USERS,name,"json"),name);
+   if(state.status==="NOT_FOUND")throw new Error("KV_SCAN_INCOMPLETE: "+name);
+   const user=state.value;if(!user||typeof user!=="object")throw new Error("KV_SCAN_INVALID_USER: "+name);
+   if(user.telegramId!=null&&user.vkId==null){if(legacy)continue;throw new Error("KV_SCAN_PLATFORM_MISMATCH: "+name);}
+   if(user.vkId==null)throw new Error("KV_SCAN_UNVERIFIABLE_USER: "+name);
+   const id=String(user.vkId),expected=legacy?name.slice(5):name.slice(USER_PREFIX.length);
+   if(id!==expected)throw new Error("KV_SCAN_ID_MISMATCH: "+name);
+   users.set(id,user);
   }
-
-  const users = [];
-
-  let cursor;
-
-  do {
-    const page =
-      await env.KGEU_VK_USERS.list({
-        prefix:
-          USER_PREFIX,
-        cursor,
-      });
-
-    for (
-      const item of page.keys
-    ) {
-      if (
-        !item.name.startsWith(
-          USER_PREFIX
-        )
-      ) {
-        continue;
-      }
-
-      try {
-        const user =
-          await env.KGEU_VK_USERS.get(
-            item.name,
-            "json"
-          );
-
-        if (user?.vkId) {
-          users.push(user);
-        }
-      } catch (e) {
-        console.error(
-          "LIST USER PARSE ERROR",
-          item.name,
-          e?.stack || e
-        );
-      }
-    }
-
-    cursor =
-      page.list_complete
-        ? undefined
-        : page.cursor;
-
-  } while (cursor);
-
-  return users;
+ };
+ await scan(USER_PREFIX);await scan(LEGACY_USER_PREFIX,true);return [...users.values()];
 }
-
 
 /* =========================================================
    CRON
