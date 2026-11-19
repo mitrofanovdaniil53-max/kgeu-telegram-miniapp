@@ -20,6 +20,7 @@ const sharedMetaSource = between('  let sharedSyncMetadataWriteFailed = false;',
 const legacyMetaSource = between('  function readLegacyServiceSyncMetaForSharedSync()', '  function backupVkServiceCacheBeforeHydration()');
 const cacheSource = between('  function readCachedServiceState()', '  function hasMeaningfulServiceData(data)');
 const stableCompareSource = between('  function stableServiceValue(value)', '  // Merge pre-existing VK-local records');
+const hasMeaningfulServiceSource = between('  function hasMeaningfulServiceData(data)', '  function stableServiceValue(value)');
 const hydrationSource = between('  function backupVkServiceCacheBeforeHydration()', '  async function syncNow(reason)');
 const serviceMetaSource = between('  function serviceSyncMeta()', '  let serviceLocalRevision=0');
 const serviceBackupSource = between('  function serviceBackupBeforeCloudRestore(requireBackup)', '  function serviceApplyCloudSnapshot(snapshot, expectedLocalChangeVersion)');
@@ -388,6 +389,8 @@ function createDirtyJournalRuntime(storage, options = {}) {
     "function payloadForSync() { return {}; }",
     "function scheduleSync() {}",
     "function applyCloudServiceDataSafely() { state.applies = (state.applies || 0) + 1; return true; }",
+    "function kgeuFlushMigratedNoteSync() {}",
+    hasMeaningfulServiceSource,
     serviceMetaSource,
     serviceDirtySource,
     serviceSaveSource,
