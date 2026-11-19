@@ -133,6 +133,29 @@ test('saveUser avoids a fragile read-after-write verification request', async ()
   assert.equal(vkKv.calls.get.length, 0);
 });
 
+test('read failure after successful or failed put never triggers another profile write', async () => {
+  const tg = loadWorker(tgPath), vk = loadWorker(vkPath);
+  let readFails = false;
+  const tgAfterSuccess = makeKv({ failGet: () => readFails });
+  const vkAfterSuccess = makeKv({ failGet: () => readFails });
+  await tg.saveUser({ KGEU_SCHEDULE: tgAfterSuccess }, { telegramId: '91' });
+  await vk.saveUser({ KGEU_VK_USERS: vkAfterSuccess }, { vkId: 91 });
+  readFails = true;
+  await assert.rejects(tg.ensureUser({ KGEU_SCHEDULE: tgAfterSuccess }, { id: 91 }), /KGEU_STORAGE_UNAVAILABLE/);
+  await assert.rejects(vk.ensureUser({ KGEU_VK_USERS: vkAfterSuccess }, { from_id: 91 }), /KGEU_STORAGE_UNAVAILABLE/);
+  assert.equal(tgAfterSuccess.calls.put.length, 1);
+  assert.equal(vkAfterSuccess.calls.put.length, 1);
+
+  const tgAfterFailure = makeKv({ failGet: () => true, failPut: () => true });
+  const vkAfterFailure = makeKv({ failGet: () => true, failPut: () => true });
+  await assert.rejects(tg.saveUser({ KGEU_SCHEDULE: tgAfterFailure }, { telegramId: '92' }), /KGEU_STORAGE_UNAVAILABLE/);
+  await assert.rejects(vk.saveUser({ KGEU_VK_USERS: vkAfterFailure }, { vkId: 92 }), /KGEU_STORAGE_UNAVAILABLE/);
+  await assert.rejects(tg.ensureUser({ KGEU_SCHEDULE: tgAfterFailure }, { id: 92 }), /KGEU_STORAGE_UNAVAILABLE/);
+  await assert.rejects(vk.ensureUser({ KGEU_VK_USERS: vkAfterFailure }, { from_id: 92 }), /KGEU_STORAGE_UNAVAILABLE/);
+  assert.equal(tgAfterFailure.calls.put.length, 1);
+  assert.equal(vkAfterFailure.calls.put.length, 1);
+});
+
 test('VK loadGroups falls back to upstream API after KV cache read error and does not overwrite cache', async () => {
   let fetchCount = 0;
   const vk = loadWorker(vkPath, {
