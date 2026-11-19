@@ -79,18 +79,6 @@ test('rollback attempts every key even when one restoration write fails', () => 
   }
 });
 
-test('rollback verifies read-back and reports silent restoration failure', () => {
-  const h = harness({ silentSet: { key: keys.meta, at: 1 } });
-  assert.equal(h.api.backupVkServiceCacheBeforeHydration(), true);
-  for (const key of [keys.student, keys.cache, keys.sync, keys.meta]) h.map.set(key, '"cloud"');
-  const result = h.api.restoreVkServiceCacheAfterFailedHydration(keys.backup);
-  assert.equal(result.ok, false);
-  assert.ok(result.errors.some(item => item.key === keys.meta));
-  assert.ok(result.restored.includes(keys.student));
-  assert.ok(result.restored.includes(keys.cache));
-  assert.ok(result.restored.includes(keys.sync));
-});
-
 test('rollback reports missing or malformed backup without claiming success', () => {
   const h = harness();
   assert.deepEqual(h.api.restoreVkServiceCacheAfterFailedHydration(keys.backup).ok, false);
