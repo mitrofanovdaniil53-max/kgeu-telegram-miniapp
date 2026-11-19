@@ -5995,8 +5995,11 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!value || typeof value !== 'object' || Array.isArray(value)) {
         return { exists: true, valid: false, dirty: false };
       }
-      if (Object.prototype.hasOwnProperty.call(value, 'dirty') && typeof value.dirty !== 'boolean') {
-        return { exists: true, valid: false, dirty: false };
+      if (!Object.prototype.hasOwnProperty.call(value, 'dirty')) {
+        return { exists: true, valid: false, status: 'partial', dirty: false };
+      }
+      if (typeof value.dirty !== 'boolean') {
+        return { exists: true, valid: false, status: 'malformed', dirty: false };
       }
       ['lastLocalSave', 'lastServerSync'].forEach(key => {
         if (Object.prototype.hasOwnProperty.call(value, key)
